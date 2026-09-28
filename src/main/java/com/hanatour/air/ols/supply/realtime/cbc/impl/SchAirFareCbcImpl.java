@@ -539,7 +539,7 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 							//통합탭-필터설정 : 공급코드
 							this.setFilterMap(fareFltrMap, ALL_TAP, newSplyCd, newSplyCd, 0L, FltrType.SPLY_CD);
 
-							this.setCombFilterMap(fareFltrMap, newSplyCd, sAirFarCombYn , "결합" , 0L, FltrType.AIR_FAR_COMB_YN);
+							this.setCombFilterMap(fareFltrMap, newSplyCd, sAirFarCombYn , "결합", FltrType.AIR_FAR_COMB_YN);
 
 							//운임 계산용 금액/포맷문자열 - 편도결합/비결합 공통 로직은 computeFeeAmountTexts()로 추출
 							//이후 로직은 feeAmountTexts를 파라미터로 그대로 넘겨 쓰므로 개별 필드는 언패킹하지 않는다.
@@ -702,15 +702,9 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 									//------------------------------
 
 									logger.debug("yt node.itnrLst - for k=" + k++);
-									String enterTxt = "";
 									String viaEnterTxt = "";
 									if(fsi > 1){
-										enterTxt = "\n";
 										viaEnterTxt = "\n";
-									}else {
-										if(itnrSeq > 1){
-											enterTxt = "\n\n";
-										}
 									}
 
 									JsonNode fltPrcNode = fltLstNode.path("fltPrcLst").get(0);	//비행프라이싱정보
@@ -1129,7 +1123,7 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 							farIndex++;
 
 						}	//인벤토리 타입 제외
-						this.setCombFilterMap(fareFltrMap, ALL_TAP, sAirFarCombYn , "결합" , 0L, FltrType.AIR_FAR_COMB_YN);
+						this.setCombFilterMap(fareFltrMap, ALL_TAP, sAirFarCombYn , "결합", FltrType.AIR_FAR_COMB_YN);
 
 					} else {
 						//------------------------------
@@ -1183,8 +1177,8 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 						//통합탭-필터설정 : 공급코드
 						this.setFilterMap(fareFltrMap, ALL_TAP, newSplyCd, newSplyCd, 0L, FltrType.SPLY_CD);
 
-						this.setCombFilterMap(fareFltrMap, ALL_TAP, sAirFarCombYn , "미결합" , 0L, FltrType.AIR_FAR_COMB_YN);
-						this.setCombFilterMap(fareFltrMap, newSplyCd, sAirFarCombYn , "미결합" , 0L, FltrType.AIR_FAR_COMB_YN);
+						this.setCombFilterMap(fareFltrMap, ALL_TAP, sAirFarCombYn , "미결합", FltrType.AIR_FAR_COMB_YN);
+						this.setCombFilterMap(fareFltrMap, newSplyCd, sAirFarCombYn , "미결합", FltrType.AIR_FAR_COMB_YN);
 
 						sbMktAlCodes = new StringBuilder("");
 						sbOprAlCodes = new StringBuilder("");
@@ -3262,7 +3256,7 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 		}
 	}
 
-	private void setCombFilterMap(Map<String, SchAirFareResultFilterVo> fltrMap, String splyCd, String aItmCd, String aItmNm, Long adtTamt, FltrType fltrType){
+	private void setCombFilterMap(Map<String, SchAirFareResultFilterVo> fltrMap, String splyCd, String aItmCd, String aItmNm, FltrType fltrType){
 		if(StringUtil.isEmpty(aItmCd)){
 			return;
 		}
