@@ -1127,68 +1127,17 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 							String sBscAmtFmAdt = "\n기본운임 "   + sAdtBscAmtFm + " (Q "    + sAdtQchrgAmtFm + " FUEL " + sAdtFuelExchgAmtFm + " TAX "  + sAdtTaxAmt + ")" + " Total " + sAdtTamtFm;
 							String sBscAmtFmChd = "\n기본운임 "   + sChdBscAmtFm + " (Q "    + sChdQchrgAmtFm + " FUEL " + sChdFuelExchgAmtFm + " TAX "  + sChdTaxAmt + ")" + " Total " + sChdTamtFm;
 							String sBscAmtFmInf = "\n기본운임 "   + sInfBscAmtFm + " (Q "    + sInfQchrgAmtFm + " FUEL " + sInfFuelExchgAmtFm + " TAX "  + sInfTaxAmt + ")" + " Total " + sInfTamtFm;
-							//------------------------------------
-							// 대리점 커미션정보
-							//------------------------------------
-							sbAgtCmsnGnrlTitle = new StringBuilder("");
-							sbAgtCmsnDtcmTitle = new StringBuilder("");
-							sbAgtCmsnGnrlAdt   = new StringBuilder("");
-							sbAgtCmsnGnrlChd   = new StringBuilder("");
-							sbAgtCmsnGnrlInf   = new StringBuilder("");
-							sbAgtCmsnDtcmAdt   = new StringBuilder("");
-							sbAgtCmsnDtcmChd   = new StringBuilder("");
-							sbAgtCmsnDtcmInf   = new StringBuilder("");
+							//대리점 커미션정보 - 편도결합/비결합 공통 로직은 buildAgtCmsnTexts()로 추출
+							AgtCmsnTexts agtCmsnTexts = this.buildAgtCmsnTexts(farVoLst);
+							sbAgtCmsnGnrlTitle = agtCmsnTexts.sbAgtCmsnGnrlTitle;
+							sbAgtCmsnDtcmTitle = agtCmsnTexts.sbAgtCmsnDtcmTitle;
+							sbAgtCmsnGnrlAdt = agtCmsnTexts.sbAgtCmsnGnrlAdt;
+							sbAgtCmsnGnrlChd = agtCmsnTexts.sbAgtCmsnGnrlChd;
+							sbAgtCmsnGnrlInf = agtCmsnTexts.sbAgtCmsnGnrlInf;
+							sbAgtCmsnDtcmAdt = agtCmsnTexts.sbAgtCmsnDtcmAdt;
+							sbAgtCmsnDtcmChd = agtCmsnTexts.sbAgtCmsnDtcmChd;
+							sbAgtCmsnDtcmInf = agtCmsnTexts.sbAgtCmsnDtcmInf;
 
-							String agtCmsnSeq = StringUtil.nullConvert(farVoLst.path("agtCmsnSeq").asText());
-
-							if(StringUtil.isEmpty(agtCmsnSeq)) {
-								sbAgtCmsnGnrlTitle.append("\n일반 대리점컴 ");
-								sbAgtCmsnGnrlAdt.append(  " ADT - ");
-								sbAgtCmsnGnrlChd.append(  " CHD - ");
-								sbAgtCmsnGnrlInf.append(  " INF - ");
-								sbAgtCmsnDtcmTitle.append("\n닷컴 대리점컴 ");
-								sbAgtCmsnDtcmAdt.append(  " ADT - ");
-								sbAgtCmsnDtcmChd.append(  " CHD - ");
-								sbAgtCmsnDtcmInf.append(  " INF - ");
-							}else {
-								String agtCmsnAdtCmsnTrf = StringUtil.nullConvert(farVoLst.path("agtCmsnAdtCmsnTrf").asText());	// 대리점커미션성인커미션오율
-								String agtCmsnChdCmsnTrf = StringUtil.nullConvert(farVoLst.path("agtCmsnChdCmsnTrf").asText());	// 대리점커미션아동커미션오율
-								String agtCmsnInfCmsnTrf = StringUtil.nullConvert(farVoLst.path("agtCmsnInfCmsnTrf").asText());	// 대리점커미션유아커미션오율
-								String agtCmsnGnrlAdtAmt = StringUtil.nullConvert(farVoLst.path("agtCmsnGnrlAdtAmt").asText());	// 대리점커미션일반성인금액
-								String agtCmsnGnrlChdAmt = StringUtil.nullConvert(farVoLst.path("agtCmsnGnrlChdAmt").asText());	// 대리점커미션일반아동금액
-								String agtCmsnGnrlInfAmt = StringUtil.nullConvert(farVoLst.path("agtCmsnGnrlInfAmt").asText());	// 대리점커미션일반유아금액
-								String agtCmsnDtcmAdtAmt = StringUtil.nullConvert(farVoLst.path("agtCmsnDtcmAdtAmt").asText());	// 대리점커미션닷컴성인금액
-								String agtCmsnDtcmChdAmt = StringUtil.nullConvert(farVoLst.path("agtCmsnDtcmChdAmt").asText());	// 대리점커미션닷컴아동금액
-								String agtCmsnDtcmInfAmt = StringUtil.nullConvert(farVoLst.path("agtCmsnDtcmInfAmt").asText());	// 대리점커미션닷컴유아금액
-
-								// 대리점커미션적용방식 : R - 정률, A - 정액
-								String agtCmsnAplMthdCd = StringUtil.nullConvert(farVoLst.path("agtCmsnAplMthdCd"   ).asText());
-								if("R".equals(agtCmsnAplMthdCd)) {
-									//------------------------
-									// 정률
-									//------------------------
-									sbAgtCmsnGnrlTitle.append("\n일반 대리점컴 (No."+agtCmsnSeq+")");
-									sbAgtCmsnGnrlAdt.append( " ADT R " + agtCmsnAdtCmsnTrf +"% / " + NumberUtil.formatNumber(agtCmsnGnrlAdtAmt, "#,###,###"));
-									sbAgtCmsnGnrlChd.append(   " CHD R " + agtCmsnChdCmsnTrf +"% / " + NumberUtil.formatNumber(agtCmsnGnrlChdAmt, "#,###,###"));
-									sbAgtCmsnGnrlInf.append(   " INF R " + agtCmsnInfCmsnTrf +"% / " + NumberUtil.formatNumber(agtCmsnGnrlInfAmt, "#,###,###"));
-									sbAgtCmsnDtcmTitle.append("\n닷컴 대리점컴 (No."+agtCmsnSeq+")");
-									sbAgtCmsnDtcmAdt.append(   " ADT R " + agtCmsnAdtCmsnTrf +"% / " + NumberUtil.formatNumber(agtCmsnDtcmAdtAmt, "#,###,###"));
-									sbAgtCmsnDtcmChd.append(   " CHD R " + agtCmsnChdCmsnTrf +"% / " + NumberUtil.formatNumber(agtCmsnDtcmChdAmt, "#,###,###"));
-									sbAgtCmsnDtcmInf.append(   " INF R " + agtCmsnInfCmsnTrf +"% / " + NumberUtil.formatNumber(agtCmsnDtcmInfAmt, "#,###,###"));
-								} else if("A".equals(agtCmsnAplMthdCd)) {
-									//------------------------
-									// 정액
-									//------------------------
-									sbAgtCmsnGnrlTitle.append("\n일반 대리점컴 (No."+agtCmsnSeq+")");
-									sbAgtCmsnGnrlAdt.append(   " ADT A / " + NumberUtil.formatNumber(agtCmsnGnrlAdtAmt, "#,###,###"));
-									sbAgtCmsnGnrlChd.append(   " CHD A / " + NumberUtil.formatNumber(agtCmsnGnrlChdAmt, "#,###,###"));
-									sbAgtCmsnGnrlInf.append(   " INF A / " + NumberUtil.formatNumber(agtCmsnGnrlInfAmt, "#,###,###"));
-									sbAgtCmsnDtcmTitle.append("\n닷컴 대리점컴 (No."+agtCmsnSeq+")");
-									sbAgtCmsnDtcmAdt.append(   " ADT A / " + NumberUtil.formatNumber(agtCmsnDtcmAdtAmt, "#,###,###"));
-									sbAgtCmsnDtcmChd.append(   " CHD A / " + NumberUtil.formatNumber(agtCmsnDtcmChdAmt, "#,###,###"));
-									sbAgtCmsnDtcmInf.append(   " INF A / " + NumberUtil.formatNumber(agtCmsnDtcmInfAmt, "#,###,###"));
-								}
-							}
 
 							//--------------------------------------
 							// 발권수수료-성인원화전체금액
@@ -1993,68 +1942,17 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 						String sBscAmtFmAdt = "\n기본운임 "   + sAdtBscAmtFm + " (Q "    + sAdtQchrgAmtFm + " FUEL " + sAdtFuelExchgAmtFm + " TAX "  + sAdtTaxAmt + ")" + " Total " + sAdtTamtFm;
 						String sBscAmtFmChd = "\n기본운임 "   + sChdBscAmtFm + " (Q "    + sChdQchrgAmtFm + " FUEL " + sChdFuelExchgAmtFm + " TAX "  + sChdTaxAmt + ")" + " Total " + sChdTamtFm;
 						String sBscAmtFmInf = "\n기본운임 "   + sInfBscAmtFm + " (Q "    + sInfQchrgAmtFm + " FUEL " + sInfFuelExchgAmtFm + " TAX "  + sInfTaxAmt + ")" + " Total " + sInfTamtFm;
-						//------------------------------------
-						// 대리점 커미션정보
-						//------------------------------------
-						sbAgtCmsnGnrlTitle = new StringBuilder("");
-						sbAgtCmsnDtcmTitle = new StringBuilder("");
-						sbAgtCmsnGnrlAdt   = new StringBuilder("");
-						sbAgtCmsnGnrlChd   = new StringBuilder("");
-						sbAgtCmsnGnrlInf   = new StringBuilder("");
-						sbAgtCmsnDtcmAdt   = new StringBuilder("");
-						sbAgtCmsnDtcmChd   = new StringBuilder("");
-						sbAgtCmsnDtcmInf   = new StringBuilder("");
+						//대리점 커미션정보 - 편도결합/비결합 공통 로직은 buildAgtCmsnTexts()로 추출
+						AgtCmsnTexts agtCmsnTexts = this.buildAgtCmsnTexts(farLstNode);
+						sbAgtCmsnGnrlTitle = agtCmsnTexts.sbAgtCmsnGnrlTitle;
+						sbAgtCmsnDtcmTitle = agtCmsnTexts.sbAgtCmsnDtcmTitle;
+						sbAgtCmsnGnrlAdt = agtCmsnTexts.sbAgtCmsnGnrlAdt;
+						sbAgtCmsnGnrlChd = agtCmsnTexts.sbAgtCmsnGnrlChd;
+						sbAgtCmsnGnrlInf = agtCmsnTexts.sbAgtCmsnGnrlInf;
+						sbAgtCmsnDtcmAdt = agtCmsnTexts.sbAgtCmsnDtcmAdt;
+						sbAgtCmsnDtcmChd = agtCmsnTexts.sbAgtCmsnDtcmChd;
+						sbAgtCmsnDtcmInf = agtCmsnTexts.sbAgtCmsnDtcmInf;
 
-						String agtCmsnSeq = StringUtil.nullConvert(farLstNode.path("agtCmsnSeq").asText());
-
-						if(StringUtil.isEmpty(agtCmsnSeq)) {
-							sbAgtCmsnGnrlTitle.append("\n일반 대리점컴 ");
-							sbAgtCmsnGnrlAdt.append(  " ADT - ");
-							sbAgtCmsnGnrlChd.append(  " CHD - ");
-							sbAgtCmsnGnrlInf.append(  " INF - ");
-							sbAgtCmsnDtcmTitle.append("\n닷컴 대리점컴 ");
-							sbAgtCmsnDtcmAdt.append(  " ADT - ");
-							sbAgtCmsnDtcmChd.append(  " CHD - ");
-							sbAgtCmsnDtcmInf.append(  " INF - ");
-						}else {
-							String agtCmsnAdtCmsnTrf = StringUtil.nullConvert(farLstNode.path("agtCmsnAdtCmsnTrf").asText());	// 대리점커미션성인커미션오율
-							String agtCmsnChdCmsnTrf = StringUtil.nullConvert(farLstNode.path("agtCmsnChdCmsnTrf").asText());	// 대리점커미션아동커미션오율
-							String agtCmsnInfCmsnTrf = StringUtil.nullConvert(farLstNode.path("agtCmsnInfCmsnTrf").asText());	// 대리점커미션유아커미션오율
-							String agtCmsnGnrlAdtAmt = StringUtil.nullConvert(farLstNode.path("agtCmsnGnrlAdtAmt").asText());	// 대리점커미션일반성인금액
-							String agtCmsnGnrlChdAmt = StringUtil.nullConvert(farLstNode.path("agtCmsnGnrlChdAmt").asText());	// 대리점커미션일반아동금액
-							String agtCmsnGnrlInfAmt = StringUtil.nullConvert(farLstNode.path("agtCmsnGnrlInfAmt").asText());	// 대리점커미션일반유아금액
-							String agtCmsnDtcmAdtAmt = StringUtil.nullConvert(farLstNode.path("agtCmsnDtcmAdtAmt").asText());	// 대리점커미션닷컴성인금액
-							String agtCmsnDtcmChdAmt = StringUtil.nullConvert(farLstNode.path("agtCmsnDtcmChdAmt").asText());	// 대리점커미션닷컴아동금액
-							String agtCmsnDtcmInfAmt = StringUtil.nullConvert(farLstNode.path("agtCmsnDtcmInfAmt").asText());	// 대리점커미션닷컴유아금액
-
-							// 대리점커미션적용방식 : R - 정률, A - 정액
-							String agtCmsnAplMthdCd = StringUtil.nullConvert(farLstNode.path("agtCmsnAplMthdCd"   ).asText());
-							if("R".equals(agtCmsnAplMthdCd)) {
-								//------------------------
-								// 정률
-								//------------------------
-								sbAgtCmsnGnrlTitle.append("\n일반 대리점컴 (No."+agtCmsnSeq+")");
-								sbAgtCmsnGnrlAdt.append( " ADT R " + agtCmsnAdtCmsnTrf +"% / " + NumberUtil.formatNumber(agtCmsnGnrlAdtAmt, "#,###,###"));
-								sbAgtCmsnGnrlChd.append(   " CHD R " + agtCmsnChdCmsnTrf +"% / " + NumberUtil.formatNumber(agtCmsnGnrlChdAmt, "#,###,###"));
-								sbAgtCmsnGnrlInf.append(   " INF R " + agtCmsnInfCmsnTrf +"% / " + NumberUtil.formatNumber(agtCmsnGnrlInfAmt, "#,###,###"));
-								sbAgtCmsnDtcmTitle.append("\n닷컴 대리점컴 (No."+agtCmsnSeq+")");
-								sbAgtCmsnDtcmAdt.append(   " ADT R " + agtCmsnAdtCmsnTrf +"% / " + NumberUtil.formatNumber(agtCmsnDtcmAdtAmt, "#,###,###"));
-								sbAgtCmsnDtcmChd.append(   " CHD R " + agtCmsnChdCmsnTrf +"% / " + NumberUtil.formatNumber(agtCmsnDtcmChdAmt, "#,###,###"));
-								sbAgtCmsnDtcmInf.append(   " INF R " + agtCmsnInfCmsnTrf +"% / " + NumberUtil.formatNumber(agtCmsnDtcmInfAmt, "#,###,###"));
-							} else if("A".equals(agtCmsnAplMthdCd)) {
-								//------------------------
-								// 정액
-								//------------------------
-								sbAgtCmsnGnrlTitle.append("\n일반 대리점컴 (No."+agtCmsnSeq+")");
-								sbAgtCmsnGnrlAdt.append(   " ADT A / " + NumberUtil.formatNumber(agtCmsnGnrlAdtAmt, "#,###,###"));
-								sbAgtCmsnGnrlChd.append(   " CHD A / " + NumberUtil.formatNumber(agtCmsnGnrlChdAmt, "#,###,###"));
-								sbAgtCmsnGnrlInf.append(   " INF A / " + NumberUtil.formatNumber(agtCmsnGnrlInfAmt, "#,###,###"));
-								sbAgtCmsnDtcmTitle.append("\n닷컴 대리점컴 (No."+agtCmsnSeq+")");
-								sbAgtCmsnDtcmAdt.append(   " ADT A / " + NumberUtil.formatNumber(agtCmsnDtcmAdtAmt, "#,###,###"));
-								sbAgtCmsnDtcmChd.append(   " CHD A / " + NumberUtil.formatNumber(agtCmsnDtcmChdAmt, "#,###,###"));
-								sbAgtCmsnDtcmInf.append(   " INF A / " + NumberUtil.formatNumber(agtCmsnDtcmInfAmt, "#,###,###"));
-							}
-						}
 
 						//--------------------------------------
 						// 발권수수료-성인원화전체금액
@@ -3283,6 +3181,102 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 			this.sbDtcmChdSpclColtMlgAmt = sbDtcmChdSpclColtMlgAmt;
 		}
 	}
+	/**
+	 * 대리점 커미션(일반/닷컴) 텍스트를 조립한다.
+	 * farVoLst(편도결합)/farLstNode(비결합)는 필드명이 동일하므로 fareNode 하나로 통일. 원본 로직 무변경.
+	 */
+	private AgtCmsnTexts buildAgtCmsnTexts(JsonNode fareNode) {
+		//------------------------------------
+		// 대리점 커미션정보
+		//------------------------------------
+		StringBuilder sbAgtCmsnGnrlTitle = new StringBuilder("");
+		StringBuilder sbAgtCmsnDtcmTitle = new StringBuilder("");
+		StringBuilder sbAgtCmsnGnrlAdt   = new StringBuilder("");
+		StringBuilder sbAgtCmsnGnrlChd   = new StringBuilder("");
+		StringBuilder sbAgtCmsnGnrlInf   = new StringBuilder("");
+		StringBuilder sbAgtCmsnDtcmAdt   = new StringBuilder("");
+		StringBuilder sbAgtCmsnDtcmChd   = new StringBuilder("");
+		StringBuilder sbAgtCmsnDtcmInf   = new StringBuilder("");
+
+		String agtCmsnSeq = StringUtil.nullConvert(fareNode.path("agtCmsnSeq").asText());
+
+		if(StringUtil.isEmpty(agtCmsnSeq)) {
+			sbAgtCmsnGnrlTitle.append("\n일반 대리점컴 ");
+			sbAgtCmsnGnrlAdt.append(  " ADT - ");
+			sbAgtCmsnGnrlChd.append(  " CHD - ");
+			sbAgtCmsnGnrlInf.append(  " INF - ");
+			sbAgtCmsnDtcmTitle.append("\n닷컴 대리점컴 ");
+			sbAgtCmsnDtcmAdt.append(  " ADT - ");
+			sbAgtCmsnDtcmChd.append(  " CHD - ");
+			sbAgtCmsnDtcmInf.append(  " INF - ");
+		}else {
+			String agtCmsnAdtCmsnTrf = StringUtil.nullConvert(fareNode.path("agtCmsnAdtCmsnTrf").asText());	// 대리점커미션성인커미션오율
+			String agtCmsnChdCmsnTrf = StringUtil.nullConvert(fareNode.path("agtCmsnChdCmsnTrf").asText());	// 대리점커미션아동커미션오율
+			String agtCmsnInfCmsnTrf = StringUtil.nullConvert(fareNode.path("agtCmsnInfCmsnTrf").asText());	// 대리점커미션유아커미션오율
+			String agtCmsnGnrlAdtAmt = StringUtil.nullConvert(fareNode.path("agtCmsnGnrlAdtAmt").asText());	// 대리점커미션일반성인금액
+			String agtCmsnGnrlChdAmt = StringUtil.nullConvert(fareNode.path("agtCmsnGnrlChdAmt").asText());	// 대리점커미션일반아동금액
+			String agtCmsnGnrlInfAmt = StringUtil.nullConvert(fareNode.path("agtCmsnGnrlInfAmt").asText());	// 대리점커미션일반유아금액
+			String agtCmsnDtcmAdtAmt = StringUtil.nullConvert(fareNode.path("agtCmsnDtcmAdtAmt").asText());	// 대리점커미션닷컴성인금액
+			String agtCmsnDtcmChdAmt = StringUtil.nullConvert(fareNode.path("agtCmsnDtcmChdAmt").asText());	// 대리점커미션닷컴아동금액
+			String agtCmsnDtcmInfAmt = StringUtil.nullConvert(fareNode.path("agtCmsnDtcmInfAmt").asText());	// 대리점커미션닷컴유아금액
+
+			// 대리점커미션적용방식 : R - 정률, A - 정액
+			String agtCmsnAplMthdCd = StringUtil.nullConvert(fareNode.path("agtCmsnAplMthdCd"   ).asText());
+			if("R".equals(agtCmsnAplMthdCd)) {
+				//------------------------
+				// 정률
+				//------------------------
+				sbAgtCmsnGnrlTitle.append("\n일반 대리점컴 (No."+agtCmsnSeq+")");
+				sbAgtCmsnGnrlAdt.append( " ADT R " + agtCmsnAdtCmsnTrf +"% / " + NumberUtil.formatNumber(agtCmsnGnrlAdtAmt, "#,###,###"));
+				sbAgtCmsnGnrlChd.append(   " CHD R " + agtCmsnChdCmsnTrf +"% / " + NumberUtil.formatNumber(agtCmsnGnrlChdAmt, "#,###,###"));
+				sbAgtCmsnGnrlInf.append(   " INF R " + agtCmsnInfCmsnTrf +"% / " + NumberUtil.formatNumber(agtCmsnGnrlInfAmt, "#,###,###"));
+				sbAgtCmsnDtcmTitle.append("\n닷컴 대리점컴 (No."+agtCmsnSeq+")");
+				sbAgtCmsnDtcmAdt.append(   " ADT R " + agtCmsnAdtCmsnTrf +"% / " + NumberUtil.formatNumber(agtCmsnDtcmAdtAmt, "#,###,###"));
+				sbAgtCmsnDtcmChd.append(   " CHD R " + agtCmsnChdCmsnTrf +"% / " + NumberUtil.formatNumber(agtCmsnDtcmChdAmt, "#,###,###"));
+				sbAgtCmsnDtcmInf.append(   " INF R " + agtCmsnInfCmsnTrf +"% / " + NumberUtil.formatNumber(agtCmsnDtcmInfAmt, "#,###,###"));
+			} else if("A".equals(agtCmsnAplMthdCd)) {
+				//------------------------
+				// 정액
+				//------------------------
+				sbAgtCmsnGnrlTitle.append("\n일반 대리점컴 (No."+agtCmsnSeq+")");
+				sbAgtCmsnGnrlAdt.append(   " ADT A / " + NumberUtil.formatNumber(agtCmsnGnrlAdtAmt, "#,###,###"));
+				sbAgtCmsnGnrlChd.append(   " CHD A / " + NumberUtil.formatNumber(agtCmsnGnrlChdAmt, "#,###,###"));
+				sbAgtCmsnGnrlInf.append(   " INF A / " + NumberUtil.formatNumber(agtCmsnGnrlInfAmt, "#,###,###"));
+				sbAgtCmsnDtcmTitle.append("\n닷컴 대리점컴 (No."+agtCmsnSeq+")");
+				sbAgtCmsnDtcmAdt.append(   " ADT A / " + NumberUtil.formatNumber(agtCmsnDtcmAdtAmt, "#,###,###"));
+				sbAgtCmsnDtcmChd.append(   " CHD A / " + NumberUtil.formatNumber(agtCmsnDtcmChdAmt, "#,###,###"));
+				sbAgtCmsnDtcmInf.append(   " INF A / " + NumberUtil.formatNumber(agtCmsnDtcmInfAmt, "#,###,###"));
+			}
+		}
+
+
+		return new AgtCmsnTexts(sbAgtCmsnGnrlTitle, sbAgtCmsnDtcmTitle, sbAgtCmsnGnrlAdt, sbAgtCmsnGnrlChd, sbAgtCmsnGnrlInf, sbAgtCmsnDtcmAdt, sbAgtCmsnDtcmChd, sbAgtCmsnDtcmInf);
+	}
+
+	/** buildAgtCmsnTexts()의 결과를 담는 불변 보유체. */
+	private static final class AgtCmsnTexts {
+		private final StringBuilder sbAgtCmsnGnrlTitle;
+		private final StringBuilder sbAgtCmsnDtcmTitle;
+		private final StringBuilder sbAgtCmsnGnrlAdt;
+		private final StringBuilder sbAgtCmsnGnrlChd;
+		private final StringBuilder sbAgtCmsnGnrlInf;
+		private final StringBuilder sbAgtCmsnDtcmAdt;
+		private final StringBuilder sbAgtCmsnDtcmChd;
+		private final StringBuilder sbAgtCmsnDtcmInf;
+
+		private AgtCmsnTexts(StringBuilder sbAgtCmsnGnrlTitle, StringBuilder sbAgtCmsnDtcmTitle, StringBuilder sbAgtCmsnGnrlAdt, StringBuilder sbAgtCmsnGnrlChd, StringBuilder sbAgtCmsnGnrlInf, StringBuilder sbAgtCmsnDtcmAdt, StringBuilder sbAgtCmsnDtcmChd, StringBuilder sbAgtCmsnDtcmInf) {
+			this.sbAgtCmsnGnrlTitle = sbAgtCmsnGnrlTitle;
+			this.sbAgtCmsnDtcmTitle = sbAgtCmsnDtcmTitle;
+			this.sbAgtCmsnGnrlAdt = sbAgtCmsnGnrlAdt;
+			this.sbAgtCmsnGnrlChd = sbAgtCmsnGnrlChd;
+			this.sbAgtCmsnGnrlInf = sbAgtCmsnGnrlInf;
+			this.sbAgtCmsnDtcmAdt = sbAgtCmsnDtcmAdt;
+			this.sbAgtCmsnDtcmChd = sbAgtCmsnDtcmChd;
+			this.sbAgtCmsnDtcmInf = sbAgtCmsnDtcmInf;
+		}
+	}
+
+
 
 
 
