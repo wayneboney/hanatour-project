@@ -1158,195 +1158,11 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 							sbIsueFeeDtcmInf.append(dtcmInfKrwAllAmt);
 							//--------------------------------------
 
-							//###### 운임기본정보setting #####
-							sbTmpFareBscInfo = new StringBuilder("");
-							sbEtcInfo = new StringBuilder("");
+							//기본보기/더보기 조립 - 편도결합/비결합 공통 로직은 buildDefaultAndMoreViewInfo()로 추출
+							DefaultMoreViewFareBscTexts defaultMoreViewFareBscTexts = this.buildDefaultAndMoreViewInfo(farVoLst, fixFarYn, ntytFixFarDvCd, atmtIsueYn, imdtPayPsblYn, apiSupCode, isExistCardGnrlInfo, isExistCardDtcmInfo, gnrlEventCdDp, sBscAmtFmAdt, sBscAmtFmChd, sBscAmtFmInf, bCntAdt, bCntChd, bCntInf, sbSplyInfo, sbSiteRuleGnrlAdt, sbSiteRuleGnrlChd, sbSiteRuleGnrlInf, sbSiteRuleDtcmAdt, sbSiteRuleDtcmChd, sbSiteRuleDtcmInf, sbAdtGnrlDcAmtInfo, sbChdGnrlDcAmtInfo, sbInfGnrlDcAmtInfo, sbAdtDtcmDcAmtInfo, sbChdDtcmDcAmtInfo, sbInfDtcmDcAmtInfo, sbIsueFeeGnrlAdt, sbIsueFeeGnrlChd, sbIsueFeeGnrlInf, sbIsueFeeDtcmAdt, sbIsueFeeDtcmChd, sbIsueFeeDtcmInf, sbGnrlAdtSpclColtMlgAmt, sbGnrlChdSpclColtMlgAmt, sbDtcmAdtSpclColtMlgAmt, sbDtcmChdSpclColtMlgAmt, sbCardGnrlAdt, sbCardGnrlChd, sbCardDtcmAdt, sbCardDtcmChd, sbAgtCmsnGnrlTitle, sbAgtCmsnDtcmTitle, sbAgtCmsnGnrlAdt, sbAgtCmsnGnrlChd, sbAgtCmsnGnrlInf, sbAgtCmsnDtcmAdt, sbAgtCmsnDtcmChd, sbAgtCmsnDtcmInf, sbDefaultInfoFm, sbMoreViewInfoFm);
+							fareBscInfo = defaultMoreViewFareBscTexts.fareBscInfo;
+							moreTxt = defaultMoreViewFareBscTexts.moreTxt;
 
-							//운임확정정보
-							if("Y".equals(fixFarYn )){
-								sbTmpFareBscInfo.append("운임확정 ");
-								sbEtcInfo.append(      " 운임확정");
-							}else {
-								sbTmpFareBscInfo.append("운임미확정 ");
-								sbEtcInfo.append(       " 운임미확정 ("+ntytFixFarDvCd+")");
-							}
-							sbEtcInfo.append(" GDS자동발권가능여부" + atmtIsueYn);	// 20200311 : '자동발권여부' > 'GDS자동발권가능여부'로 변경
-
-
-							//즉시결제가능여부
-							if("Y".equals(imdtPayPsblYn)){
-								sbTmpFareBscInfo.append("즉시결제 ");
-							}else {
-								sbTmpFareBscInfo.append("추후결제 ");
-							}
-
-							if("Y".equals(imdtPayPsblYn)){
-								sbEtcInfo.append(" 즉시결제Y");
-							}else {
-								sbEtcInfo.append(" 즉시결제N");
-							}
-
-							//결제타입
-							String payTypeCd   = StringUtil.nullConvert(farVoLst.path("payTypeCd"  ).textValue());	//결제유형코드
-							String payTypeCdNm = StringUtil.nullConvert(farVoLst.path("payTypeCdNm").textValue());	//결제유형코드명
-							sbTmpFareBscInfo.append("결제타입 "+payTypeCd+"["+payTypeCdNm+"]"+" ");
-
-							sbEtcInfo.append(" 결제타입 ("+payTypeCd+")"+payTypeCdNm);
-
-							String maxTktDate   = StringUtil.nullConvert(farVoLst.path("maxTktDate"  ).textValue());	//발권마감일자
-							String maxTktTime   = StringUtil.nullConvert(farVoLst.path("maxTktTime"  ).textValue());	//발권마감시간
-
-							if (StringUtils.isNotEmpty(maxTktDate)) {
-								maxTktDate = DateUtil.formatDate(maxTktDate, "yyyy-MM-dd");
-							}
-
-							sbEtcInfo.append(" 발권마감일 " + maxTktDate + " " + maxTktTime);
-
-							String evdnDocNcstYn   = StringUtil.nullConvert(farVoLst.path("evdnDocNcstYn"  ).textValue());	//증빙문서필요여부
-							sbEtcInfo.append(" 룰셋증빙서류필요여부" + evdnDocNcstYn);	// 20191025 : 룰셋증빙서류필요여부
-
-							if("N".equals(apiSupCode) || "L".equals(apiSupCode) || "R".equals(apiSupCode) || "P".equals(apiSupCode)){//NDC,루프드한자 일때만 Upsell 여부 추가
-								String sUpsellTF = farVoLst.path("upsellPsblYn").textValue();
-								sbEtcInfo.append("\nUPSELL 공급여부" + sUpsellTF);	// 20240319 : upsell 공급여부
-							}
-
-							if("G".equals(apiSupCode) || "M".equals(apiSupCode)){//갈릴레오,아마데우스 일때만 페어패밀리 여부 추가
-								String sFareFmlYn = farVoLst.path("fareFmlYn").textValue();
-								if("Y".equals(sFareFmlYn)){
-									sbEtcInfo.append("\n페어패밀리 여부" + sFareFmlYn);	// 20240703 : 페어패밀리 여부
-								}
-							}
-
-							fareBscInfo = "";
-							sbFareBscInfo = new StringBuilder("");
-							sbFareBscInfo.append("".equals(sbIsueFeeGnrlAdt.toString()) ? "" : sbIsueFeeGnrlAdt.toString() + "\n");
-							sbFareBscInfo.append("".equals(sbIsueFeeDtcmAdt.toString()) ? sbTmpFareBscInfo.toString() : sbIsueFeeDtcmAdt.toString() + "\n" + sbTmpFareBscInfo.toString());
-
-							//더보기 텍스트
-							moreTxt = "";
-							if(!StringUtil.isEmpty(sbAdtDtcmDcAmtInfo.toString()) || "Y".equals(isExistCardGnrlInfo) || "Y".equals(isExistCardDtcmInfo)){
-								moreTxt = "+더보기";
-
-								fareBscInfo = sbAdtDtcmDcAmtInfo.toString() + "\n" + sbFareBscInfo.toString();
-							} else {
-								fareBscInfo = sbFareBscInfo.toString();
-							}
-
-							//------------------------------------
-							// 기본보기 - 공급코드, 발권항공사, 여정타입..  + 기타정보(운임확정, 자동발권여부, 즉시결제..)
-							//------------------------------------
-							sbDefaultInfoFm.append(sbSplyInfo.toString() + sbEtcInfo.toString());
-							//------------------------------------
-							// 기본보기 - 기본운임(Adt + Chd + Inf)
-							//------------------------------------
-							if(bCntAdt) sbDefaultInfoFm.append(sBscAmtFmAdt);
-							if(bCntChd) sbDefaultInfoFm.append(sBscAmtFmChd);
-							if(bCntInf) sbDefaultInfoFm.append(sBscAmtFmInf);
-							//------------------------------------
-							// 기본보기 - 판매룰 일반(Adt + Chd + Inf)
-							//------------------------------------
-							if(bCntAdt) sbDefaultInfoFm.append(sbSiteRuleGnrlAdt.toString());
-							if(bCntChd) sbDefaultInfoFm.append(sbSiteRuleGnrlChd.toString());
-							if(bCntInf) sbDefaultInfoFm.append(sbSiteRuleGnrlInf.toString());
-							//------------------------------------
-							// 기본보기 - PF, BEST..일반 (Adt + Chd + Inf)
-							//------------------------------------
-							if(bCntAdt) sbDefaultInfoFm.append(sbAdtGnrlDcAmtInfo.toString());
-							if(bCntChd) sbDefaultInfoFm.append(sbChdGnrlDcAmtInfo.toString());
-							if(bCntInf) sbDefaultInfoFm.append(sbInfGnrlDcAmtInfo.toString());
-							//------------------------------------
-							// 기본보기 - TASF 일반
-							//------------------------------------
-							if(bCntAdt) sbDefaultInfoFm.append(sbIsueFeeGnrlAdt.toString());
-							if(bCntChd) sbDefaultInfoFm.append(sbIsueFeeGnrlChd.toString());
-							if(bCntInf) sbDefaultInfoFm.append(sbIsueFeeGnrlInf.toString());
-							//------------------------------------
-
-							//------------------------------------
-							// 더보기 - 일반이벤트(이벤트1, 이벤트2)
-							//------------------------------------
-							sbMoreViewInfoFm.append(gnrlEventCdDp);
-							//------------------------------------
-							// 더보기 - 특별적립마일리지 일반(Adt + Chd)
-							//------------------------------------
-							if(bCntAdt) sbMoreViewInfoFm.append(sbGnrlAdtSpclColtMlgAmt.toString());
-							if(bCntChd) sbMoreViewInfoFm.append(sbGnrlChdSpclColtMlgAmt.toString());
-							//------------------------------------
-							// 더보기 - 카드 일반
-							//------------------------------------
-							if(bCntAdt) sbMoreViewInfoFm.append(sbCardGnrlAdt.toString());
-							if(bCntChd) sbMoreViewInfoFm.append(sbCardGnrlChd.toString());
-//					if(bCntInf) sbMoreViewInfoFm.append(sbCardGnrlInf.toString());		// 유아 - 화면에서 제외로 보류
-							//------------------------------------
-							// 더보기 - 판매룰 닷컴(Adt + Chd + Inf)
-							//------------------------------------
-							if(bCntAdt) sbMoreViewInfoFm.append(sbSiteRuleDtcmAdt.toString());
-							if(bCntChd) sbMoreViewInfoFm.append(sbSiteRuleDtcmChd.toString());
-							if(bCntInf) sbMoreViewInfoFm.append(sbSiteRuleDtcmInf.toString());
-							//------------------------------------
-							// 더보기 - PF, BEST..닷컴 (Adt + Chd + Inf)
-							//------------------------------------
-							if(bCntAdt) sbMoreViewInfoFm.append(sbAdtDtcmDcAmtInfo.toString());
-							if(bCntChd) sbMoreViewInfoFm.append(sbChdDtcmDcAmtInfo.toString());
-							if(bCntInf) sbMoreViewInfoFm.append(sbInfDtcmDcAmtInfo.toString());
-							//------------------------------------
-							// 더보기 - TASF 닷컴
-							//------------------------------------
-							if(bCntAdt) sbMoreViewInfoFm.append(sbIsueFeeDtcmAdt.toString());
-							if(bCntChd) sbMoreViewInfoFm.append(sbIsueFeeDtcmChd.toString());
-							if(bCntInf) sbMoreViewInfoFm.append(sbIsueFeeDtcmInf.toString());
-							//------------------------------------
-							// 더보기 - 특별적립마일리지 닷컴(Adt + Chd)
-							//------------------------------------
-							if(bCntAdt) sbMoreViewInfoFm.append(sbDtcmAdtSpclColtMlgAmt.toString());
-							if(bCntChd) sbMoreViewInfoFm.append(sbDtcmChdSpclColtMlgAmt.toString());
-							//------------------------------------
-							// 더보기 - 카드 닷컴
-							//------------------------------------
-							if(bCntAdt) sbMoreViewInfoFm.append(sbCardDtcmAdt.toString());
-							if(bCntChd) sbMoreViewInfoFm.append(sbCardDtcmChd.toString());
-							//------------------------------------
-							// 더보기 - 대리점컴 - 일반, 닷컴만 row로 출력함(Adt, Chd, Inf는 한줄로 표현함)
-							//------------------------------------
-							sbTempAgtCmsnGnrlStr = new StringBuilder("");
-							sbTempAgtCmsnDtcmStr = new StringBuilder("");
-
-							if(bCntAdt) sbTempAgtCmsnGnrlStr.append(sbAgtCmsnGnrlAdt.toString());	// 대리점컴 - 일반 - ADT
-							if(bCntAdt) sbTempAgtCmsnDtcmStr.append(sbAgtCmsnDtcmAdt.toString());	// 대리점컴 - 닷컴 - ADT
-							if(bCntChd) {
-								// 대리점컴 - 일반 - CHD
-								if(StringUtil.isEmpty(sbTempAgtCmsnGnrlStr.toString())) {
-									sbTempAgtCmsnGnrlStr.append(sbAgtCmsnGnrlChd.toString());
-								} else {
-									sbTempAgtCmsnGnrlStr.append("," +sbAgtCmsnGnrlChd.toString());
-								}
-								// 대리점컴 - 닷컴 - CHD
-								if(StringUtil.isEmpty(sbTempAgtCmsnDtcmStr.toString())) {
-									sbTempAgtCmsnDtcmStr.append(sbAgtCmsnDtcmChd.toString());
-								} else {
-									sbTempAgtCmsnDtcmStr.append("," +sbAgtCmsnDtcmChd.toString());
-								}
-							}
-							if(bCntInf) {
-								// 대리점컴 - 일반 - INF
-								if(StringUtil.isEmpty(sbTempAgtCmsnGnrlStr.toString())) {
-									sbTempAgtCmsnGnrlStr.append(sbAgtCmsnGnrlInf.toString());
-								} else {
-									sbTempAgtCmsnGnrlStr.append("," +sbAgtCmsnGnrlInf.toString());
-								}
-								// 대리점컴 - 닷컴 - INF
-								if(StringUtil.isEmpty(sbTempAgtCmsnDtcmStr.toString())) {
-									sbTempAgtCmsnDtcmStr.append(sbAgtCmsnDtcmInf.toString());
-								} else {
-									sbTempAgtCmsnDtcmStr.append("," +sbAgtCmsnDtcmInf.toString());
-								}
-							}
-
-							// 대리점컴 - 닷컴..(ADT, CHD, INF 로 표현함)
-							sbMoreViewInfoFm.append(sbAgtCmsnGnrlTitle.toString() + sbTempAgtCmsnGnrlStr.toString());
-							sbMoreViewInfoFm.append(sbAgtCmsnDtcmTitle.toString() + sbTempAgtCmsnDtcmStr.toString());
-							//------------------------------------
-							sbMoreViewInfoFm.append("\n");
 
 							farIndex++;
 
@@ -1973,194 +1789,11 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 						sbIsueFeeDtcmInf.append(dtcmInfKrwAllAmt);
 						//--------------------------------------
 
-						//###### 운임기본정보setting #####
-						sbTmpFareBscInfo = new StringBuilder("");
-						sbEtcInfo = new StringBuilder("");
+						//기본보기/더보기 조립 - 편도결합/비결합 공통 로직은 buildDefaultAndMoreViewInfo()로 추출
+						DefaultMoreViewFareBscTexts defaultMoreViewFareBscTexts = this.buildDefaultAndMoreViewInfo(farLstNode, fixFarYn, ntytFixFarDvCd, atmtIsueYn, imdtPayPsblYn, apiSupCode, isExistCardGnrlInfo, isExistCardDtcmInfo, gnrlEventCdDp, sBscAmtFmAdt, sBscAmtFmChd, sBscAmtFmInf, bCntAdt, bCntChd, bCntInf, sbSplyInfo, sbSiteRuleGnrlAdt, sbSiteRuleGnrlChd, sbSiteRuleGnrlInf, sbSiteRuleDtcmAdt, sbSiteRuleDtcmChd, sbSiteRuleDtcmInf, sbAdtGnrlDcAmtInfo, sbChdGnrlDcAmtInfo, sbInfGnrlDcAmtInfo, sbAdtDtcmDcAmtInfo, sbChdDtcmDcAmtInfo, sbInfDtcmDcAmtInfo, sbIsueFeeGnrlAdt, sbIsueFeeGnrlChd, sbIsueFeeGnrlInf, sbIsueFeeDtcmAdt, sbIsueFeeDtcmChd, sbIsueFeeDtcmInf, sbGnrlAdtSpclColtMlgAmt, sbGnrlChdSpclColtMlgAmt, sbDtcmAdtSpclColtMlgAmt, sbDtcmChdSpclColtMlgAmt, sbCardGnrlAdt, sbCardGnrlChd, sbCardDtcmAdt, sbCardDtcmChd, sbAgtCmsnGnrlTitle, sbAgtCmsnDtcmTitle, sbAgtCmsnGnrlAdt, sbAgtCmsnGnrlChd, sbAgtCmsnGnrlInf, sbAgtCmsnDtcmAdt, sbAgtCmsnDtcmChd, sbAgtCmsnDtcmInf, sbDefaultInfoFm, sbMoreViewInfoFm);
+						fareBscInfo = defaultMoreViewFareBscTexts.fareBscInfo;
+						moreTxt = defaultMoreViewFareBscTexts.moreTxt;
 
-						//운임확정정보
-						if("Y".equals(fixFarYn )){
-							sbTmpFareBscInfo.append("운임확정 ");
-							sbEtcInfo.append(      " 운임확정");
-						}else {
-							sbTmpFareBscInfo.append("운임미확정 ");
-							sbEtcInfo.append(       " 운임미확정 ("+ntytFixFarDvCd+")");
-						}
-						sbEtcInfo.append(" GDS자동발권가능여부" + atmtIsueYn);	// 20200311 : '자동발권여부' > 'GDS자동발권가능여부'로 변경
-
-
-						//즉시결제가능여부
-						if("Y".equals(imdtPayPsblYn)){
-							sbTmpFareBscInfo.append("즉시결제 ");
-						}else {
-							sbTmpFareBscInfo.append("추후결제 ");
-						}
-
-						if("Y".equals(imdtPayPsblYn)){
-							sbEtcInfo.append(" 즉시결제Y");
-						}else {
-							sbEtcInfo.append(" 즉시결제N");
-						}
-
-						//결제타입
-						String payTypeCd   = StringUtil.nullConvert(farLstNode.path("payTypeCd"  ).textValue());	//결제유형코드
-						String payTypeCdNm = StringUtil.nullConvert(farLstNode.path("payTypeCdNm").textValue());	//결제유형코드명
-						sbTmpFareBscInfo.append("결제타입 "+payTypeCd+"["+payTypeCdNm+"]"+" ");
-
-						sbEtcInfo.append(" 결제타입 ("+payTypeCd+")"+payTypeCdNm);
-
-						String maxTktDate   = StringUtil.nullConvert(farLstNode.path("maxTktDate"  ).textValue());	//발권마감일자
-						String maxTktTime   = StringUtil.nullConvert(farLstNode.path("maxTktTime"  ).textValue());	//발권마감시간
-
-						if (StringUtils.isNotEmpty(maxTktDate)) {
-							maxTktDate = DateUtil.formatDate(maxTktDate, "yyyy-MM-dd");
-						}
-
-						sbEtcInfo.append(" 발권마감일 " + maxTktDate + " " + maxTktTime);
-
-						String evdnDocNcstYn   = StringUtil.nullConvert(farLstNode.path("evdnDocNcstYn"  ).textValue());	//증빙문서필요여부
-						sbEtcInfo.append(" 룰셋증빙서류필요여부" + evdnDocNcstYn);	// 20191025 : 룰셋증빙서류필요여부
-
-						if("N".equals(apiSupCode) || "L".equals(apiSupCode) || "R".equals(apiSupCode)|| "P".equals(apiSupCode)){//NDC 일때만 Upsell 여부 추가
-							String sUpsellTF = farLstNode.path("upsellPsblYn").textValue();
-							sbEtcInfo.append("\nUPSELL 공급여부" + sUpsellTF);	// 20240319 : upsell 공급여부
-						}
-
-						if("G".equals(apiSupCode) || "M".equals(apiSupCode)){//갈릴레오,아마데우스 일때만 페어패밀리 여부 추가
-							String sFareFmlYn = farLstNode.path("fareFmlYn").textValue();
-							if("Y".equals(sFareFmlYn)){
-								sbEtcInfo.append("\n페어패밀리 여부" + sFareFmlYn);	// 20240703 : 페어패밀리 여부
-							}
-						}
-
-						fareBscInfo = "";
-						sbFareBscInfo = new StringBuilder("");
-						sbFareBscInfo.append("".equals(sbIsueFeeGnrlAdt.toString()) ? "" : sbIsueFeeGnrlAdt.toString() + "\n");
-						sbFareBscInfo.append("".equals(sbIsueFeeDtcmAdt.toString()) ? sbTmpFareBscInfo.toString() : sbIsueFeeDtcmAdt.toString() + "\n" + sbTmpFareBscInfo.toString());
-
-						//더보기 텍스트
-						moreTxt = "";
-						if(!StringUtil.isEmpty(sbAdtDtcmDcAmtInfo.toString()) || "Y".equals(isExistCardGnrlInfo) || "Y".equals(isExistCardDtcmInfo)){
-							moreTxt = "+더보기";
-
-							fareBscInfo = sbAdtDtcmDcAmtInfo.toString() + "\n" + sbFareBscInfo.toString();
-						} else {
-							fareBscInfo = sbFareBscInfo.toString();
-						}
-
-						//------------------------------------
-						// 기본보기 - 공급코드, 발권항공사, 여정타입..  + 기타정보(운임확정, 자동발권여부, 즉시결제..)
-						//------------------------------------
-						sbDefaultInfoFm.append(sbSplyInfo.toString() + sbEtcInfo.toString());
-						//------------------------------------
-						// 기본보기 - 기본운임(Adt + Chd + Inf)
-						//------------------------------------
-						if(bCntAdt) sbDefaultInfoFm.append(sBscAmtFmAdt);
-						if(bCntChd) sbDefaultInfoFm.append(sBscAmtFmChd);
-						if(bCntInf) sbDefaultInfoFm.append(sBscAmtFmInf);
-						//------------------------------------
-						// 기본보기 - 판매룰 일반(Adt + Chd + Inf)
-						//------------------------------------
-						if(bCntAdt) sbDefaultInfoFm.append(sbSiteRuleGnrlAdt.toString());
-						if(bCntChd) sbDefaultInfoFm.append(sbSiteRuleGnrlChd.toString());
-						if(bCntInf) sbDefaultInfoFm.append(sbSiteRuleGnrlInf.toString());
-						//------------------------------------
-						// 기본보기 - PF, BEST..일반 (Adt + Chd + Inf)
-						//------------------------------------
-						if(bCntAdt) sbDefaultInfoFm.append(sbAdtGnrlDcAmtInfo.toString());
-						if(bCntChd) sbDefaultInfoFm.append(sbChdGnrlDcAmtInfo.toString());
-						if(bCntInf) sbDefaultInfoFm.append(sbInfGnrlDcAmtInfo.toString());
-						//------------------------------------
-						// 기본보기 - TASF 일반
-						//------------------------------------
-						if(bCntAdt) sbDefaultInfoFm.append(sbIsueFeeGnrlAdt.toString());
-						if(bCntChd) sbDefaultInfoFm.append(sbIsueFeeGnrlChd.toString());
-						if(bCntInf) sbDefaultInfoFm.append(sbIsueFeeGnrlInf.toString());
-						//------------------------------------
-
-						//------------------------------------
-						// 더보기 - 일반이벤트(이벤트1, 이벤트2)
-						//------------------------------------
-						sbMoreViewInfoFm.append(gnrlEventCdDp);
-						//------------------------------------
-						// 더보기 - 특별적립마일리지 일반(Adt + Chd)
-						//------------------------------------
-						if(bCntAdt) sbMoreViewInfoFm.append(sbGnrlAdtSpclColtMlgAmt.toString());
-						if(bCntChd) sbMoreViewInfoFm.append(sbGnrlChdSpclColtMlgAmt.toString());
-						//------------------------------------
-						// 더보기 - 카드 일반
-						//------------------------------------
-						if(bCntAdt) sbMoreViewInfoFm.append(sbCardGnrlAdt.toString());
-						if(bCntChd) sbMoreViewInfoFm.append(sbCardGnrlChd.toString());
-						//------------------------------------
-						// 더보기 - 판매룰 닷컴(Adt + Chd + Inf)
-						//------------------------------------
-						if(bCntAdt) sbMoreViewInfoFm.append(sbSiteRuleDtcmAdt.toString());
-						if(bCntChd) sbMoreViewInfoFm.append(sbSiteRuleDtcmChd.toString());
-						if(bCntInf) sbMoreViewInfoFm.append(sbSiteRuleDtcmInf.toString());
-						//------------------------------------
-						// 더보기 - PF, BEST..닷컴 (Adt + Chd + Inf)
-						//------------------------------------
-						if(bCntAdt) sbMoreViewInfoFm.append(sbAdtDtcmDcAmtInfo.toString());
-						if(bCntChd) sbMoreViewInfoFm.append(sbChdDtcmDcAmtInfo.toString());
-						if(bCntInf) sbMoreViewInfoFm.append(sbInfDtcmDcAmtInfo.toString());
-						//------------------------------------
-						// 더보기 - TASF 닷컴
-						//------------------------------------
-						if(bCntAdt) sbMoreViewInfoFm.append(sbIsueFeeDtcmAdt.toString());
-						if(bCntChd) sbMoreViewInfoFm.append(sbIsueFeeDtcmChd.toString());
-						if(bCntInf) sbMoreViewInfoFm.append(sbIsueFeeDtcmInf.toString());
-						//------------------------------------
-						// 더보기 - 특별적립마일리지 닷컴(Adt + Chd)
-						//------------------------------------
-						if(bCntAdt) sbMoreViewInfoFm.append(sbDtcmAdtSpclColtMlgAmt.toString());
-						if(bCntChd) sbMoreViewInfoFm.append(sbDtcmChdSpclColtMlgAmt.toString());
-						//------------------------------------
-						// 더보기 - 카드 닷컴
-						//------------------------------------
-						if(bCntAdt) sbMoreViewInfoFm.append(sbCardDtcmAdt.toString());
-						if(bCntChd) sbMoreViewInfoFm.append(sbCardDtcmChd.toString());
-						//------------------------------------
-						// 더보기 - 대리점컴 - 일반, 닷컴만 row로 출력함(Adt, Chd, Inf는 한줄로 표현함)
-						//------------------------------------
-						sbTempAgtCmsnGnrlStr = new StringBuilder("");
-						sbTempAgtCmsnDtcmStr = new StringBuilder("");
-
-						if(bCntAdt) sbTempAgtCmsnGnrlStr.append(sbAgtCmsnGnrlAdt.toString());	// 대리점컴 - 일반 - ADT
-						if(bCntAdt) sbTempAgtCmsnDtcmStr.append(sbAgtCmsnDtcmAdt.toString());	// 대리점컴 - 닷컴 - ADT
-						if(bCntChd) {
-							// 대리점컴 - 일반 - CHD
-							if(StringUtil.isEmpty(sbTempAgtCmsnGnrlStr.toString())) {
-								sbTempAgtCmsnGnrlStr.append(sbAgtCmsnGnrlChd.toString());
-							} else {
-								sbTempAgtCmsnGnrlStr.append("," +sbAgtCmsnGnrlChd.toString());
-							}
-							// 대리점컴 - 닷컴 - CHD
-							if(StringUtil.isEmpty(sbTempAgtCmsnDtcmStr.toString())) {
-								sbTempAgtCmsnDtcmStr.append(sbAgtCmsnDtcmChd.toString());
-							} else {
-								sbTempAgtCmsnDtcmStr.append("," +sbAgtCmsnDtcmChd.toString());
-							}
-						}
-						if(bCntInf) {
-							// 대리점컴 - 일반 - INF
-							if(StringUtil.isEmpty(sbTempAgtCmsnGnrlStr.toString())) {
-								sbTempAgtCmsnGnrlStr.append(sbAgtCmsnGnrlInf.toString());
-							} else {
-								sbTempAgtCmsnGnrlStr.append("," +sbAgtCmsnGnrlInf.toString());
-							}
-							// 대리점컴 - 닷컴 - INF
-							if(StringUtil.isEmpty(sbTempAgtCmsnDtcmStr.toString())) {
-								sbTempAgtCmsnDtcmStr.append(sbAgtCmsnDtcmInf.toString());
-							} else {
-								sbTempAgtCmsnDtcmStr.append("," +sbAgtCmsnDtcmInf.toString());
-							}
-						}
-
-						// 대리점컴 - 닷컴..(ADT, CHD, INF 로 표현함)
-						sbMoreViewInfoFm.append(sbAgtCmsnGnrlTitle.toString() + sbTempAgtCmsnGnrlStr.toString());
-						sbMoreViewInfoFm.append(sbAgtCmsnDtcmTitle.toString() + sbTempAgtCmsnDtcmStr.toString());
-						//------------------------------------
-						sbMoreViewInfoFm.append("\n");
 
 
 
@@ -3275,6 +2908,219 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 			this.sbAgtCmsnDtcmInf = sbAgtCmsnDtcmInf;
 		}
 	}
+	/**
+	 * 기본보기(sbDefaultInfoFm)/더보기(sbMoreViewInfoFm) 화면 텍스트를 최종 조립하고,
+	 * 운임확정/즉시결제/발권마감일 등 기타정보(sbEtcInfo)와 fareBscInfo/moreTxt를 계산한다.
+	 * farVoLst(편도결합)/farLstNode(비결합)는 필드명이 동일하므로 fareNode 하나로 통일. 원본 로직 무변경.
+	 * sbDefaultInfoFm/sbMoreViewInfoFm은 호출측이 이미 가진 StringBuilder를 그대로 넘겨받아 append만 하므로 반환값에 포함하지 않는다.
+	 * 나머지 StringBuilder 파라미터는 모두 읽기(.toString())에만 쓰인다.
+	 */
+	private DefaultMoreViewFareBscTexts buildDefaultAndMoreViewInfo(JsonNode fareNode, String fixFarYn, String ntytFixFarDvCd, String atmtIsueYn, String imdtPayPsblYn, String apiSupCode, String isExistCardGnrlInfo, String isExistCardDtcmInfo, String gnrlEventCdDp, String sBscAmtFmAdt, String sBscAmtFmChd, String sBscAmtFmInf, boolean bCntAdt, boolean bCntChd, boolean bCntInf, StringBuilder sbSplyInfo, StringBuilder sbSiteRuleGnrlAdt, StringBuilder sbSiteRuleGnrlChd, StringBuilder sbSiteRuleGnrlInf, StringBuilder sbSiteRuleDtcmAdt, StringBuilder sbSiteRuleDtcmChd, StringBuilder sbSiteRuleDtcmInf, StringBuilder sbAdtGnrlDcAmtInfo, StringBuilder sbChdGnrlDcAmtInfo, StringBuilder sbInfGnrlDcAmtInfo, StringBuilder sbAdtDtcmDcAmtInfo, StringBuilder sbChdDtcmDcAmtInfo, StringBuilder sbInfDtcmDcAmtInfo, StringBuilder sbIsueFeeGnrlAdt, StringBuilder sbIsueFeeGnrlChd, StringBuilder sbIsueFeeGnrlInf, StringBuilder sbIsueFeeDtcmAdt, StringBuilder sbIsueFeeDtcmChd, StringBuilder sbIsueFeeDtcmInf, StringBuilder sbGnrlAdtSpclColtMlgAmt, StringBuilder sbGnrlChdSpclColtMlgAmt, StringBuilder sbDtcmAdtSpclColtMlgAmt, StringBuilder sbDtcmChdSpclColtMlgAmt, StringBuilder sbCardGnrlAdt, StringBuilder sbCardGnrlChd, StringBuilder sbCardDtcmAdt, StringBuilder sbCardDtcmChd, StringBuilder sbAgtCmsnGnrlTitle, StringBuilder sbAgtCmsnDtcmTitle, StringBuilder sbAgtCmsnGnrlAdt, StringBuilder sbAgtCmsnGnrlChd, StringBuilder sbAgtCmsnGnrlInf, StringBuilder sbAgtCmsnDtcmAdt, StringBuilder sbAgtCmsnDtcmChd, StringBuilder sbAgtCmsnDtcmInf, StringBuilder sbDefaultInfoFm, StringBuilder sbMoreViewInfoFm) {
+		//###### 운임기본정보setting #####
+		StringBuilder sbTmpFareBscInfo = new StringBuilder("");
+		StringBuilder sbEtcInfo = new StringBuilder("");
+
+		//운임확정정보
+		if("Y".equals(fixFarYn )){
+			sbTmpFareBscInfo.append("운임확정 ");
+			sbEtcInfo.append(      " 운임확정");
+		}else {
+			sbTmpFareBscInfo.append("운임미확정 ");
+			sbEtcInfo.append(       " 운임미확정 ("+ntytFixFarDvCd+")");
+		}
+		sbEtcInfo.append(" GDS자동발권가능여부" + atmtIsueYn);	// 20200311 : '자동발권여부' > 'GDS자동발권가능여부'로 변경
+
+
+		//즉시결제가능여부
+		if("Y".equals(imdtPayPsblYn)){
+			sbTmpFareBscInfo.append("즉시결제 ");
+		}else {
+			sbTmpFareBscInfo.append("추후결제 ");
+		}
+
+		if("Y".equals(imdtPayPsblYn)){
+			sbEtcInfo.append(" 즉시결제Y");
+		}else {
+			sbEtcInfo.append(" 즉시결제N");
+		}
+
+		//결제타입
+		String payTypeCd   = StringUtil.nullConvert(fareNode.path("payTypeCd"  ).textValue());	//결제유형코드
+		String payTypeCdNm = StringUtil.nullConvert(fareNode.path("payTypeCdNm").textValue());	//결제유형코드명
+		sbTmpFareBscInfo.append("결제타입 "+payTypeCd+"["+payTypeCdNm+"]"+" ");
+
+		sbEtcInfo.append(" 결제타입 ("+payTypeCd+")"+payTypeCdNm);
+
+		String maxTktDate   = StringUtil.nullConvert(fareNode.path("maxTktDate"  ).textValue());	//발권마감일자
+		String maxTktTime   = StringUtil.nullConvert(fareNode.path("maxTktTime"  ).textValue());	//발권마감시간
+
+		if (StringUtils.isNotEmpty(maxTktDate)) {
+			maxTktDate = DateUtil.formatDate(maxTktDate, "yyyy-MM-dd");
+		}
+
+		sbEtcInfo.append(" 발권마감일 " + maxTktDate + " " + maxTktTime);
+
+		String evdnDocNcstYn   = StringUtil.nullConvert(fareNode.path("evdnDocNcstYn"  ).textValue());	//증빙문서필요여부
+		sbEtcInfo.append(" 룰셋증빙서류필요여부" + evdnDocNcstYn);	// 20191025 : 룰셋증빙서류필요여부
+
+		if("N".equals(apiSupCode) || "L".equals(apiSupCode) || "R".equals(apiSupCode) || "P".equals(apiSupCode)){//NDC,루프드한자 일때만 Upsell 여부 추가
+			String sUpsellTF = fareNode.path("upsellPsblYn").textValue();
+			sbEtcInfo.append("\nUPSELL 공급여부" + sUpsellTF);	// 20240319 : upsell 공급여부
+		}
+
+		if("G".equals(apiSupCode) || "M".equals(apiSupCode)){//갈릴레오,아마데우스 일때만 페어패밀리 여부 추가
+			String sFareFmlYn = fareNode.path("fareFmlYn").textValue();
+			if("Y".equals(sFareFmlYn)){
+				sbEtcInfo.append("\n페어패밀리 여부" + sFareFmlYn);	// 20240703 : 페어패밀리 여부
+			}
+		}
+
+		String fareBscInfo = "";
+		StringBuilder sbFareBscInfo = new StringBuilder("");
+		sbFareBscInfo.append("".equals(sbIsueFeeGnrlAdt.toString()) ? "" : sbIsueFeeGnrlAdt.toString() + "\n");
+		sbFareBscInfo.append("".equals(sbIsueFeeDtcmAdt.toString()) ? sbTmpFareBscInfo.toString() : sbIsueFeeDtcmAdt.toString() + "\n" + sbTmpFareBscInfo.toString());
+
+		//더보기 텍스트
+		String moreTxt = "";
+		if(!StringUtil.isEmpty(sbAdtDtcmDcAmtInfo.toString()) || "Y".equals(isExistCardGnrlInfo) || "Y".equals(isExistCardDtcmInfo)){
+			moreTxt = "+더보기";
+
+			fareBscInfo = sbAdtDtcmDcAmtInfo.toString() + "\n" + sbFareBscInfo.toString();
+		} else {
+			fareBscInfo = sbFareBscInfo.toString();
+		}
+
+		//------------------------------------
+		// 기본보기 - 공급코드, 발권항공사, 여정타입..  + 기타정보(운임확정, 자동발권여부, 즉시결제..)
+		//------------------------------------
+		sbDefaultInfoFm.append(sbSplyInfo.toString() + sbEtcInfo.toString());
+		//------------------------------------
+		// 기본보기 - 기본운임(Adt + Chd + Inf)
+		//------------------------------------
+		if(bCntAdt) sbDefaultInfoFm.append(sBscAmtFmAdt);
+		if(bCntChd) sbDefaultInfoFm.append(sBscAmtFmChd);
+		if(bCntInf) sbDefaultInfoFm.append(sBscAmtFmInf);
+		//------------------------------------
+		// 기본보기 - 판매룰 일반(Adt + Chd + Inf)
+		//------------------------------------
+		if(bCntAdt) sbDefaultInfoFm.append(sbSiteRuleGnrlAdt.toString());
+		if(bCntChd) sbDefaultInfoFm.append(sbSiteRuleGnrlChd.toString());
+		if(bCntInf) sbDefaultInfoFm.append(sbSiteRuleGnrlInf.toString());
+		//------------------------------------
+		// 기본보기 - PF, BEST..일반 (Adt + Chd + Inf)
+		//------------------------------------
+		if(bCntAdt) sbDefaultInfoFm.append(sbAdtGnrlDcAmtInfo.toString());
+		if(bCntChd) sbDefaultInfoFm.append(sbChdGnrlDcAmtInfo.toString());
+		if(bCntInf) sbDefaultInfoFm.append(sbInfGnrlDcAmtInfo.toString());
+		//------------------------------------
+		// 기본보기 - TASF 일반
+		//------------------------------------
+		if(bCntAdt) sbDefaultInfoFm.append(sbIsueFeeGnrlAdt.toString());
+		if(bCntChd) sbDefaultInfoFm.append(sbIsueFeeGnrlChd.toString());
+		if(bCntInf) sbDefaultInfoFm.append(sbIsueFeeGnrlInf.toString());
+		//------------------------------------
+
+		//------------------------------------
+		// 더보기 - 일반이벤트(이벤트1, 이벤트2)
+		//------------------------------------
+		sbMoreViewInfoFm.append(gnrlEventCdDp);
+		//------------------------------------
+		// 더보기 - 특별적립마일리지 일반(Adt + Chd)
+		//------------------------------------
+		if(bCntAdt) sbMoreViewInfoFm.append(sbGnrlAdtSpclColtMlgAmt.toString());
+		if(bCntChd) sbMoreViewInfoFm.append(sbGnrlChdSpclColtMlgAmt.toString());
+		//------------------------------------
+		// 더보기 - 카드 일반
+		//------------------------------------
+		if(bCntAdt) sbMoreViewInfoFm.append(sbCardGnrlAdt.toString());
+		if(bCntChd) sbMoreViewInfoFm.append(sbCardGnrlChd.toString());
+		//------------------------------------
+		// 더보기 - 판매룰 닷컴(Adt + Chd + Inf)
+		//------------------------------------
+		if(bCntAdt) sbMoreViewInfoFm.append(sbSiteRuleDtcmAdt.toString());
+		if(bCntChd) sbMoreViewInfoFm.append(sbSiteRuleDtcmChd.toString());
+		if(bCntInf) sbMoreViewInfoFm.append(sbSiteRuleDtcmInf.toString());
+		//------------------------------------
+		// 더보기 - PF, BEST..닷컴 (Adt + Chd + Inf)
+		//------------------------------------
+		if(bCntAdt) sbMoreViewInfoFm.append(sbAdtDtcmDcAmtInfo.toString());
+		if(bCntChd) sbMoreViewInfoFm.append(sbChdDtcmDcAmtInfo.toString());
+		if(bCntInf) sbMoreViewInfoFm.append(sbInfDtcmDcAmtInfo.toString());
+		//------------------------------------
+		// 더보기 - TASF 닷컴
+		//------------------------------------
+		if(bCntAdt) sbMoreViewInfoFm.append(sbIsueFeeDtcmAdt.toString());
+		if(bCntChd) sbMoreViewInfoFm.append(sbIsueFeeDtcmChd.toString());
+		if(bCntInf) sbMoreViewInfoFm.append(sbIsueFeeDtcmInf.toString());
+		//------------------------------------
+		// 더보기 - 특별적립마일리지 닷컴(Adt + Chd)
+		//------------------------------------
+		if(bCntAdt) sbMoreViewInfoFm.append(sbDtcmAdtSpclColtMlgAmt.toString());
+		if(bCntChd) sbMoreViewInfoFm.append(sbDtcmChdSpclColtMlgAmt.toString());
+		//------------------------------------
+		// 더보기 - 카드 닷컴
+		//------------------------------------
+		if(bCntAdt) sbMoreViewInfoFm.append(sbCardDtcmAdt.toString());
+		if(bCntChd) sbMoreViewInfoFm.append(sbCardDtcmChd.toString());
+		//------------------------------------
+		// 더보기 - 대리점컴 - 일반, 닷컴만 row로 출력함(Adt, Chd, Inf는 한줄로 표현함)
+		//------------------------------------
+		StringBuilder sbTempAgtCmsnGnrlStr = new StringBuilder("");
+		StringBuilder sbTempAgtCmsnDtcmStr = new StringBuilder("");
+
+		if(bCntAdt) sbTempAgtCmsnGnrlStr.append(sbAgtCmsnGnrlAdt.toString());	// 대리점컴 - 일반 - ADT
+		if(bCntAdt) sbTempAgtCmsnDtcmStr.append(sbAgtCmsnDtcmAdt.toString());	// 대리점컴 - 닷컴 - ADT
+		if(bCntChd) {
+			// 대리점컴 - 일반 - CHD
+			if(StringUtil.isEmpty(sbTempAgtCmsnGnrlStr.toString())) {
+				sbTempAgtCmsnGnrlStr.append(sbAgtCmsnGnrlChd.toString());
+			} else {
+				sbTempAgtCmsnGnrlStr.append("," +sbAgtCmsnGnrlChd.toString());
+			}
+			// 대리점컴 - 닷컴 - CHD
+			if(StringUtil.isEmpty(sbTempAgtCmsnDtcmStr.toString())) {
+				sbTempAgtCmsnDtcmStr.append(sbAgtCmsnDtcmChd.toString());
+			} else {
+				sbTempAgtCmsnDtcmStr.append("," +sbAgtCmsnDtcmChd.toString());
+			}
+		}
+		if(bCntInf) {
+			// 대리점컴 - 일반 - INF
+			if(StringUtil.isEmpty(sbTempAgtCmsnGnrlStr.toString())) {
+				sbTempAgtCmsnGnrlStr.append(sbAgtCmsnGnrlInf.toString());
+			} else {
+				sbTempAgtCmsnGnrlStr.append("," +sbAgtCmsnGnrlInf.toString());
+			}
+			// 대리점컴 - 닷컴 - INF
+			if(StringUtil.isEmpty(sbTempAgtCmsnDtcmStr.toString())) {
+				sbTempAgtCmsnDtcmStr.append(sbAgtCmsnDtcmInf.toString());
+			} else {
+				sbTempAgtCmsnDtcmStr.append("," +sbAgtCmsnDtcmInf.toString());
+			}
+		}
+
+		// 대리점컴 - 닷컴..(ADT, CHD, INF 로 표현함)
+		sbMoreViewInfoFm.append(sbAgtCmsnGnrlTitle.toString() + sbTempAgtCmsnGnrlStr.toString());
+		sbMoreViewInfoFm.append(sbAgtCmsnDtcmTitle.toString() + sbTempAgtCmsnDtcmStr.toString());
+		//------------------------------------
+		sbMoreViewInfoFm.append("\n");
+
+
+		return new DefaultMoreViewFareBscTexts(fareBscInfo, moreTxt);
+	}
+
+	/** buildDefaultAndMoreViewInfo()의 결과를 담는 불변 보유체. */
+	private static final class DefaultMoreViewFareBscTexts {
+		private final String fareBscInfo;
+		private final String moreTxt;
+
+		private DefaultMoreViewFareBscTexts(String fareBscInfo, String moreTxt) {
+			this.fareBscInfo = fareBscInfo;
+			this.moreTxt = moreTxt;
+		}
+	}
+
+
 
 
 
