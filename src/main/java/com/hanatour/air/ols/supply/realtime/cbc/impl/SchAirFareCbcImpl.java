@@ -542,34 +542,8 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 							this.setCombFilterMap(fareFltrMap, newSplyCd, sAirFarCombYn , "결합" , 0L, FltrType.AIR_FAR_COMB_YN);
 
 							//운임 계산용 금액/포맷문자열 - 편도결합/비결합 공통 로직은 computeFeeAmountTexts()로 추출
+							//이후 로직은 feeAmountTexts를 파라미터로 그대로 넘겨 쓰므로 개별 필드는 언패킹하지 않는다.
 							FeeAmountTexts feeAmountTexts = this.computeFeeAmountTexts(farVoLst);
-							long gnrlAdtEtcAmtL = feeAmountTexts.gnrlAdtEtcAmtL;
-							long gnrlChdEtcAmtL = feeAmountTexts.gnrlChdEtcAmtL;
-							long gnrlInfEtcAmtL = feeAmountTexts.gnrlInfEtcAmtL;
-							long dtcmAdtEtcAmtL = feeAmountTexts.dtcmAdtEtcAmtL;
-							long dtcmChdEtcAmtL = feeAmountTexts.dtcmChdEtcAmtL;
-							long dtcmInfEtcAmtL = feeAmountTexts.dtcmInfEtcAmtL;
-							String adtQchrgAmtStr = feeAmountTexts.adtQchrgAmtStr;
-							String chdQchrgAmtStr = feeAmountTexts.chdQchrgAmtStr;
-							String infQchrgAmtStr = feeAmountTexts.infQchrgAmtStr;
-							String adtFuelExchgAmtStr = feeAmountTexts.adtFuelExchgAmtStr;
-							String chdFuelExchgAmtStr = feeAmountTexts.chdFuelExchgAmtStr;
-							String infFuelExchgAmtStr = feeAmountTexts.infFuelExchgAmtStr;
-							String adtTaxAmtStr = feeAmountTexts.adtTaxAmtStr;
-							String chdTaxAmtStr = feeAmountTexts.chdTaxAmtStr;
-							String infTaxAmtStr = feeAmountTexts.infTaxAmtStr;
-							String gnrlAdtIsueFeeAmtStr = feeAmountTexts.gnrlAdtIsueFeeAmtStr;
-							String gnrlChdIsueFeeAmtStr = feeAmountTexts.gnrlChdIsueFeeAmtStr;
-							String gnrlInfIsueFeeAmtStr = feeAmountTexts.gnrlInfIsueFeeAmtStr;
-							String dtcmAdtIsueFeeAmtStr = feeAmountTexts.dtcmAdtIsueFeeAmtStr;
-							String dtcmChdIsueFeeAmtStr = feeAmountTexts.dtcmChdIsueFeeAmtStr;
-							String dtcmInfIsueFeeAmtStr = feeAmountTexts.dtcmInfIsueFeeAmtStr;
-
-							//################ 기본 요금정보 #############################
-							long chdBscAmtL = farVoLst.path("chdBscAmt").asLong(0);		//계산용-아동기본요금
-							long infBscAmtL = farVoLst.path("infBscAmt").asLong(0);		//계산용-유아기본요금
-							long chdBscTotalAmt = chdBscAmtL + gnrlChdEtcAmtL;	//아동기본 최종요금
-							long infBscTotalAmt = infBscAmtL + gnrlInfEtcAmtL;	//유아기본 최종요금
 
 							//사이트룰(판매룰/할인이벤트) 텍스트 조립 - 편도결합/비결합 공통 로직은 buildSiteRuleTexts()로 추출
 							SiteRuleTexts siteRuleTexts = this.buildSiteRuleTexts(farVoLst);
@@ -1220,34 +1194,8 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 						sbAcctCodes  = new StringBuilder("");
 
 						//운임 계산용 금액/포맷문자열 - 편도결합/비결합 공통 로직은 computeFeeAmountTexts()로 추출
+						//이후 로직은 feeAmountTexts를 파라미터로 그대로 넘겨 쓰므로 개별 필드는 언패킹하지 않는다.
 						FeeAmountTexts feeAmountTexts = this.computeFeeAmountTexts(farLstNode);
-						long gnrlAdtEtcAmtL = feeAmountTexts.gnrlAdtEtcAmtL;
-						long gnrlChdEtcAmtL = feeAmountTexts.gnrlChdEtcAmtL;
-						long gnrlInfEtcAmtL = feeAmountTexts.gnrlInfEtcAmtL;
-						long dtcmAdtEtcAmtL = feeAmountTexts.dtcmAdtEtcAmtL;
-						long dtcmChdEtcAmtL = feeAmountTexts.dtcmChdEtcAmtL;
-						long dtcmInfEtcAmtL = feeAmountTexts.dtcmInfEtcAmtL;
-						String adtQchrgAmtStr = feeAmountTexts.adtQchrgAmtStr;
-						String chdQchrgAmtStr = feeAmountTexts.chdQchrgAmtStr;
-						String infQchrgAmtStr = feeAmountTexts.infQchrgAmtStr;
-						String adtFuelExchgAmtStr = feeAmountTexts.adtFuelExchgAmtStr;
-						String chdFuelExchgAmtStr = feeAmountTexts.chdFuelExchgAmtStr;
-						String infFuelExchgAmtStr = feeAmountTexts.infFuelExchgAmtStr;
-						String adtTaxAmtStr = feeAmountTexts.adtTaxAmtStr;
-						String chdTaxAmtStr = feeAmountTexts.chdTaxAmtStr;
-						String infTaxAmtStr = feeAmountTexts.infTaxAmtStr;
-						String gnrlAdtIsueFeeAmtStr = feeAmountTexts.gnrlAdtIsueFeeAmtStr;
-						String gnrlChdIsueFeeAmtStr = feeAmountTexts.gnrlChdIsueFeeAmtStr;
-						String gnrlInfIsueFeeAmtStr = feeAmountTexts.gnrlInfIsueFeeAmtStr;
-						String dtcmAdtIsueFeeAmtStr = feeAmountTexts.dtcmAdtIsueFeeAmtStr;
-						String dtcmChdIsueFeeAmtStr = feeAmountTexts.dtcmChdIsueFeeAmtStr;
-						String dtcmInfIsueFeeAmtStr = feeAmountTexts.dtcmInfIsueFeeAmtStr;
-
-						//################ 기본 요금정보 #############################
-						long chdBscAmtL = farLstNode.path("chdBscAmt").asLong(0);		//계산용-아동기본요금
-						long infBscAmtL = farLstNode.path("infBscAmt").asLong(0);		//계산용-유아기본요금
-						long chdBscTotalAmt = chdBscAmtL + gnrlChdEtcAmtL;	//아동기본 최종요금
-						long infBscTotalAmt = infBscAmtL + gnrlInfEtcAmtL;	//유아기본 최종요금
 
 						//사이트룰(판매룰/할인이벤트) 텍스트 조립 - 편도결합/비결합 공통 로직은 buildSiteRuleTexts()로 추출
 						SiteRuleTexts siteRuleTexts = this.buildSiteRuleTexts(farLstNode);
