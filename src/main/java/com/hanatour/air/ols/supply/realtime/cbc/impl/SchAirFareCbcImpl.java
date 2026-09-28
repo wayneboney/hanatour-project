@@ -551,43 +551,29 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 
 							this.setCombFilterMap(fareFltrMap, newSplyCd, sAirFarCombYn , "결합" , 0L, FltrType.AIR_FAR_COMB_YN);
 
-							long adtQchrgAmtL       = farVoLst.path("adtQchrgAmt"      ).asLong(0);	//계산용-성인Q차지금액
-							long chdQchrgAmtL       = farVoLst.path("chdQchrgAmt"      ).asLong(0);	//계산용-아동Q차지금액
-							long infQchrgAmtL       = farVoLst.path("infQchrgAmt"      ).asLong(0);	//계산용-유아Q차지금액
-							long adtTaxAmtL         = farVoLst.path("adtTaxAmt"        ).asLong(0);	//계산용-성인세금금액
-							long chdTaxAmtL         = farVoLst.path("chdTaxAmt"        ).asLong(0);	//계산용-아동세금금액
-							long infTaxAmtL         = farVoLst.path("infTaxAmt"        ).asLong(0);	//계산용-유아세금금액
-							long gnrlAdtIsueFeeAmtL = farVoLst.path("gnrlAdtIsueFeeAmt").asLong(0);	//계산용-성인발권수수료금액
-							long gnrlChdIsueFeeAmtL = farVoLst.path("gnrlChdIsueFeeAmt").asLong(0);	//계산용-아동발권수수료금액
-							long gnrlInfIsueFeeAmtL = farVoLst.path("gnrlInfIsueFeeAmt").asLong(0);	//계산용-유아발권수수료금액
-							long dtcmAdtIsueFeeAmtL = farVoLst.path("dtcmAdtIsueFeeAmt").asLong(0);	//계산용-닷컴성인발권수수료금액
-							long dtcmChdIsueFeeAmtL = farVoLst.path("dtcmChdIsueFeeAmt").asLong(0);	//계산용-닷컴아동발권수수료금액
-							long dtcmInfIsueFeeAmtL = farVoLst.path("dtcmInfIsueFeeAmt").asLong(0);	//계산용-닷컴유아발권수수료금액
-							long adtFuelExchgAmtL   = farVoLst.path("adtFuelExchgAmt"  ).asLong(0);	//계산용-성인유류할증금액
-							long chdFuelExchgAmtL   = farVoLst.path("chdFuelExchgAmt"  ).asLong(0);	//계산용-아동유류할증금액
-							long infFuelExchgAmtL   = farVoLst.path("infFuelExchgAmt"  ).asLong(0);	//계산용-유아유류할증금액
-							long gnrlAdtEtcAmtL = adtQchrgAmtL + adtTaxAmtL + gnrlAdtIsueFeeAmtL + adtFuelExchgAmtL;	//계산용-기타금액합계 - 일반
-							long gnrlChdEtcAmtL = chdQchrgAmtL + chdTaxAmtL + gnrlChdIsueFeeAmtL + chdFuelExchgAmtL;	//계산용-기타금액합계 - 일반
-							long gnrlInfEtcAmtL = infQchrgAmtL + infTaxAmtL + gnrlInfIsueFeeAmtL + infFuelExchgAmtL;	//계산용-기타금액합계 - 일반
-							long dtcmAdtEtcAmtL = adtQchrgAmtL + adtTaxAmtL + dtcmAdtIsueFeeAmtL + adtFuelExchgAmtL;	//계산용-기타금액합계 - 닷컴
-							long dtcmChdEtcAmtL = chdQchrgAmtL + chdTaxAmtL + dtcmChdIsueFeeAmtL + chdFuelExchgAmtL;	//계산용-기타금액합계 - 닷컴
-							long dtcmInfEtcAmtL = infQchrgAmtL + infTaxAmtL + dtcmInfIsueFeeAmtL + infFuelExchgAmtL;	//계산용-기타금액합계 - 닷컴
-
-							String adtQchrgAmtStr       = "Q "           + NumberUtil.formatNumber(String.valueOf(adtQchrgAmtL    ), "#,###,###");
-							String chdQchrgAmtStr       = "Q "           + NumberUtil.formatNumber(String.valueOf(chdQchrgAmtL    ), "#,###,###");
-							String infQchrgAmtStr       = "Q "           + NumberUtil.formatNumber(String.valueOf(infQchrgAmtL    ), "#,###,###");
-							String adtFuelExchgAmtStr   = " FUEL "       + NumberUtil.formatNumber(String.valueOf(adtFuelExchgAmtL), "#,###,###");
-							String chdFuelExchgAmtStr   = " FUEL "       + NumberUtil.formatNumber(String.valueOf(chdFuelExchgAmtL), "#,###,###");
-							String infFuelExchgAmtStr   = " FUEL "       + NumberUtil.formatNumber(String.valueOf(infFuelExchgAmtL), "#,###,###");
-							String adtTaxAmtStr         = " TAX "        + NumberUtil.formatNumber(String.valueOf(adtTaxAmtL      ), "#,###,###");
-							String chdTaxAmtStr         = " TAX "        + NumberUtil.formatNumber(String.valueOf(chdTaxAmtL      ), "#,###,###");
-							String infTaxAmtStr         = " TAX "        + NumberUtil.formatNumber(String.valueOf(infTaxAmtL      ), "#,###,###");
-							String gnrlAdtIsueFeeAmtStr = " TASF "       + NumberUtil.formatNumber(String.valueOf(gnrlAdtIsueFeeAmtL  ), "#,###,###");
-							String gnrlChdIsueFeeAmtStr = " TASF "       + NumberUtil.formatNumber(String.valueOf(gnrlChdIsueFeeAmtL  ), "#,###,###");
-							String gnrlInfIsueFeeAmtStr = " TASF "       + NumberUtil.formatNumber(String.valueOf(gnrlInfIsueFeeAmtL  ), "#,###,###");
-							String dtcmAdtIsueFeeAmtStr = " TASF "       + NumberUtil.formatNumber(String.valueOf(dtcmAdtIsueFeeAmtL  ), "#,###,###");
-							String dtcmChdIsueFeeAmtStr = " TASF "       + NumberUtil.formatNumber(String.valueOf(dtcmChdIsueFeeAmtL  ), "#,###,###");
-							String dtcmInfIsueFeeAmtStr = " TASF "       + NumberUtil.formatNumber(String.valueOf(dtcmInfIsueFeeAmtL  ), "#,###,###");
+							//운임 계산용 금액/포맷문자열 - 편도결합/비결합 공통 로직은 computeFeeAmountTexts()로 추출
+							FeeAmountTexts feeAmountTexts = this.computeFeeAmountTexts(farVoLst);
+							long gnrlAdtEtcAmtL = feeAmountTexts.gnrlAdtEtcAmtL;
+							long gnrlChdEtcAmtL = feeAmountTexts.gnrlChdEtcAmtL;
+							long gnrlInfEtcAmtL = feeAmountTexts.gnrlInfEtcAmtL;
+							long dtcmAdtEtcAmtL = feeAmountTexts.dtcmAdtEtcAmtL;
+							long dtcmChdEtcAmtL = feeAmountTexts.dtcmChdEtcAmtL;
+							long dtcmInfEtcAmtL = feeAmountTexts.dtcmInfEtcAmtL;
+							String adtQchrgAmtStr = feeAmountTexts.adtQchrgAmtStr;
+							String chdQchrgAmtStr = feeAmountTexts.chdQchrgAmtStr;
+							String infQchrgAmtStr = feeAmountTexts.infQchrgAmtStr;
+							String adtFuelExchgAmtStr = feeAmountTexts.adtFuelExchgAmtStr;
+							String chdFuelExchgAmtStr = feeAmountTexts.chdFuelExchgAmtStr;
+							String infFuelExchgAmtStr = feeAmountTexts.infFuelExchgAmtStr;
+							String adtTaxAmtStr = feeAmountTexts.adtTaxAmtStr;
+							String chdTaxAmtStr = feeAmountTexts.chdTaxAmtStr;
+							String infTaxAmtStr = feeAmountTexts.infTaxAmtStr;
+							String gnrlAdtIsueFeeAmtStr = feeAmountTexts.gnrlAdtIsueFeeAmtStr;
+							String gnrlChdIsueFeeAmtStr = feeAmountTexts.gnrlChdIsueFeeAmtStr;
+							String gnrlInfIsueFeeAmtStr = feeAmountTexts.gnrlInfIsueFeeAmtStr;
+							String dtcmAdtIsueFeeAmtStr = feeAmountTexts.dtcmAdtIsueFeeAmtStr;
+							String dtcmChdIsueFeeAmtStr = feeAmountTexts.dtcmChdIsueFeeAmtStr;
+							String dtcmInfIsueFeeAmtStr = feeAmountTexts.dtcmInfIsueFeeAmtStr;
 
 							//################ 기본 요금정보 #############################
 							long chdBscAmtL = farVoLst.path("chdBscAmt").asLong(0);		//계산용-아동기본요금
@@ -1914,43 +1900,29 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 						sbFareTypes  = new StringBuilder("");
 						sbAcctCodes  = new StringBuilder("");
 
-						long adtQchrgAmtL       = farLstNode.path("adtQchrgAmt"      ).asLong(0);	//계산용-성인Q차지금액
-						long chdQchrgAmtL       = farLstNode.path("chdQchrgAmt"      ).asLong(0);	//계산용-아동Q차지금액
-						long infQchrgAmtL       = farLstNode.path("infQchrgAmt"      ).asLong(0);	//계산용-유아Q차지금액
-						long adtTaxAmtL         = farLstNode.path("adtTaxAmt"        ).asLong(0);	//계산용-성인세금금액
-						long chdTaxAmtL         = farLstNode.path("chdTaxAmt"        ).asLong(0);	//계산용-아동세금금액
-						long infTaxAmtL         = farLstNode.path("infTaxAmt"        ).asLong(0);	//계산용-유아세금금액
-						long gnrlAdtIsueFeeAmtL = farLstNode.path("gnrlAdtIsueFeeAmt").asLong(0);	//계산용-성인발권수수료금액
-						long gnrlChdIsueFeeAmtL = farLstNode.path("gnrlChdIsueFeeAmt").asLong(0);	//계산용-아동발권수수료금액
-						long gnrlInfIsueFeeAmtL = farLstNode.path("gnrlInfIsueFeeAmt").asLong(0);	//계산용-유아발권수수료금액
-						long dtcmAdtIsueFeeAmtL = farLstNode.path("dtcmAdtIsueFeeAmt").asLong(0);	//계산용-닷컴성인발권수수료금액
-						long dtcmChdIsueFeeAmtL = farLstNode.path("dtcmChdIsueFeeAmt").asLong(0);	//계산용-닷컴아동발권수수료금액
-						long dtcmInfIsueFeeAmtL = farLstNode.path("dtcmInfIsueFeeAmt").asLong(0);	//계산용-닷컴유아발권수수료금액
-						long adtFuelExchgAmtL   = farLstNode.path("adtFuelExchgAmt"  ).asLong(0);	//계산용-성인유류할증금액
-						long chdFuelExchgAmtL   = farLstNode.path("chdFuelExchgAmt"  ).asLong(0);	//계산용-아동유류할증금액
-						long infFuelExchgAmtL   = farLstNode.path("infFuelExchgAmt"  ).asLong(0);	//계산용-유아유류할증금액
-						long gnrlAdtEtcAmtL = adtQchrgAmtL + adtTaxAmtL + gnrlAdtIsueFeeAmtL + adtFuelExchgAmtL;	//계산용-기타금액합계 - 일반
-						long gnrlChdEtcAmtL = chdQchrgAmtL + chdTaxAmtL + gnrlChdIsueFeeAmtL + chdFuelExchgAmtL;	//계산용-기타금액합계 - 일반
-						long gnrlInfEtcAmtL = infQchrgAmtL + infTaxAmtL + gnrlInfIsueFeeAmtL + infFuelExchgAmtL;	//계산용-기타금액합계 - 일반
-						long dtcmAdtEtcAmtL = adtQchrgAmtL + adtTaxAmtL + dtcmAdtIsueFeeAmtL + adtFuelExchgAmtL;	//계산용-기타금액합계 - 닷컴
-						long dtcmChdEtcAmtL = chdQchrgAmtL + chdTaxAmtL + dtcmChdIsueFeeAmtL + chdFuelExchgAmtL;	//계산용-기타금액합계 - 닷컴
-						long dtcmInfEtcAmtL = infQchrgAmtL + infTaxAmtL + dtcmInfIsueFeeAmtL + infFuelExchgAmtL;	//계산용-기타금액합계 - 닷컴
-
-						String adtQchrgAmtStr       = "Q "           + NumberUtil.formatNumber(String.valueOf(adtQchrgAmtL    ), "#,###,###");
-						String chdQchrgAmtStr       = "Q "           + NumberUtil.formatNumber(String.valueOf(chdQchrgAmtL    ), "#,###,###");
-						String infQchrgAmtStr       = "Q "           + NumberUtil.formatNumber(String.valueOf(infQchrgAmtL    ), "#,###,###");
-						String adtFuelExchgAmtStr   = " FUEL "       + NumberUtil.formatNumber(String.valueOf(adtFuelExchgAmtL), "#,###,###");
-						String chdFuelExchgAmtStr   = " FUEL "       + NumberUtil.formatNumber(String.valueOf(chdFuelExchgAmtL), "#,###,###");
-						String infFuelExchgAmtStr   = " FUEL "       + NumberUtil.formatNumber(String.valueOf(infFuelExchgAmtL), "#,###,###");
-						String adtTaxAmtStr         = " TAX "        + NumberUtil.formatNumber(String.valueOf(adtTaxAmtL      ), "#,###,###");
-						String chdTaxAmtStr         = " TAX "        + NumberUtil.formatNumber(String.valueOf(chdTaxAmtL      ), "#,###,###");
-						String infTaxAmtStr         = " TAX "        + NumberUtil.formatNumber(String.valueOf(infTaxAmtL      ), "#,###,###");
-						String gnrlAdtIsueFeeAmtStr = " TASF "       + NumberUtil.formatNumber(String.valueOf(gnrlAdtIsueFeeAmtL  ), "#,###,###");
-						String gnrlChdIsueFeeAmtStr = " TASF "       + NumberUtil.formatNumber(String.valueOf(gnrlChdIsueFeeAmtL  ), "#,###,###");
-						String gnrlInfIsueFeeAmtStr = " TASF "       + NumberUtil.formatNumber(String.valueOf(gnrlInfIsueFeeAmtL  ), "#,###,###");
-						String dtcmAdtIsueFeeAmtStr = " TASF "       + NumberUtil.formatNumber(String.valueOf(dtcmAdtIsueFeeAmtL  ), "#,###,###");
-						String dtcmChdIsueFeeAmtStr = " TASF "       + NumberUtil.formatNumber(String.valueOf(dtcmChdIsueFeeAmtL  ), "#,###,###");
-						String dtcmInfIsueFeeAmtStr = " TASF "       + NumberUtil.formatNumber(String.valueOf(dtcmInfIsueFeeAmtL  ), "#,###,###");
+						//운임 계산용 금액/포맷문자열 - 편도결합/비결합 공통 로직은 computeFeeAmountTexts()로 추출
+						FeeAmountTexts feeAmountTexts = this.computeFeeAmountTexts(farLstNode);
+						long gnrlAdtEtcAmtL = feeAmountTexts.gnrlAdtEtcAmtL;
+						long gnrlChdEtcAmtL = feeAmountTexts.gnrlChdEtcAmtL;
+						long gnrlInfEtcAmtL = feeAmountTexts.gnrlInfEtcAmtL;
+						long dtcmAdtEtcAmtL = feeAmountTexts.dtcmAdtEtcAmtL;
+						long dtcmChdEtcAmtL = feeAmountTexts.dtcmChdEtcAmtL;
+						long dtcmInfEtcAmtL = feeAmountTexts.dtcmInfEtcAmtL;
+						String adtQchrgAmtStr = feeAmountTexts.adtQchrgAmtStr;
+						String chdQchrgAmtStr = feeAmountTexts.chdQchrgAmtStr;
+						String infQchrgAmtStr = feeAmountTexts.infQchrgAmtStr;
+						String adtFuelExchgAmtStr = feeAmountTexts.adtFuelExchgAmtStr;
+						String chdFuelExchgAmtStr = feeAmountTexts.chdFuelExchgAmtStr;
+						String infFuelExchgAmtStr = feeAmountTexts.infFuelExchgAmtStr;
+						String adtTaxAmtStr = feeAmountTexts.adtTaxAmtStr;
+						String chdTaxAmtStr = feeAmountTexts.chdTaxAmtStr;
+						String infTaxAmtStr = feeAmountTexts.infTaxAmtStr;
+						String gnrlAdtIsueFeeAmtStr = feeAmountTexts.gnrlAdtIsueFeeAmtStr;
+						String gnrlChdIsueFeeAmtStr = feeAmountTexts.gnrlChdIsueFeeAmtStr;
+						String gnrlInfIsueFeeAmtStr = feeAmountTexts.gnrlInfIsueFeeAmtStr;
+						String dtcmAdtIsueFeeAmtStr = feeAmountTexts.dtcmAdtIsueFeeAmtStr;
+						String dtcmChdIsueFeeAmtStr = feeAmountTexts.dtcmChdIsueFeeAmtStr;
+						String dtcmInfIsueFeeAmtStr = feeAmountTexts.dtcmInfIsueFeeAmtStr;
 
 						//################ 기본 요금정보 #############################
 						long chdBscAmtL = farLstNode.path("chdBscAmt").asLong(0);		//계산용-아동기본요금
@@ -3492,6 +3464,104 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 			this.dcEventNm = dcEventNm;
 		}
 	}
+	/**
+	 * 운임 계산용 금액(Q/FUEL/TAX/TASF 등) 및 포맷 문자열을 계산한다.
+	 * farVoLst(편도결합)/farLstNode(비결합)는 필드명이 동일하므로 fareNode 하나로 통일.
+	 * 원본 로직 무변경.
+	 */
+	private FeeAmountTexts computeFeeAmountTexts(JsonNode fareNode) {
+		long adtQchrgAmtL       = fareNode.path("adtQchrgAmt"      ).asLong(0);	//계산용-성인Q차지금액
+		long chdQchrgAmtL       = fareNode.path("chdQchrgAmt"      ).asLong(0);	//계산용-아동Q차지금액
+		long infQchrgAmtL       = fareNode.path("infQchrgAmt"      ).asLong(0);	//계산용-유아Q차지금액
+		long adtTaxAmtL         = fareNode.path("adtTaxAmt"        ).asLong(0);	//계산용-성인세금금액
+		long chdTaxAmtL         = fareNode.path("chdTaxAmt"        ).asLong(0);	//계산용-아동세금금액
+		long infTaxAmtL         = fareNode.path("infTaxAmt"        ).asLong(0);	//계산용-유아세금금액
+		long gnrlAdtIsueFeeAmtL = fareNode.path("gnrlAdtIsueFeeAmt").asLong(0);	//계산용-성인발권수수료금액
+		long gnrlChdIsueFeeAmtL = fareNode.path("gnrlChdIsueFeeAmt").asLong(0);	//계산용-아동발권수수료금액
+		long gnrlInfIsueFeeAmtL = fareNode.path("gnrlInfIsueFeeAmt").asLong(0);	//계산용-유아발권수수료금액
+		long dtcmAdtIsueFeeAmtL = fareNode.path("dtcmAdtIsueFeeAmt").asLong(0);	//계산용-닷컴성인발권수수료금액
+		long dtcmChdIsueFeeAmtL = fareNode.path("dtcmChdIsueFeeAmt").asLong(0);	//계산용-닷컴아동발권수수료금액
+		long dtcmInfIsueFeeAmtL = fareNode.path("dtcmInfIsueFeeAmt").asLong(0);	//계산용-닷컴유아발권수수료금액
+		long adtFuelExchgAmtL   = fareNode.path("adtFuelExchgAmt"  ).asLong(0);	//계산용-성인유류할증금액
+		long chdFuelExchgAmtL   = fareNode.path("chdFuelExchgAmt"  ).asLong(0);	//계산용-아동유류할증금액
+		long infFuelExchgAmtL   = fareNode.path("infFuelExchgAmt"  ).asLong(0);	//계산용-유아유류할증금액
+		long gnrlAdtEtcAmtL = adtQchrgAmtL + adtTaxAmtL + gnrlAdtIsueFeeAmtL + adtFuelExchgAmtL;	//계산용-기타금액합계 - 일반
+		long gnrlChdEtcAmtL = chdQchrgAmtL + chdTaxAmtL + gnrlChdIsueFeeAmtL + chdFuelExchgAmtL;	//계산용-기타금액합계 - 일반
+		long gnrlInfEtcAmtL = infQchrgAmtL + infTaxAmtL + gnrlInfIsueFeeAmtL + infFuelExchgAmtL;	//계산용-기타금액합계 - 일반
+		long dtcmAdtEtcAmtL = adtQchrgAmtL + adtTaxAmtL + dtcmAdtIsueFeeAmtL + adtFuelExchgAmtL;	//계산용-기타금액합계 - 닷컴
+		long dtcmChdEtcAmtL = chdQchrgAmtL + chdTaxAmtL + dtcmChdIsueFeeAmtL + chdFuelExchgAmtL;	//계산용-기타금액합계 - 닷컴
+		long dtcmInfEtcAmtL = infQchrgAmtL + infTaxAmtL + dtcmInfIsueFeeAmtL + infFuelExchgAmtL;	//계산용-기타금액합계 - 닷컴
+
+		String adtQchrgAmtStr       = "Q "           + NumberUtil.formatNumber(String.valueOf(adtQchrgAmtL    ), "#,###,###");
+		String chdQchrgAmtStr       = "Q "           + NumberUtil.formatNumber(String.valueOf(chdQchrgAmtL    ), "#,###,###");
+		String infQchrgAmtStr       = "Q "           + NumberUtil.formatNumber(String.valueOf(infQchrgAmtL    ), "#,###,###");
+		String adtFuelExchgAmtStr   = " FUEL "       + NumberUtil.formatNumber(String.valueOf(adtFuelExchgAmtL), "#,###,###");
+		String chdFuelExchgAmtStr   = " FUEL "       + NumberUtil.formatNumber(String.valueOf(chdFuelExchgAmtL), "#,###,###");
+		String infFuelExchgAmtStr   = " FUEL "       + NumberUtil.formatNumber(String.valueOf(infFuelExchgAmtL), "#,###,###");
+		String adtTaxAmtStr         = " TAX "        + NumberUtil.formatNumber(String.valueOf(adtTaxAmtL      ), "#,###,###");
+		String chdTaxAmtStr         = " TAX "        + NumberUtil.formatNumber(String.valueOf(chdTaxAmtL      ), "#,###,###");
+		String infTaxAmtStr         = " TAX "        + NumberUtil.formatNumber(String.valueOf(infTaxAmtL      ), "#,###,###");
+		String gnrlAdtIsueFeeAmtStr = " TASF "       + NumberUtil.formatNumber(String.valueOf(gnrlAdtIsueFeeAmtL  ), "#,###,###");
+		String gnrlChdIsueFeeAmtStr = " TASF "       + NumberUtil.formatNumber(String.valueOf(gnrlChdIsueFeeAmtL  ), "#,###,###");
+		String gnrlInfIsueFeeAmtStr = " TASF "       + NumberUtil.formatNumber(String.valueOf(gnrlInfIsueFeeAmtL  ), "#,###,###");
+		String dtcmAdtIsueFeeAmtStr = " TASF "       + NumberUtil.formatNumber(String.valueOf(dtcmAdtIsueFeeAmtL  ), "#,###,###");
+		String dtcmChdIsueFeeAmtStr = " TASF "       + NumberUtil.formatNumber(String.valueOf(dtcmChdIsueFeeAmtL  ), "#,###,###");
+		String dtcmInfIsueFeeAmtStr = " TASF "       + NumberUtil.formatNumber(String.valueOf(dtcmInfIsueFeeAmtL  ), "#,###,###");
+
+
+		return new FeeAmountTexts(gnrlAdtEtcAmtL, gnrlChdEtcAmtL, gnrlInfEtcAmtL, dtcmAdtEtcAmtL, dtcmChdEtcAmtL, dtcmInfEtcAmtL, adtQchrgAmtStr, chdQchrgAmtStr, infQchrgAmtStr, adtFuelExchgAmtStr, chdFuelExchgAmtStr, infFuelExchgAmtStr, adtTaxAmtStr, chdTaxAmtStr, infTaxAmtStr, gnrlAdtIsueFeeAmtStr, gnrlChdIsueFeeAmtStr, gnrlInfIsueFeeAmtStr, dtcmAdtIsueFeeAmtStr, dtcmChdIsueFeeAmtStr, dtcmInfIsueFeeAmtStr);
+	}
+
+	/** computeFeeAmountTexts()의 결과를 담는 불변 보유체. */
+	private static final class FeeAmountTexts {
+		private final long gnrlAdtEtcAmtL;
+		private final long gnrlChdEtcAmtL;
+		private final long gnrlInfEtcAmtL;
+		private final long dtcmAdtEtcAmtL;
+		private final long dtcmChdEtcAmtL;
+		private final long dtcmInfEtcAmtL;
+		private final String adtQchrgAmtStr;
+		private final String chdQchrgAmtStr;
+		private final String infQchrgAmtStr;
+		private final String adtFuelExchgAmtStr;
+		private final String chdFuelExchgAmtStr;
+		private final String infFuelExchgAmtStr;
+		private final String adtTaxAmtStr;
+		private final String chdTaxAmtStr;
+		private final String infTaxAmtStr;
+		private final String gnrlAdtIsueFeeAmtStr;
+		private final String gnrlChdIsueFeeAmtStr;
+		private final String gnrlInfIsueFeeAmtStr;
+		private final String dtcmAdtIsueFeeAmtStr;
+		private final String dtcmChdIsueFeeAmtStr;
+		private final String dtcmInfIsueFeeAmtStr;
+
+		private FeeAmountTexts(long gnrlAdtEtcAmtL, long gnrlChdEtcAmtL, long gnrlInfEtcAmtL, long dtcmAdtEtcAmtL, long dtcmChdEtcAmtL, long dtcmInfEtcAmtL, String adtQchrgAmtStr, String chdQchrgAmtStr, String infQchrgAmtStr, String adtFuelExchgAmtStr, String chdFuelExchgAmtStr, String infFuelExchgAmtStr, String adtTaxAmtStr, String chdTaxAmtStr, String infTaxAmtStr, String gnrlAdtIsueFeeAmtStr, String gnrlChdIsueFeeAmtStr, String gnrlInfIsueFeeAmtStr, String dtcmAdtIsueFeeAmtStr, String dtcmChdIsueFeeAmtStr, String dtcmInfIsueFeeAmtStr) {
+			this.gnrlAdtEtcAmtL = gnrlAdtEtcAmtL;
+			this.gnrlChdEtcAmtL = gnrlChdEtcAmtL;
+			this.gnrlInfEtcAmtL = gnrlInfEtcAmtL;
+			this.dtcmAdtEtcAmtL = dtcmAdtEtcAmtL;
+			this.dtcmChdEtcAmtL = dtcmChdEtcAmtL;
+			this.dtcmInfEtcAmtL = dtcmInfEtcAmtL;
+			this.adtQchrgAmtStr = adtQchrgAmtStr;
+			this.chdQchrgAmtStr = chdQchrgAmtStr;
+			this.infQchrgAmtStr = infQchrgAmtStr;
+			this.adtFuelExchgAmtStr = adtFuelExchgAmtStr;
+			this.chdFuelExchgAmtStr = chdFuelExchgAmtStr;
+			this.infFuelExchgAmtStr = infFuelExchgAmtStr;
+			this.adtTaxAmtStr = adtTaxAmtStr;
+			this.chdTaxAmtStr = chdTaxAmtStr;
+			this.infTaxAmtStr = infTaxAmtStr;
+			this.gnrlAdtIsueFeeAmtStr = gnrlAdtIsueFeeAmtStr;
+			this.gnrlChdIsueFeeAmtStr = gnrlChdIsueFeeAmtStr;
+			this.gnrlInfIsueFeeAmtStr = gnrlInfIsueFeeAmtStr;
+			this.dtcmAdtIsueFeeAmtStr = dtcmAdtIsueFeeAmtStr;
+			this.dtcmChdIsueFeeAmtStr = dtcmChdIsueFeeAmtStr;
+			this.dtcmInfIsueFeeAmtStr = dtcmInfIsueFeeAmtStr;
+		}
+	}
+
+
 
 
 	
