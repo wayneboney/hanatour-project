@@ -1032,49 +1032,13 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 								exlsTargnYnStr = exlsTargnYnStr + "\n";
 							}
 
-							//--------------------------------------
-							// 특별적립마일리지금액
-							//--------------------------------------
-							long gnrlAdtSpclColtMlgTrfL = farVoLst.path("gnrlAdtSpclColtMlgTrf").asLong(0);	//일반성인특별적립마일리지율
-							long gnrlChdSpclColtMlgTrfL = farVoLst.path("gnrlChdSpclColtMlgTrf").asLong(0);	//일반아동특별적립마일리지율
-							long dtcmAdtSpclColtMlgTrfL = farVoLst.path("dtcmAdtSpclColtMlgTrf").asLong(0);	//닷컴성인특별적립마일리지율
-							long dtcmChdSpclColtMlgTrfL = farVoLst.path("dtcmChdSpclColtMlgTrf").asLong(0);	//닷컴아동특별적립마일리지율
+							//특별적립마일리지 텍스트 - 편도결합/비결합 공통 로직은 buildSpclColtMlgTexts()로 추출
+							SpclColtMlgTexts spclColtMlgTexts = this.buildSpclColtMlgTexts(farVoLst);
+							sbGnrlAdtSpclColtMlgAmt = spclColtMlgTexts.sbGnrlAdtSpclColtMlgAmt;
+							sbGnrlChdSpclColtMlgAmt = spclColtMlgTexts.sbGnrlChdSpclColtMlgAmt;
+							sbDtcmAdtSpclColtMlgAmt = spclColtMlgTexts.sbDtcmAdtSpclColtMlgAmt;
+							sbDtcmChdSpclColtMlgAmt = spclColtMlgTexts.sbDtcmChdSpclColtMlgAmt;
 
-							long gnrlAdtSpclColtMlgAmtL = farVoLst.path("gnrlAdtSpclColtMlgAmt").asLong(0);	//일반성인특별적립마일리지금액
-							long gnrlChdSpclColtMlgAmtL = farVoLst.path("gnrlChdSpclColtMlgAmt").asLong(0);	//일반아동특별적립마일리지금액
-							long dtcmAdtSpclColtMlgAmtL = farVoLst.path("dtcmAdtSpclColtMlgAmt").asLong(0);	//닷컴성인특별적립마일리지금액
-							long dtcmChdSpclColtMlgAmtL = farVoLst.path("dtcmChdSpclColtMlgAmt").asLong(0);	//닷컴아동특별적립마일리지금액
-
-							sbGnrlAdtSpclColtMlgAmt = new StringBuilder("");
-							sbGnrlChdSpclColtMlgAmt = new StringBuilder("");
-							sbDtcmAdtSpclColtMlgAmt = new StringBuilder("");
-							sbDtcmChdSpclColtMlgAmt = new StringBuilder("");
-
-							if(gnrlAdtSpclColtMlgAmtL != 0) {
-								sbGnrlAdtSpclColtMlgAmt.append("\n일반 특별적립마일리지 ADT ");
-								sbGnrlAdtSpclColtMlgAmt.append(NumberUtil.formatNumber(gnrlAdtSpclColtMlgTrfL, "#,###,###"));
-								if(gnrlAdtSpclColtMlgTrfL < 100) sbGnrlAdtSpclColtMlgAmt.append("% / ");		// 율과 금액 동일필드로 사용함으로 100 미만일 경우 '%' 붙임
-								sbGnrlAdtSpclColtMlgAmt.append(NumberUtil.formatNumber(gnrlAdtSpclColtMlgAmtL, "#,###,###"));
-							}
-							if(gnrlChdSpclColtMlgAmtL != 0) {
-								sbGnrlChdSpclColtMlgAmt.append("\n일반 특별적립마일리지 CHD ");
-								sbGnrlChdSpclColtMlgAmt.append(NumberUtil.formatNumber(gnrlChdSpclColtMlgTrfL, "#,###,###"));
-								if(gnrlChdSpclColtMlgTrfL < 100) sbGnrlChdSpclColtMlgAmt.append("% / ");		// 율과 금액 동일필드로 사용함으로 100 미만일 경우 '%' 붙임
-								sbGnrlChdSpclColtMlgAmt.append(NumberUtil.formatNumber(gnrlChdSpclColtMlgAmtL, "#,###,###"));
-							}
-							if(dtcmAdtSpclColtMlgAmtL != 0) {
-								sbDtcmAdtSpclColtMlgAmt.append("\n닷컴 특별적립마일리지 ADT ");
-								sbDtcmAdtSpclColtMlgAmt.append(NumberUtil.formatNumber(dtcmAdtSpclColtMlgTrfL, "#,###,###"));
-								if(dtcmAdtSpclColtMlgTrfL < 100) sbDtcmAdtSpclColtMlgAmt.append("% / ");		// 율과 금액 동일필드로 사용함으로 100 미만일 경우 '%' 붙임
-								sbDtcmAdtSpclColtMlgAmt.append(NumberUtil.formatNumber(dtcmAdtSpclColtMlgAmtL, "#,###,###"));
-							}
-							if(dtcmChdSpclColtMlgAmtL != 0) {
-								sbDtcmChdSpclColtMlgAmt.append("\n닷컴 특별적립마일리지 CHD ");
-								sbDtcmChdSpclColtMlgAmt.append(NumberUtil.formatNumber(dtcmChdSpclColtMlgTrfL, "#,###,###"));
-								if(dtcmChdSpclColtMlgTrfL < 100) sbDtcmChdSpclColtMlgAmt.append("% / ");		// 율과 금액 동일필드로 사용함으로 100 미만일 경우 '%' 붙임
-								sbDtcmChdSpclColtMlgAmt.append(NumberUtil.formatNumber(dtcmChdSpclColtMlgAmtL, "#,###,###"));
-							}
-							//--------------------------------------
 
 
 
@@ -1934,49 +1898,13 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 							exlsTargnYnStr = exlsTargnYnStr + "\n";
 						}
 
-						//--------------------------------------
-						// 특별적립마일리지금액
-						//--------------------------------------
-						long gnrlAdtSpclColtMlgTrfL = farLstNode.path("gnrlAdtSpclColtMlgTrf").asLong(0);	//일반성인특별적립마일리지율
-						long gnrlChdSpclColtMlgTrfL = farLstNode.path("gnrlChdSpclColtMlgTrf").asLong(0);	//일반아동특별적립마일리지율
-						long dtcmAdtSpclColtMlgTrfL = farLstNode.path("dtcmAdtSpclColtMlgTrf").asLong(0);	//닷컴성인특별적립마일리지율
-						long dtcmChdSpclColtMlgTrfL = farLstNode.path("dtcmChdSpclColtMlgTrf").asLong(0);	//닷컴아동특별적립마일리지율
+						//특별적립마일리지 텍스트 - 편도결합/비결합 공통 로직은 buildSpclColtMlgTexts()로 추출
+						SpclColtMlgTexts spclColtMlgTexts = this.buildSpclColtMlgTexts(farLstNode);
+						sbGnrlAdtSpclColtMlgAmt = spclColtMlgTexts.sbGnrlAdtSpclColtMlgAmt;
+						sbGnrlChdSpclColtMlgAmt = spclColtMlgTexts.sbGnrlChdSpclColtMlgAmt;
+						sbDtcmAdtSpclColtMlgAmt = spclColtMlgTexts.sbDtcmAdtSpclColtMlgAmt;
+						sbDtcmChdSpclColtMlgAmt = spclColtMlgTexts.sbDtcmChdSpclColtMlgAmt;
 
-						long gnrlAdtSpclColtMlgAmtL = farLstNode.path("gnrlAdtSpclColtMlgAmt").asLong(0);	//일반성인특별적립마일리지금액
-						long gnrlChdSpclColtMlgAmtL = farLstNode.path("gnrlChdSpclColtMlgAmt").asLong(0);	//일반아동특별적립마일리지금액
-						long dtcmAdtSpclColtMlgAmtL = farLstNode.path("dtcmAdtSpclColtMlgAmt").asLong(0);	//닷컴성인특별적립마일리지금액
-						long dtcmChdSpclColtMlgAmtL = farLstNode.path("dtcmChdSpclColtMlgAmt").asLong(0);	//닷컴아동특별적립마일리지금액
-
-						sbGnrlAdtSpclColtMlgAmt = new StringBuilder("");
-						sbGnrlChdSpclColtMlgAmt = new StringBuilder("");
-						sbDtcmAdtSpclColtMlgAmt = new StringBuilder("");
-						sbDtcmChdSpclColtMlgAmt = new StringBuilder("");
-
-						if(gnrlAdtSpclColtMlgAmtL != 0) {
-							sbGnrlAdtSpclColtMlgAmt.append("\n일반 특별적립마일리지 ADT ");
-							sbGnrlAdtSpclColtMlgAmt.append(NumberUtil.formatNumber(gnrlAdtSpclColtMlgTrfL, "#,###,###"));
-							if(gnrlAdtSpclColtMlgTrfL < 100) sbGnrlAdtSpclColtMlgAmt.append("% / ");		// 율과 금액 동일필드로 사용함으로 100 미만일 경우 '%' 붙임
-							sbGnrlAdtSpclColtMlgAmt.append(NumberUtil.formatNumber(gnrlAdtSpclColtMlgAmtL, "#,###,###"));
-						}
-						if(gnrlChdSpclColtMlgAmtL != 0) {
-							sbGnrlChdSpclColtMlgAmt.append("\n일반 특별적립마일리지 CHD ");
-							sbGnrlChdSpclColtMlgAmt.append(NumberUtil.formatNumber(gnrlChdSpclColtMlgTrfL, "#,###,###"));
-							if(gnrlChdSpclColtMlgTrfL < 100) sbGnrlChdSpclColtMlgAmt.append("% / ");		// 율과 금액 동일필드로 사용함으로 100 미만일 경우 '%' 붙임
-							sbGnrlChdSpclColtMlgAmt.append(NumberUtil.formatNumber(gnrlChdSpclColtMlgAmtL, "#,###,###"));
-						}
-						if(dtcmAdtSpclColtMlgAmtL != 0) {
-							sbDtcmAdtSpclColtMlgAmt.append("\n닷컴 특별적립마일리지 ADT ");
-							sbDtcmAdtSpclColtMlgAmt.append(NumberUtil.formatNumber(dtcmAdtSpclColtMlgTrfL, "#,###,###"));
-							if(dtcmAdtSpclColtMlgTrfL < 100) sbDtcmAdtSpclColtMlgAmt.append("% / ");		// 율과 금액 동일필드로 사용함으로 100 미만일 경우 '%' 붙임
-							sbDtcmAdtSpclColtMlgAmt.append(NumberUtil.formatNumber(dtcmAdtSpclColtMlgAmtL, "#,###,###"));
-						}
-						if(dtcmChdSpclColtMlgAmtL != 0) {
-							sbDtcmChdSpclColtMlgAmt.append("\n닷컴 특별적립마일리지 CHD ");
-							sbDtcmChdSpclColtMlgAmt.append(NumberUtil.formatNumber(dtcmChdSpclColtMlgTrfL, "#,###,###"));
-							if(dtcmChdSpclColtMlgTrfL < 100) sbDtcmChdSpclColtMlgAmt.append("% / ");		// 율과 금액 동일필드로 사용함으로 100 미만일 경우 '%' 붙임
-							sbDtcmChdSpclColtMlgAmt.append(NumberUtil.formatNumber(dtcmChdSpclColtMlgAmtL, "#,###,###"));
-						}
-						//--------------------------------------
 
 						sbAdtGnrlDcAmtInfo = new StringBuilder("");
 						sbChdGnrlDcAmtInfo = new StringBuilder("");
@@ -3288,6 +3216,75 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 			this.sbIsueFeeDtcmInf = sbIsueFeeDtcmInf;
 		}
 	}
+	/**
+	 * 특별적립마일리지(일반/닷컴, 성인/아동) 텍스트를 조립한다.
+	 * farVoLst(편도결합)/farLstNode(비결합)는 필드명이 동일하므로 fareNode 하나로 통일. 원본 로직 무변경.
+	 */
+	private SpclColtMlgTexts buildSpclColtMlgTexts(JsonNode fareNode) {
+		//--------------------------------------
+		// 특별적립마일리지금액
+		//--------------------------------------
+		long gnrlAdtSpclColtMlgTrfL = fareNode.path("gnrlAdtSpclColtMlgTrf").asLong(0);	//일반성인특별적립마일리지율
+		long gnrlChdSpclColtMlgTrfL = fareNode.path("gnrlChdSpclColtMlgTrf").asLong(0);	//일반아동특별적립마일리지율
+		long dtcmAdtSpclColtMlgTrfL = fareNode.path("dtcmAdtSpclColtMlgTrf").asLong(0);	//닷컴성인특별적립마일리지율
+		long dtcmChdSpclColtMlgTrfL = fareNode.path("dtcmChdSpclColtMlgTrf").asLong(0);	//닷컴아동특별적립마일리지율
+
+		long gnrlAdtSpclColtMlgAmtL = fareNode.path("gnrlAdtSpclColtMlgAmt").asLong(0);	//일반성인특별적립마일리지금액
+		long gnrlChdSpclColtMlgAmtL = fareNode.path("gnrlChdSpclColtMlgAmt").asLong(0);	//일반아동특별적립마일리지금액
+		long dtcmAdtSpclColtMlgAmtL = fareNode.path("dtcmAdtSpclColtMlgAmt").asLong(0);	//닷컴성인특별적립마일리지금액
+		long dtcmChdSpclColtMlgAmtL = fareNode.path("dtcmChdSpclColtMlgAmt").asLong(0);	//닷컴아동특별적립마일리지금액
+
+		StringBuilder sbGnrlAdtSpclColtMlgAmt = new StringBuilder("");
+		StringBuilder sbGnrlChdSpclColtMlgAmt = new StringBuilder("");
+		StringBuilder sbDtcmAdtSpclColtMlgAmt = new StringBuilder("");
+		StringBuilder sbDtcmChdSpclColtMlgAmt = new StringBuilder("");
+
+		if(gnrlAdtSpclColtMlgAmtL != 0) {
+			sbGnrlAdtSpclColtMlgAmt.append("\n일반 특별적립마일리지 ADT ");
+			sbGnrlAdtSpclColtMlgAmt.append(NumberUtil.formatNumber(gnrlAdtSpclColtMlgTrfL, "#,###,###"));
+			if(gnrlAdtSpclColtMlgTrfL < 100) sbGnrlAdtSpclColtMlgAmt.append("% / ");		// 율과 금액 동일필드로 사용함으로 100 미만일 경우 '%' 붙임
+			sbGnrlAdtSpclColtMlgAmt.append(NumberUtil.formatNumber(gnrlAdtSpclColtMlgAmtL, "#,###,###"));
+		}
+		if(gnrlChdSpclColtMlgAmtL != 0) {
+			sbGnrlChdSpclColtMlgAmt.append("\n일반 특별적립마일리지 CHD ");
+			sbGnrlChdSpclColtMlgAmt.append(NumberUtil.formatNumber(gnrlChdSpclColtMlgTrfL, "#,###,###"));
+			if(gnrlChdSpclColtMlgTrfL < 100) sbGnrlChdSpclColtMlgAmt.append("% / ");		// 율과 금액 동일필드로 사용함으로 100 미만일 경우 '%' 붙임
+			sbGnrlChdSpclColtMlgAmt.append(NumberUtil.formatNumber(gnrlChdSpclColtMlgAmtL, "#,###,###"));
+		}
+		if(dtcmAdtSpclColtMlgAmtL != 0) {
+			sbDtcmAdtSpclColtMlgAmt.append("\n닷컴 특별적립마일리지 ADT ");
+			sbDtcmAdtSpclColtMlgAmt.append(NumberUtil.formatNumber(dtcmAdtSpclColtMlgTrfL, "#,###,###"));
+			if(dtcmAdtSpclColtMlgTrfL < 100) sbDtcmAdtSpclColtMlgAmt.append("% / ");		// 율과 금액 동일필드로 사용함으로 100 미만일 경우 '%' 붙임
+			sbDtcmAdtSpclColtMlgAmt.append(NumberUtil.formatNumber(dtcmAdtSpclColtMlgAmtL, "#,###,###"));
+		}
+		if(dtcmChdSpclColtMlgAmtL != 0) {
+			sbDtcmChdSpclColtMlgAmt.append("\n닷컴 특별적립마일리지 CHD ");
+			sbDtcmChdSpclColtMlgAmt.append(NumberUtil.formatNumber(dtcmChdSpclColtMlgTrfL, "#,###,###"));
+			if(dtcmChdSpclColtMlgTrfL < 100) sbDtcmChdSpclColtMlgAmt.append("% / ");		// 율과 금액 동일필드로 사용함으로 100 미만일 경우 '%' 붙임
+			sbDtcmChdSpclColtMlgAmt.append(NumberUtil.formatNumber(dtcmChdSpclColtMlgAmtL, "#,###,###"));
+		}
+		//--------------------------------------
+
+
+		return new SpclColtMlgTexts(sbGnrlAdtSpclColtMlgAmt, sbGnrlChdSpclColtMlgAmt, sbDtcmAdtSpclColtMlgAmt, sbDtcmChdSpclColtMlgAmt);
+	}
+
+	/** buildSpclColtMlgTexts()의 결과를 담는 불변 보유체. */
+	private static final class SpclColtMlgTexts {
+		private final StringBuilder sbGnrlAdtSpclColtMlgAmt;
+		private final StringBuilder sbGnrlChdSpclColtMlgAmt;
+		private final StringBuilder sbDtcmAdtSpclColtMlgAmt;
+		private final StringBuilder sbDtcmChdSpclColtMlgAmt;
+
+		private SpclColtMlgTexts(StringBuilder sbGnrlAdtSpclColtMlgAmt, StringBuilder sbGnrlChdSpclColtMlgAmt, StringBuilder sbDtcmAdtSpclColtMlgAmt, StringBuilder sbDtcmChdSpclColtMlgAmt) {
+			this.sbGnrlAdtSpclColtMlgAmt = sbGnrlAdtSpclColtMlgAmt;
+			this.sbGnrlChdSpclColtMlgAmt = sbGnrlChdSpclColtMlgAmt;
+			this.sbDtcmAdtSpclColtMlgAmt = sbDtcmAdtSpclColtMlgAmt;
+			this.sbDtcmChdSpclColtMlgAmt = sbDtcmChdSpclColtMlgAmt;
+		}
+	}
+
+
 
 
 
