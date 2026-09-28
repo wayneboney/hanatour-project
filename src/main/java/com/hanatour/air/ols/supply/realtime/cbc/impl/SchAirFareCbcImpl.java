@@ -1097,186 +1097,15 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 							isExistCardDtcmInfo = cardPromotionTexts.isExistCardDtcmInfo;
 
 
-							//#### 발권수수료정보 #####
-							JsonNode feeDtlNode = farVoLst.path("feeDtl");
-							sbIsueFeeGnrlAdt = new StringBuilder("\n일반 TASF ADT ");
-							sbIsueFeeGnrlChd = new StringBuilder("\n일반 TASF CHD ");
-							sbIsueFeeGnrlInf = new StringBuilder("\n일반 TASF INF ");
-							sbIsueFeeDtcmAdt = new StringBuilder("\n닷컴 TASF ADT ");
-							sbIsueFeeDtcmChd = new StringBuilder("\n닷컴 TASF CHD ");
-							sbIsueFeeDtcmInf = new StringBuilder("\n닷컴 TASF INF ");
+							//발권수수료(TASF) 텍스트 - 편도결합/비결합 공통 로직은 buildTasfFeeTexts()로 추출
+							TasfFeeTexts tasfFeeTexts = this.buildTasfFeeTexts(farVoLst);
+							sbIsueFeeGnrlAdt = tasfFeeTexts.sbIsueFeeGnrlAdt;
+							sbIsueFeeGnrlChd = tasfFeeTexts.sbIsueFeeGnrlChd;
+							sbIsueFeeGnrlInf = tasfFeeTexts.sbIsueFeeGnrlInf;
+							sbIsueFeeDtcmAdt = tasfFeeTexts.sbIsueFeeDtcmAdt;
+							sbIsueFeeDtcmChd = tasfFeeTexts.sbIsueFeeDtcmChd;
+							sbIsueFeeDtcmInf = tasfFeeTexts.sbIsueFeeDtcmInf;
 
-							//--------------------------------------
-							// TASF - 공급수수료
-							//--------------------------------------
-							String splyFeeRuleId = StringUtil.nullConvert(feeDtlNode.path("splyFeeRuleId").textValue());	// 공급수수료룰ID
-							if(StringUtil.isEmpty(splyFeeRuleId)) {
-								sbIsueFeeGnrlAdt.append("공급 - ");
-								sbIsueFeeGnrlChd.append("공급 - ");
-								sbIsueFeeGnrlInf.append("공급 - ");
-								sbIsueFeeDtcmAdt.append("공급 - ");
-								sbIsueFeeDtcmChd.append("공급 - ");
-								sbIsueFeeDtcmInf.append("공급 - ");
-							}else {
-								String splyAdtFeeTrf    = StringUtil.nullConvert(feeDtlNode.path("splyAdtFeeTrf"   ).asText());	// 공급성인수수료요율
-								String splyChdFeeTrf    = StringUtil.nullConvert(feeDtlNode.path("splyChdFeeTrf"   ).asText());	// 공급아동수수료요율
-								String splyInfFeeTrf    = StringUtil.nullConvert(feeDtlNode.path("splyInfFeeTrf"   ).asText());	// 공급유아수수료요율
-								String splyAdtFeeKrwAmt = StringUtil.nullConvert(feeDtlNode.path("splyAdtFeeKrwAmt").asText());	// 공급성인수수료원화금액
-								String splyChdFeeKrwAmt = StringUtil.nullConvert(feeDtlNode.path("splyChdFeeKrwAmt").asText());	// 공급아동수수료원화금액
-								String splyInfFeeKrwAmt = StringUtil.nullConvert(feeDtlNode.path("splyInfFeeKrwAmt").asText());	// 공급유아수수료원화금액
-
-								// 공급수수료적용방식코드 : R - 정률, A - 정액
-								String splyFeeAplMthdCd       = StringUtil.nullConvert(feeDtlNode.path("splyFeeAplMthdCd").textValue());
-								if("R".equals(splyFeeAplMthdCd)) {
-									//------------------------
-									// 정률
-									//------------------------
-									sbIsueFeeGnrlAdt.append("공급 R " + splyAdtFeeTrf +"% / " + NumberUtil.formatNumber(splyAdtFeeKrwAmt, "#,###,###")+" (No."+splyFeeRuleId+") ");
-									sbIsueFeeGnrlChd.append("공급 R " + splyChdFeeTrf +"% / " + NumberUtil.formatNumber(splyChdFeeKrwAmt, "#,###,###")+" (No."+splyFeeRuleId+") ");
-									sbIsueFeeGnrlInf.append("공급 R " + splyInfFeeTrf +"% / " + NumberUtil.formatNumber(splyInfFeeKrwAmt, "#,###,###")+" (No."+splyFeeRuleId+") ");
-									sbIsueFeeDtcmAdt.append("공급 R " + splyAdtFeeTrf +"% / " + NumberUtil.formatNumber(splyAdtFeeKrwAmt, "#,###,###")+" (No."+splyFeeRuleId+") ");
-									sbIsueFeeDtcmChd.append("공급 R " + splyChdFeeTrf +"% / " + NumberUtil.formatNumber(splyChdFeeKrwAmt, "#,###,###")+" (No."+splyFeeRuleId+") ");
-									sbIsueFeeDtcmInf.append("공급 R " + splyInfFeeTrf +"% / " + NumberUtil.formatNumber(splyInfFeeKrwAmt, "#,###,###")+" (No."+splyFeeRuleId+") ");
-								} else if("A".equals(splyFeeAplMthdCd)) {
-									//------------------------
-									// 정액
-									//------------------------
-									sbIsueFeeGnrlAdt.append("공급 A / " + NumberUtil.formatNumber(splyAdtFeeKrwAmt, "#,###,###")+" (No."+splyFeeRuleId+") ");
-									sbIsueFeeGnrlChd.append("공급 A / " + NumberUtil.formatNumber(splyChdFeeKrwAmt, "#,###,###")+" (No."+splyFeeRuleId+") ");
-									sbIsueFeeGnrlInf.append("공급 A / " + NumberUtil.formatNumber(splyInfFeeKrwAmt, "#,###,###")+" (No."+splyFeeRuleId+") ");
-									sbIsueFeeDtcmAdt.append("공급 A / " + NumberUtil.formatNumber(splyAdtFeeKrwAmt, "#,###,###")+" (No."+splyFeeRuleId+") ");
-									sbIsueFeeDtcmChd.append("공급 A / " + NumberUtil.formatNumber(splyChdFeeKrwAmt, "#,###,###")+" (No."+splyFeeRuleId+") ");
-									sbIsueFeeDtcmInf.append("공급 A / " + NumberUtil.formatNumber(splyInfFeeKrwAmt, "#,###,###")+" (No."+splyFeeRuleId+") ");
-								}
-							}
-							//--------------------------------------
-							// TASF - 판매수수료
-							//--------------------------------------
-							String saleFeeRuleId = StringUtil.nullConvert(feeDtlNode.path("saleFeeRuleId").textValue());	// 판매수수료룰ID
-							if(StringUtil.isEmpty(saleFeeRuleId)) {
-								sbIsueFeeGnrlAdt.append(" 판매 - ");
-								sbIsueFeeGnrlChd.append(" 판매 - ");
-								sbIsueFeeGnrlInf.append(" 판매 - ");
-								sbIsueFeeDtcmAdt.append(" 판매 - ");
-								sbIsueFeeDtcmChd.append(" 판매 - ");
-								sbIsueFeeDtcmInf.append(" 판매 - ");
-							}else {
-								String saleAdtFeeTrf        = StringUtil.nullConvert(feeDtlNode.path("saleAdtFeeTrf"       ).asText());	// 판매성인수수료요율
-								String saleChdFeeTrf        = StringUtil.nullConvert(feeDtlNode.path("saleChdFeeTrf"       ).asText());	// 판매아동수수료요율
-								String saleInfFeeTrf        = StringUtil.nullConvert(feeDtlNode.path("saleInfFeeTrf"       ).asText());	// 판매유아수수료요율
-								String saleGnrlAdtFeeKrwAmt = StringUtil.nullConvert(feeDtlNode.path("saleGnrlAdtFeeKrwAmt").asText());	// 판매일반성인수수료원화금액
-								String saleGnrlChdFeeKrwAmt = StringUtil.nullConvert(feeDtlNode.path("saleGnrlChdFeeKrwAmt").asText());	// 판매일반아동수수료원화금액
-								String saleGnrlInfFeeKrwAmt = StringUtil.nullConvert(feeDtlNode.path("saleGnrlInfFeeKrwAmt").asText());	// 판매일반유아수수료원화금액
-								String saleDtcmAdtFeeKrwAmt = StringUtil.nullConvert(feeDtlNode.path("saleDtcmAdtFeeKrwAmt").asText());	// 판매닷컴성인수수료원화금액
-								String saleDtcmChdFeeKrwAmt = StringUtil.nullConvert(feeDtlNode.path("saleDtcmChdFeeKrwAmt").asText());	// 판매닷컴아동수수료원화금액
-								String saleDtcmInfFeeKrwAmt = StringUtil.nullConvert(feeDtlNode.path("saleDtcmInfFeeKrwAmt").asText());	// 판매닷컴유아수수료원화금액
-
-								// 판매수수료적용방식 : R - 정률, A - 정액
-								String saleFeeAplMthdCd = StringUtil.nullConvert(feeDtlNode.path("saleFeeAplMthdCd"   ).asText());
-								if("R".equals(saleFeeAplMthdCd)) {
-									//------------------------
-									// 정률
-									//------------------------
-									sbIsueFeeGnrlAdt.append(" 판매 R " + saleAdtFeeTrf +"% / " + NumberUtil.formatNumber(saleGnrlAdtFeeKrwAmt, "#,###,###")+" (No."+saleFeeRuleId+") ");
-									sbIsueFeeGnrlChd.append(" 판매 R " + saleChdFeeTrf +"% / " + NumberUtil.formatNumber(saleGnrlChdFeeKrwAmt, "#,###,###")+" (No."+saleFeeRuleId+") ");
-									sbIsueFeeGnrlInf.append(" 판매 R " + saleInfFeeTrf +"% / " + NumberUtil.formatNumber(saleGnrlInfFeeKrwAmt, "#,###,###")+" (No."+saleFeeRuleId+") ");
-									sbIsueFeeDtcmAdt.append(" 판매 R " + saleAdtFeeTrf +"% / " + NumberUtil.formatNumber(saleDtcmAdtFeeKrwAmt, "#,###,###")+" (No."+saleFeeRuleId+") ");
-									sbIsueFeeDtcmChd.append(" 판매 R " + saleChdFeeTrf +"% / " + NumberUtil.formatNumber(saleDtcmChdFeeKrwAmt, "#,###,###")+" (No."+saleFeeRuleId+") ");
-									sbIsueFeeDtcmInf.append(" 판매 R " + saleInfFeeTrf +"% / " + NumberUtil.formatNumber(saleDtcmInfFeeKrwAmt, "#,###,###")+" (No."+saleFeeRuleId+") ");
-								} else if("A".equals(saleFeeAplMthdCd)) {
-									//------------------------
-									// 정액
-									//------------------------
-									sbIsueFeeGnrlAdt.append(" 판매 A / " + NumberUtil.formatNumber(saleGnrlAdtFeeKrwAmt, "#,###,###")+" (No."+saleFeeRuleId+") ");
-									sbIsueFeeGnrlChd.append(" 판매 A / " + NumberUtil.formatNumber(saleGnrlChdFeeKrwAmt, "#,###,###")+" (No."+saleFeeRuleId+") ");
-									sbIsueFeeGnrlInf.append(" 판매 A / " + NumberUtil.formatNumber(saleGnrlInfFeeKrwAmt, "#,###,###")+" (No."+saleFeeRuleId+") ");
-									sbIsueFeeDtcmAdt.append(" 판매 A / " + NumberUtil.formatNumber(saleDtcmAdtFeeKrwAmt, "#,###,###")+" (No."+saleFeeRuleId+") ");
-									sbIsueFeeDtcmChd.append(" 판매 A / " + NumberUtil.formatNumber(saleDtcmChdFeeKrwAmt, "#,###,###")+" (No."+saleFeeRuleId+") ");
-									sbIsueFeeDtcmInf.append(" 판매 A / " + NumberUtil.formatNumber(saleDtcmInfFeeKrwAmt, "#,###,###")+" (No."+saleFeeRuleId+") ");
-								}
-							}
-							//--------------------------------------
-							// TASF - 분배
-							//--------------------------------------
-							String dtrbYn = StringUtil.nullConvert(feeDtlNode.path("dtrbYn"   ).asText());
-
-							if("Y".equals(dtrbYn)) {
-								String hanaDtrbRato = StringUtil.nullConvert(feeDtlNode.path("hanaDtrbRato"  ).asText());
-								String agtDtrbRato  = StringUtil.nullConvert(feeDtlNode.path("agtDtrbRato"   ).asText());
-
-								String gnrlAdtHanaDtrbKrwAmt = !"".equals(feeDtlNode.path("gnrlAdtHanaDtrbKrwAmt").asText()) ? NumberUtil.formatNumber(feeDtlNode.path("gnrlAdtHanaDtrbKrwAmt").asText(), "#,###,###") : "";	// 일반성인하나투어분배원화금액
-								String gnrlChdHanaDtrbKrwAmt = !"".equals(feeDtlNode.path("gnrlChdHanaDtrbKrwAmt").asText()) ? NumberUtil.formatNumber(feeDtlNode.path("gnrlChdHanaDtrbKrwAmt").asText(), "#,###,###") : "";	// 일반아동하나투어분배원화금액
-								String gnrlInfHanaDtrbKrwAmt = !"".equals(feeDtlNode.path("gnrlInfHanaDtrbKrwAmt").asText()) ? NumberUtil.formatNumber(feeDtlNode.path("gnrlInfHanaDtrbKrwAmt").asText(), "#,###,###") : "";	// 일반유아하나투어분배원화금액
-								String dtcmAdtHanaDtrbKrwAmt = !"".equals(feeDtlNode.path("dtcmAdtHanaDtrbKrwAmt").asText()) ? NumberUtil.formatNumber(feeDtlNode.path("dtcmAdtHanaDtrbKrwAmt").asText(), "#,###,###") : "";	// 닷컴성인하나투어분배원화금액
-								String dtcmChdHanaDtrbKrwAmt = !"".equals(feeDtlNode.path("dtcmChdHanaDtrbKrwAmt").asText()) ? NumberUtil.formatNumber(feeDtlNode.path("dtcmChdHanaDtrbKrwAmt").asText(), "#,###,###") : "";	// 닷컴아동하나투어분배원화금액
-								String dtcmInfHanaDtrbKrwAmt = !"".equals(feeDtlNode.path("dtcmInfHanaDtrbKrwAmt").asText()) ? NumberUtil.formatNumber(feeDtlNode.path("dtcmInfHanaDtrbKrwAmt").asText(), "#,###,###") : "";	// 닷컴유아하나투어분배원화금액
-								String gnrlAdtAgtDtrbKrwAmt  = !"".equals(feeDtlNode.path("gnrlAdtAgtDtrbKrwAmt" ).asText()) ? NumberUtil.formatNumber(feeDtlNode.path("gnrlAdtAgtDtrbKrwAmt" ).asText(), "#,###,###") : "";	// 일반성인대리점분배원화금액
-								String gnrlChdAgtDtrbKrwAmt  = !"".equals(feeDtlNode.path("gnrlChdAgtDtrbKrwAmt" ).asText()) ? NumberUtil.formatNumber(feeDtlNode.path("gnrlChdAgtDtrbKrwAmt" ).asText(), "#,###,###") : "";	// 일반아동대리점분배원화금액
-								String gnrlInfAgtDtrbKrwAmt  = !"".equals(feeDtlNode.path("gnrlInfAgtDtrbKrwAmt" ).asText()) ? NumberUtil.formatNumber(feeDtlNode.path("gnrlInfAgtDtrbKrwAmt" ).asText(), "#,###,###") : "";	// 일반유아대리점분배원화금액
-								String dtcmAdtAgtDtrbKrwAmt  = !"".equals(feeDtlNode.path("dtcmAdtAgtDtrbKrwAmt" ).asText()) ? NumberUtil.formatNumber(feeDtlNode.path("dtcmAdtAgtDtrbKrwAmt" ).asText(), "#,###,###") : "";	// 닷컴성인대리점분배원화금액
-								String dtcmChdAgtDtrbKrwAmt  = !"".equals(feeDtlNode.path("dtcmChdAgtDtrbKrwAmt" ).asText()) ? NumberUtil.formatNumber(feeDtlNode.path("dtcmChdAgtDtrbKrwAmt" ).asText(), "#,###,###") : "";	// 닷컴아동대리점분배원화금액
-								String dtcmInfAgtDtrbKrwAmt  = !"".equals(feeDtlNode.path("dtcmInfAgtDtrbKrwAmt" ).asText()) ? NumberUtil.formatNumber(feeDtlNode.path("dtcmInfAgtDtrbKrwAmt" ).asText(), "#,###,###") : "";	// 닷컴유아대리점분배원화금액
-
-								sbIsueFeeGnrlAdt.append("(분배" + dtrbYn + " / "+ hanaDtrbRato + " : " + agtDtrbRato +" / "+gnrlAdtHanaDtrbKrwAmt+" : "+gnrlAdtAgtDtrbKrwAmt+")");
-								sbIsueFeeGnrlChd.append("(분배" + dtrbYn + " / "+ hanaDtrbRato + " : " + agtDtrbRato +" / "+gnrlChdHanaDtrbKrwAmt+" : "+gnrlChdAgtDtrbKrwAmt+")");
-								sbIsueFeeGnrlInf.append("(분배" + dtrbYn + " / "+ hanaDtrbRato + " : " + agtDtrbRato +" / "+gnrlInfHanaDtrbKrwAmt+" : "+gnrlInfAgtDtrbKrwAmt+")");
-								sbIsueFeeDtcmAdt.append("(분배" + dtrbYn + " / "+ hanaDtrbRato + " : " + agtDtrbRato +" / "+dtcmAdtHanaDtrbKrwAmt+" : "+dtcmAdtAgtDtrbKrwAmt+")");
-								sbIsueFeeDtcmChd.append("(분배" + dtrbYn + " / "+ hanaDtrbRato + " : " + agtDtrbRato +" / "+dtcmChdHanaDtrbKrwAmt+" : "+dtcmChdAgtDtrbKrwAmt+")");
-								sbIsueFeeDtcmInf.append("(분배" + dtrbYn + " / "+ hanaDtrbRato + " : " + agtDtrbRato +" / "+dtcmInfHanaDtrbKrwAmt+" : "+dtcmInfAgtDtrbKrwAmt+")");
-							} else if("N".equals(dtrbYn)) {
-								sbIsueFeeGnrlAdt.append("(분배" + dtrbYn + ")");
-								sbIsueFeeGnrlChd.append("(분배" + dtrbYn + ")");
-								sbIsueFeeGnrlInf.append("(분배" + dtrbYn + ")");
-								sbIsueFeeDtcmAdt.append("(분배" + dtrbYn + ")");
-								sbIsueFeeDtcmChd.append("(분배" + dtrbYn + ")");
-								sbIsueFeeDtcmInf.append("(분배" + dtrbYn + ")");
-							}
-							//--------------------------------------
-							// TASF - 대리점
-							//--------------------------------------
-							String agtFeeRuleId = StringUtil.nullConvert(feeDtlNode.path("agtFeeRuleId").textValue());	// 대리점수수료룰ID
-							if(StringUtil.isEmpty(agtFeeRuleId)) {
-								sbIsueFeeGnrlAdt.append(" 대리점 - ");
-								sbIsueFeeGnrlChd.append(" 대리점 - ");
-								sbIsueFeeGnrlInf.append(" 대리점 - ");
-								sbIsueFeeDtcmAdt.append(" 대리점 - ");
-								sbIsueFeeDtcmChd.append(" 대리점 - ");
-								sbIsueFeeDtcmInf.append(" 대리점 - ");
-							}else {
-								String agtAdtFeeTrf        = StringUtil.nullConvert(feeDtlNode.path("agtAdtFeeTrf"       ).asText());	// 대리점성인수수료요율
-								String agtChdFeeTrf        = StringUtil.nullConvert(feeDtlNode.path("agtChdFeeTrf"       ).asText());	// 대리점아동수수료요율
-								String agtInfFeeTrf        = StringUtil.nullConvert(feeDtlNode.path("agtInfFeeTrf"       ).asText());	// 대리점유아수수료요율
-								String agtGnrlAdtFeeKrwAmt = StringUtil.nullConvert(feeDtlNode.path("agtGnrlAdtFeeKrwAmt").asText());	// 대리점일반성인수수료원화금액
-								String agtGnrlChdFeeKrwAmt = StringUtil.nullConvert(feeDtlNode.path("agtGnrlChdFeeKrwAmt").asText());	// 대리점일반아동수수료원화금액
-								String agtGnrlInfFeeKrwAmt = StringUtil.nullConvert(feeDtlNode.path("agtGnrlInfFeeKrwAmt").asText());	// 대리점일반유아수수료원화금액
-								String agtDtcmAdtFeeKrwAmt = StringUtil.nullConvert(feeDtlNode.path("agtDtcmAdtFeeKrwAmt").asText());	// 대리점닷컴성인수수료원화금액
-								String agtDtcmChdFeeKrwAmt = StringUtil.nullConvert(feeDtlNode.path("agtDtcmChdFeeKrwAmt").asText());	// 대리점닷컴아동수수료원화금액
-								String agtDtcmInfFeeKrwAmt = StringUtil.nullConvert(feeDtlNode.path("agtDtcmInfFeeKrwAmt").asText());	// 대리점닷컴유아수수료원화금액
-
-								// 대리점수수료적용방식 : R - 정률, A - 정액
-								String agtFeeAplMthdCd = StringUtil.nullConvert(feeDtlNode.path("agtFeeAplMthdCd"   ).asText());
-								if("R".equals(agtFeeAplMthdCd)) {
-									//------------------------
-									// 정률
-									//------------------------
-									sbIsueFeeGnrlAdt.append(" 대리점 R" + agtAdtFeeTrf +"% / " + NumberUtil.formatNumber(agtGnrlAdtFeeKrwAmt, "#,###,###")+" (No."+agtFeeRuleId+") ");
-									sbIsueFeeGnrlChd.append(" 대리점 R" + agtChdFeeTrf +"% / " + NumberUtil.formatNumber(agtGnrlChdFeeKrwAmt, "#,###,###")+" (No."+agtFeeRuleId+") ");
-									sbIsueFeeGnrlInf.append(" 대리점 R" + agtInfFeeTrf +"% / " + NumberUtil.formatNumber(agtGnrlInfFeeKrwAmt, "#,###,###")+" (No."+agtFeeRuleId+") ");
-									sbIsueFeeDtcmAdt.append(" 대리점 R" + agtAdtFeeTrf +"% / " + NumberUtil.formatNumber(agtDtcmAdtFeeKrwAmt, "#,###,###")+" (No."+agtFeeRuleId+") ");
-									sbIsueFeeDtcmChd.append(" 대리점 R" + agtChdFeeTrf +"% / " + NumberUtil.formatNumber(agtDtcmChdFeeKrwAmt, "#,###,###")+" (No."+agtFeeRuleId+") ");
-									sbIsueFeeDtcmInf.append(" 대리점 R" + agtInfFeeTrf +"% / " + NumberUtil.formatNumber(agtDtcmInfFeeKrwAmt, "#,###,###")+" (No."+agtFeeRuleId+") ");
-								} else if("A".equals(agtFeeAplMthdCd)) {
-									//------------------------
-									// 정액
-									//------------------------
-									sbIsueFeeGnrlAdt.append(" 대리점 A / " + NumberUtil.formatNumber(agtGnrlAdtFeeKrwAmt, "#,###,###")+" (No."+agtFeeRuleId+") ");
-									sbIsueFeeGnrlChd.append(" 대리점 A / " + NumberUtil.formatNumber(agtGnrlChdFeeKrwAmt, "#,###,###")+" (No."+agtFeeRuleId+") ");
-									sbIsueFeeGnrlInf.append(" 대리점 A / " + NumberUtil.formatNumber(agtGnrlInfFeeKrwAmt, "#,###,###")+" (No."+agtFeeRuleId+") ");
-									sbIsueFeeDtcmAdt.append(" 대리점 A / " + NumberUtil.formatNumber(agtDtcmAdtFeeKrwAmt, "#,###,###")+" (No."+agtFeeRuleId+") ");
-									sbIsueFeeDtcmChd.append(" 대리점 A / " + NumberUtil.formatNumber(agtDtcmChdFeeKrwAmt, "#,###,###")+" (No."+agtFeeRuleId+") ");
-									sbIsueFeeDtcmInf.append(" 대리점 A / " + NumberUtil.formatNumber(agtDtcmInfFeeKrwAmt, "#,###,###")+" (No."+agtFeeRuleId+") ");
-								}
-							}
 
 							//------------------------------------
 							// 공급코드, 발권항공사, 여정타입..
@@ -1400,6 +1229,7 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 							//--------------------------------------
 							// 발권수수료-성인원화전체금액
 							//--------------------------------------
+							JsonNode feeDtlNode = farVoLst.path("feeDtl");
 							String gnrlAdtKrwAllAmt = !"".equals(feeDtlNode.path("gnrlAdtKrwAllAmt").asText()) ? " Total " + NumberUtil.formatNumber(feeDtlNode.path("gnrlAdtKrwAllAmt").asText(), "#,###,###") : "";
 							String gnrlChdKrwAllAmt = !"".equals(feeDtlNode.path("gnrlChdKrwAllAmt").asText()) ? " Total " + NumberUtil.formatNumber(feeDtlNode.path("gnrlChdKrwAllAmt").asText(), "#,###,###") : "";
 							String gnrlInfKrwAllAmt = !"".equals(feeDtlNode.path("gnrlInfKrwAllAmt").asText()) ? " Total " + NumberUtil.formatNumber(feeDtlNode.path("gnrlInfKrwAllAmt").asText(), "#,###,###") : "";
@@ -2174,187 +2004,15 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 						isExistCardDtcmInfo = cardPromotionTexts.isExistCardDtcmInfo;
 
 
-						//#### 발권수수료정보 #####
-						JsonNode feeDtlNode = farLstNode.path("feeDtl");
+						//발권수수료(TASF) 텍스트 - 편도결합/비결합 공통 로직은 buildTasfFeeTexts()로 추출
+						TasfFeeTexts tasfFeeTexts = this.buildTasfFeeTexts(farLstNode);
+						sbIsueFeeGnrlAdt = tasfFeeTexts.sbIsueFeeGnrlAdt;
+						sbIsueFeeGnrlChd = tasfFeeTexts.sbIsueFeeGnrlChd;
+						sbIsueFeeGnrlInf = tasfFeeTexts.sbIsueFeeGnrlInf;
+						sbIsueFeeDtcmAdt = tasfFeeTexts.sbIsueFeeDtcmAdt;
+						sbIsueFeeDtcmChd = tasfFeeTexts.sbIsueFeeDtcmChd;
+						sbIsueFeeDtcmInf = tasfFeeTexts.sbIsueFeeDtcmInf;
 
-						sbIsueFeeGnrlAdt = new StringBuilder("\n일반 TASF ADT ");
-						sbIsueFeeGnrlChd = new StringBuilder("\n일반 TASF CHD ");
-						sbIsueFeeGnrlInf = new StringBuilder("\n일반 TASF INF ");
-						sbIsueFeeDtcmAdt = new StringBuilder("\n닷컴 TASF ADT ");
-						sbIsueFeeDtcmChd = new StringBuilder("\n닷컴 TASF CHD ");
-						sbIsueFeeDtcmInf = new StringBuilder("\n닷컴 TASF INF ");
-
-						//--------------------------------------
-						// TASF - 공급수수료
-						//--------------------------------------
-						String splyFeeRuleId = StringUtil.nullConvert(feeDtlNode.path("splyFeeRuleId").textValue());	// 공급수수료룰ID
-						if(StringUtil.isEmpty(splyFeeRuleId)) {
-							sbIsueFeeGnrlAdt.append("공급 - ");
-							sbIsueFeeGnrlChd.append("공급 - ");
-							sbIsueFeeGnrlInf.append("공급 - ");
-							sbIsueFeeDtcmAdt.append("공급 - ");
-							sbIsueFeeDtcmChd.append("공급 - ");
-							sbIsueFeeDtcmInf.append("공급 - ");
-						}else {
-							String splyAdtFeeTrf    = StringUtil.nullConvert(feeDtlNode.path("splyAdtFeeTrf"   ).asText());	// 공급성인수수료요율
-							String splyChdFeeTrf    = StringUtil.nullConvert(feeDtlNode.path("splyChdFeeTrf"   ).asText());	// 공급아동수수료요율
-							String splyInfFeeTrf    = StringUtil.nullConvert(feeDtlNode.path("splyInfFeeTrf"   ).asText());	// 공급유아수수료요율
-							String splyAdtFeeKrwAmt = StringUtil.nullConvert(feeDtlNode.path("splyAdtFeeKrwAmt").asText());	// 공급성인수수료원화금액
-							String splyChdFeeKrwAmt = StringUtil.nullConvert(feeDtlNode.path("splyChdFeeKrwAmt").asText());	// 공급아동수수료원화금액
-							String splyInfFeeKrwAmt = StringUtil.nullConvert(feeDtlNode.path("splyInfFeeKrwAmt").asText());	// 공급유아수수료원화금액
-
-							// 공급수수료적용방식코드 : R - 정률, A - 정액
-							String splyFeeAplMthdCd       = StringUtil.nullConvert(feeDtlNode.path("splyFeeAplMthdCd").textValue());
-							if("R".equals(splyFeeAplMthdCd)) {
-								//------------------------
-								// 정률
-								//------------------------
-								sbIsueFeeGnrlAdt.append("공급 R " + splyAdtFeeTrf +"% / " + NumberUtil.formatNumber(splyAdtFeeKrwAmt, "#,###,###")+" (No."+splyFeeRuleId+") ");
-								sbIsueFeeGnrlChd.append("공급 R " + splyChdFeeTrf +"% / " + NumberUtil.formatNumber(splyChdFeeKrwAmt, "#,###,###")+" (No."+splyFeeRuleId+") ");
-								sbIsueFeeGnrlInf.append("공급 R " + splyInfFeeTrf +"% / " + NumberUtil.formatNumber(splyInfFeeKrwAmt, "#,###,###")+" (No."+splyFeeRuleId+") ");
-								sbIsueFeeDtcmAdt.append("공급 R " + splyAdtFeeTrf +"% / " + NumberUtil.formatNumber(splyAdtFeeKrwAmt, "#,###,###")+" (No."+splyFeeRuleId+") ");
-								sbIsueFeeDtcmChd.append("공급 R " + splyChdFeeTrf +"% / " + NumberUtil.formatNumber(splyChdFeeKrwAmt, "#,###,###")+" (No."+splyFeeRuleId+") ");
-								sbIsueFeeDtcmInf.append("공급 R " + splyInfFeeTrf +"% / " + NumberUtil.formatNumber(splyInfFeeKrwAmt, "#,###,###")+" (No."+splyFeeRuleId+") ");
-							} else if("A".equals(splyFeeAplMthdCd)) {
-								//------------------------
-								// 정액
-								//------------------------
-								sbIsueFeeGnrlAdt.append("공급 A / " + NumberUtil.formatNumber(splyAdtFeeKrwAmt, "#,###,###")+" (No."+splyFeeRuleId+") ");
-								sbIsueFeeGnrlChd.append("공급 A / " + NumberUtil.formatNumber(splyChdFeeKrwAmt, "#,###,###")+" (No."+splyFeeRuleId+") ");
-								sbIsueFeeGnrlInf.append("공급 A / " + NumberUtil.formatNumber(splyInfFeeKrwAmt, "#,###,###")+" (No."+splyFeeRuleId+") ");
-								sbIsueFeeDtcmAdt.append("공급 A / " + NumberUtil.formatNumber(splyAdtFeeKrwAmt, "#,###,###")+" (No."+splyFeeRuleId+") ");
-								sbIsueFeeDtcmChd.append("공급 A / " + NumberUtil.formatNumber(splyChdFeeKrwAmt, "#,###,###")+" (No."+splyFeeRuleId+") ");
-								sbIsueFeeDtcmInf.append("공급 A / " + NumberUtil.formatNumber(splyInfFeeKrwAmt, "#,###,###")+" (No."+splyFeeRuleId+") ");
-							}
-						}
-						//--------------------------------------
-						// TASF - 판매수수료
-						//--------------------------------------
-						String saleFeeRuleId = StringUtil.nullConvert(feeDtlNode.path("saleFeeRuleId").textValue());	// 판매수수료룰ID
-						if(StringUtil.isEmpty(saleFeeRuleId)) {
-							sbIsueFeeGnrlAdt.append(" 판매 - ");
-							sbIsueFeeGnrlChd.append(" 판매 - ");
-							sbIsueFeeGnrlInf.append(" 판매 - ");
-							sbIsueFeeDtcmAdt.append(" 판매 - ");
-							sbIsueFeeDtcmChd.append(" 판매 - ");
-							sbIsueFeeDtcmInf.append(" 판매 - ");
-						}else {
-							String saleAdtFeeTrf        = StringUtil.nullConvert(feeDtlNode.path("saleAdtFeeTrf"       ).asText());	// 판매성인수수료요율
-							String saleChdFeeTrf        = StringUtil.nullConvert(feeDtlNode.path("saleChdFeeTrf"       ).asText());	// 판매아동수수료요율
-							String saleInfFeeTrf        = StringUtil.nullConvert(feeDtlNode.path("saleInfFeeTrf"       ).asText());	// 판매유아수수료요율
-							String saleGnrlAdtFeeKrwAmt = StringUtil.nullConvert(feeDtlNode.path("saleGnrlAdtFeeKrwAmt").asText());	// 판매일반성인수수료원화금액
-							String saleGnrlChdFeeKrwAmt = StringUtil.nullConvert(feeDtlNode.path("saleGnrlChdFeeKrwAmt").asText());	// 판매일반아동수수료원화금액
-							String saleGnrlInfFeeKrwAmt = StringUtil.nullConvert(feeDtlNode.path("saleGnrlInfFeeKrwAmt").asText());	// 판매일반유아수수료원화금액
-							String saleDtcmAdtFeeKrwAmt = StringUtil.nullConvert(feeDtlNode.path("saleDtcmAdtFeeKrwAmt").asText());	// 판매닷컴성인수수료원화금액
-							String saleDtcmChdFeeKrwAmt = StringUtil.nullConvert(feeDtlNode.path("saleDtcmChdFeeKrwAmt").asText());	// 판매닷컴아동수수료원화금액
-							String saleDtcmInfFeeKrwAmt = StringUtil.nullConvert(feeDtlNode.path("saleDtcmInfFeeKrwAmt").asText());	// 판매닷컴유아수수료원화금액
-
-							// 판매수수료적용방식 : R - 정률, A - 정액
-							String saleFeeAplMthdCd = StringUtil.nullConvert(feeDtlNode.path("saleFeeAplMthdCd"   ).asText());
-							if("R".equals(saleFeeAplMthdCd)) {
-								//------------------------
-								// 정률
-								//------------------------
-								sbIsueFeeGnrlAdt.append(" 판매 R " + saleAdtFeeTrf +"% / " + NumberUtil.formatNumber(saleGnrlAdtFeeKrwAmt, "#,###,###")+" (No."+saleFeeRuleId+") ");
-								sbIsueFeeGnrlChd.append(" 판매 R " + saleChdFeeTrf +"% / " + NumberUtil.formatNumber(saleGnrlChdFeeKrwAmt, "#,###,###")+" (No."+saleFeeRuleId+") ");
-								sbIsueFeeGnrlInf.append(" 판매 R " + saleInfFeeTrf +"% / " + NumberUtil.formatNumber(saleGnrlInfFeeKrwAmt, "#,###,###")+" (No."+saleFeeRuleId+") ");
-								sbIsueFeeDtcmAdt.append(" 판매 R " + saleAdtFeeTrf +"% / " + NumberUtil.formatNumber(saleDtcmAdtFeeKrwAmt, "#,###,###")+" (No."+saleFeeRuleId+") ");
-								sbIsueFeeDtcmChd.append(" 판매 R " + saleChdFeeTrf +"% / " + NumberUtil.formatNumber(saleDtcmChdFeeKrwAmt, "#,###,###")+" (No."+saleFeeRuleId+") ");
-								sbIsueFeeDtcmInf.append(" 판매 R " + saleInfFeeTrf +"% / " + NumberUtil.formatNumber(saleDtcmInfFeeKrwAmt, "#,###,###")+" (No."+saleFeeRuleId+") ");
-							} else if("A".equals(saleFeeAplMthdCd)) {
-								//------------------------
-								// 정액
-								//------------------------
-								sbIsueFeeGnrlAdt.append(" 판매 A / " + NumberUtil.formatNumber(saleGnrlAdtFeeKrwAmt, "#,###,###")+" (No."+saleFeeRuleId+") ");
-								sbIsueFeeGnrlChd.append(" 판매 A / " + NumberUtil.formatNumber(saleGnrlChdFeeKrwAmt, "#,###,###")+" (No."+saleFeeRuleId+") ");
-								sbIsueFeeGnrlInf.append(" 판매 A / " + NumberUtil.formatNumber(saleGnrlInfFeeKrwAmt, "#,###,###")+" (No."+saleFeeRuleId+") ");
-								sbIsueFeeDtcmAdt.append(" 판매 A / " + NumberUtil.formatNumber(saleDtcmAdtFeeKrwAmt, "#,###,###")+" (No."+saleFeeRuleId+") ");
-								sbIsueFeeDtcmChd.append(" 판매 A / " + NumberUtil.formatNumber(saleDtcmChdFeeKrwAmt, "#,###,###")+" (No."+saleFeeRuleId+") ");
-								sbIsueFeeDtcmInf.append(" 판매 A / " + NumberUtil.formatNumber(saleDtcmInfFeeKrwAmt, "#,###,###")+" (No."+saleFeeRuleId+") ");
-							}
-						}
-						//--------------------------------------
-						// TASF - 분배
-						//--------------------------------------
-						String dtrbYn = StringUtil.nullConvert(feeDtlNode.path("dtrbYn"   ).asText());
-
-						if("Y".equals(dtrbYn)) {
-							String hanaDtrbRato = StringUtil.nullConvert(feeDtlNode.path("hanaDtrbRato"  ).asText());
-							String agtDtrbRato  = StringUtil.nullConvert(feeDtlNode.path("agtDtrbRato"   ).asText());
-
-							String gnrlAdtHanaDtrbKrwAmt = !"".equals(feeDtlNode.path("gnrlAdtHanaDtrbKrwAmt").asText()) ? NumberUtil.formatNumber(feeDtlNode.path("gnrlAdtHanaDtrbKrwAmt").asText(), "#,###,###") : "";	// 일반성인하나투어분배원화금액
-							String gnrlChdHanaDtrbKrwAmt = !"".equals(feeDtlNode.path("gnrlChdHanaDtrbKrwAmt").asText()) ? NumberUtil.formatNumber(feeDtlNode.path("gnrlChdHanaDtrbKrwAmt").asText(), "#,###,###") : "";	// 일반아동하나투어분배원화금액
-							String gnrlInfHanaDtrbKrwAmt = !"".equals(feeDtlNode.path("gnrlInfHanaDtrbKrwAmt").asText()) ? NumberUtil.formatNumber(feeDtlNode.path("gnrlInfHanaDtrbKrwAmt").asText(), "#,###,###") : "";	// 일반유아하나투어분배원화금액
-							String dtcmAdtHanaDtrbKrwAmt = !"".equals(feeDtlNode.path("dtcmAdtHanaDtrbKrwAmt").asText()) ? NumberUtil.formatNumber(feeDtlNode.path("dtcmAdtHanaDtrbKrwAmt").asText(), "#,###,###") : "";	// 닷컴성인하나투어분배원화금액
-							String dtcmChdHanaDtrbKrwAmt = !"".equals(feeDtlNode.path("dtcmChdHanaDtrbKrwAmt").asText()) ? NumberUtil.formatNumber(feeDtlNode.path("dtcmChdHanaDtrbKrwAmt").asText(), "#,###,###") : "";	// 닷컴아동하나투어분배원화금액
-							String dtcmInfHanaDtrbKrwAmt = !"".equals(feeDtlNode.path("dtcmInfHanaDtrbKrwAmt").asText()) ? NumberUtil.formatNumber(feeDtlNode.path("dtcmInfHanaDtrbKrwAmt").asText(), "#,###,###") : "";	// 닷컴유아하나투어분배원화금액
-							String gnrlAdtAgtDtrbKrwAmt  = !"".equals(feeDtlNode.path("gnrlAdtAgtDtrbKrwAmt" ).asText()) ? NumberUtil.formatNumber(feeDtlNode.path("gnrlAdtAgtDtrbKrwAmt" ).asText(), "#,###,###") : "";	// 일반성인대리점분배원화금액
-							String gnrlChdAgtDtrbKrwAmt  = !"".equals(feeDtlNode.path("gnrlChdAgtDtrbKrwAmt" ).asText()) ? NumberUtil.formatNumber(feeDtlNode.path("gnrlChdAgtDtrbKrwAmt" ).asText(), "#,###,###") : "";	// 일반아동대리점분배원화금액
-							String gnrlInfAgtDtrbKrwAmt  = !"".equals(feeDtlNode.path("gnrlInfAgtDtrbKrwAmt" ).asText()) ? NumberUtil.formatNumber(feeDtlNode.path("gnrlInfAgtDtrbKrwAmt" ).asText(), "#,###,###") : "";	// 일반유아대리점분배원화금액
-							String dtcmAdtAgtDtrbKrwAmt  = !"".equals(feeDtlNode.path("dtcmAdtAgtDtrbKrwAmt" ).asText()) ? NumberUtil.formatNumber(feeDtlNode.path("dtcmAdtAgtDtrbKrwAmt" ).asText(), "#,###,###") : "";	// 닷컴성인대리점분배원화금액
-							String dtcmChdAgtDtrbKrwAmt  = !"".equals(feeDtlNode.path("dtcmChdAgtDtrbKrwAmt" ).asText()) ? NumberUtil.formatNumber(feeDtlNode.path("dtcmChdAgtDtrbKrwAmt" ).asText(), "#,###,###") : "";	// 닷컴아동대리점분배원화금액
-							String dtcmInfAgtDtrbKrwAmt  = !"".equals(feeDtlNode.path("dtcmInfAgtDtrbKrwAmt" ).asText()) ? NumberUtil.formatNumber(feeDtlNode.path("dtcmInfAgtDtrbKrwAmt" ).asText(), "#,###,###") : "";	// 닷컴유아대리점분배원화금액
-
-							sbIsueFeeGnrlAdt.append("(분배" + dtrbYn + " / "+ hanaDtrbRato + " : " + agtDtrbRato +" / "+gnrlAdtHanaDtrbKrwAmt+" : "+gnrlAdtAgtDtrbKrwAmt+")");
-							sbIsueFeeGnrlChd.append("(분배" + dtrbYn + " / "+ hanaDtrbRato + " : " + agtDtrbRato +" / "+gnrlChdHanaDtrbKrwAmt+" : "+gnrlChdAgtDtrbKrwAmt+")");
-							sbIsueFeeGnrlInf.append("(분배" + dtrbYn + " / "+ hanaDtrbRato + " : " + agtDtrbRato +" / "+gnrlInfHanaDtrbKrwAmt+" : "+gnrlInfAgtDtrbKrwAmt+")");
-							sbIsueFeeDtcmAdt.append("(분배" + dtrbYn + " / "+ hanaDtrbRato + " : " + agtDtrbRato +" / "+dtcmAdtHanaDtrbKrwAmt+" : "+dtcmAdtAgtDtrbKrwAmt+")");
-							sbIsueFeeDtcmChd.append("(분배" + dtrbYn + " / "+ hanaDtrbRato + " : " + agtDtrbRato +" / "+dtcmChdHanaDtrbKrwAmt+" : "+dtcmChdAgtDtrbKrwAmt+")");
-							sbIsueFeeDtcmInf.append("(분배" + dtrbYn + " / "+ hanaDtrbRato + " : " + agtDtrbRato +" / "+dtcmInfHanaDtrbKrwAmt+" : "+dtcmInfAgtDtrbKrwAmt+")");
-						} else if("N".equals(dtrbYn)) {
-							sbIsueFeeGnrlAdt.append("(분배" + dtrbYn + ")");
-							sbIsueFeeGnrlChd.append("(분배" + dtrbYn + ")");
-							sbIsueFeeGnrlInf.append("(분배" + dtrbYn + ")");
-							sbIsueFeeDtcmAdt.append("(분배" + dtrbYn + ")");
-							sbIsueFeeDtcmChd.append("(분배" + dtrbYn + ")");
-							sbIsueFeeDtcmInf.append("(분배" + dtrbYn + ")");
-						}
-						//--------------------------------------
-						// TASF - 대리점
-						//--------------------------------------
-						String agtFeeRuleId = StringUtil.nullConvert(feeDtlNode.path("agtFeeRuleId").textValue());	// 대리점수수료룰ID
-						if(StringUtil.isEmpty(agtFeeRuleId)) {
-							sbIsueFeeGnrlAdt.append(" 대리점 - ");
-							sbIsueFeeGnrlChd.append(" 대리점 - ");
-							sbIsueFeeGnrlInf.append(" 대리점 - ");
-							sbIsueFeeDtcmAdt.append(" 대리점 - ");
-							sbIsueFeeDtcmChd.append(" 대리점 - ");
-							sbIsueFeeDtcmInf.append(" 대리점 - ");
-						}else {
-							String agtAdtFeeTrf        = StringUtil.nullConvert(feeDtlNode.path("agtAdtFeeTrf"       ).asText());	// 대리점성인수수료요율
-							String agtChdFeeTrf        = StringUtil.nullConvert(feeDtlNode.path("agtChdFeeTrf"       ).asText());	// 대리점아동수수료요율
-							String agtInfFeeTrf        = StringUtil.nullConvert(feeDtlNode.path("agtInfFeeTrf"       ).asText());	// 대리점유아수수료요율
-							String agtGnrlAdtFeeKrwAmt = StringUtil.nullConvert(feeDtlNode.path("agtGnrlAdtFeeKrwAmt").asText());	// 대리점일반성인수수료원화금액
-							String agtGnrlChdFeeKrwAmt = StringUtil.nullConvert(feeDtlNode.path("agtGnrlChdFeeKrwAmt").asText());	// 대리점일반아동수수료원화금액
-							String agtGnrlInfFeeKrwAmt = StringUtil.nullConvert(feeDtlNode.path("agtGnrlInfFeeKrwAmt").asText());	// 대리점일반유아수수료원화금액
-							String agtDtcmAdtFeeKrwAmt = StringUtil.nullConvert(feeDtlNode.path("agtDtcmAdtFeeKrwAmt").asText());	// 대리점닷컴성인수수료원화금액
-							String agtDtcmChdFeeKrwAmt = StringUtil.nullConvert(feeDtlNode.path("agtDtcmChdFeeKrwAmt").asText());	// 대리점닷컴아동수수료원화금액
-							String agtDtcmInfFeeKrwAmt = StringUtil.nullConvert(feeDtlNode.path("agtDtcmInfFeeKrwAmt").asText());	// 대리점닷컴유아수수료원화금액
-
-							// 대리점수수료적용방식 : R - 정률, A - 정액
-							String agtFeeAplMthdCd = StringUtil.nullConvert(feeDtlNode.path("agtFeeAplMthdCd"   ).asText());
-							if("R".equals(agtFeeAplMthdCd)) {
-								//------------------------
-								// 정률
-								//------------------------
-								sbIsueFeeGnrlAdt.append(" 대리점 R" + agtAdtFeeTrf +"% / " + NumberUtil.formatNumber(agtGnrlAdtFeeKrwAmt, "#,###,###")+" (No."+agtFeeRuleId+") ");
-								sbIsueFeeGnrlChd.append(" 대리점 R" + agtChdFeeTrf +"% / " + NumberUtil.formatNumber(agtGnrlChdFeeKrwAmt, "#,###,###")+" (No."+agtFeeRuleId+") ");
-								sbIsueFeeGnrlInf.append(" 대리점 R" + agtInfFeeTrf +"% / " + NumberUtil.formatNumber(agtGnrlInfFeeKrwAmt, "#,###,###")+" (No."+agtFeeRuleId+") ");
-								sbIsueFeeDtcmAdt.append(" 대리점 R" + agtAdtFeeTrf +"% / " + NumberUtil.formatNumber(agtDtcmAdtFeeKrwAmt, "#,###,###")+" (No."+agtFeeRuleId+") ");
-								sbIsueFeeDtcmChd.append(" 대리점 R" + agtChdFeeTrf +"% / " + NumberUtil.formatNumber(agtDtcmChdFeeKrwAmt, "#,###,###")+" (No."+agtFeeRuleId+") ");
-								sbIsueFeeDtcmInf.append(" 대리점 R" + agtInfFeeTrf +"% / " + NumberUtil.formatNumber(agtDtcmInfFeeKrwAmt, "#,###,###")+" (No."+agtFeeRuleId+") ");
-							} else if("A".equals(agtFeeAplMthdCd)) {
-								//------------------------
-								// 정액
-								//------------------------
-								sbIsueFeeGnrlAdt.append(" 대리점 A / " + NumberUtil.formatNumber(agtGnrlAdtFeeKrwAmt, "#,###,###")+" (No."+agtFeeRuleId+") ");
-								sbIsueFeeGnrlChd.append(" 대리점 A / " + NumberUtil.formatNumber(agtGnrlChdFeeKrwAmt, "#,###,###")+" (No."+agtFeeRuleId+") ");
-								sbIsueFeeGnrlInf.append(" 대리점 A / " + NumberUtil.formatNumber(agtGnrlInfFeeKrwAmt, "#,###,###")+" (No."+agtFeeRuleId+") ");
-								sbIsueFeeDtcmAdt.append(" 대리점 A / " + NumberUtil.formatNumber(agtDtcmAdtFeeKrwAmt, "#,###,###")+" (No."+agtFeeRuleId+") ");
-								sbIsueFeeDtcmChd.append(" 대리점 A / " + NumberUtil.formatNumber(agtDtcmChdFeeKrwAmt, "#,###,###")+" (No."+agtFeeRuleId+") ");
-								sbIsueFeeDtcmInf.append(" 대리점 A / " + NumberUtil.formatNumber(agtDtcmInfFeeKrwAmt, "#,###,###")+" (No."+agtFeeRuleId+") ");
-							}
-						}
 
 						//------------------------------------
 						// 공급코드, 발권항공사, 여정타입..
@@ -2473,6 +2131,7 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 						//--------------------------------------
 						// 발권수수료-성인원화전체금액
 						//--------------------------------------
+						JsonNode feeDtlNode = farLstNode.path("feeDtl");
 						String gnrlAdtKrwAllAmt = !"".equals(feeDtlNode.path("gnrlAdtKrwAllAmt").asText()) ? " Total " + NumberUtil.formatNumber(feeDtlNode.path("gnrlAdtKrwAllAmt").asText(), "#,###,###") : "";
 						String gnrlChdKrwAllAmt = !"".equals(feeDtlNode.path("gnrlChdKrwAllAmt").asText()) ? " Total " + NumberUtil.formatNumber(feeDtlNode.path("gnrlChdKrwAllAmt").asText(), "#,###,###") : "";
 						String gnrlInfKrwAllAmt = !"".equals(feeDtlNode.path("gnrlInfKrwAllAmt").asText()) ? " Total " + NumberUtil.formatNumber(feeDtlNode.path("gnrlInfKrwAllAmt").asText(), "#,###,###") : "";
@@ -3420,6 +3079,217 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 			this.isExistCardDtcmInfo = isExistCardDtcmInfo;
 		}
 	}
+	/**
+	 * 발권수수료(TASF: 공급/판매/분배/대리점) 텍스트를 조립한다.
+	 * farVoLst(편도결합)/farLstNode(비결합)는 필드명이 동일하므로 fareNode 하나로 통일. 원본 로직 무변경.
+	 */
+	private TasfFeeTexts buildTasfFeeTexts(JsonNode fareNode) {
+		//#### 발권수수료정보 #####
+		JsonNode feeDtlNode = fareNode.path("feeDtl");
+
+		StringBuilder sbIsueFeeGnrlAdt = new StringBuilder("\n일반 TASF ADT ");
+		StringBuilder sbIsueFeeGnrlChd = new StringBuilder("\n일반 TASF CHD ");
+		StringBuilder sbIsueFeeGnrlInf = new StringBuilder("\n일반 TASF INF ");
+		StringBuilder sbIsueFeeDtcmAdt = new StringBuilder("\n닷컴 TASF ADT ");
+		StringBuilder sbIsueFeeDtcmChd = new StringBuilder("\n닷컴 TASF CHD ");
+		StringBuilder sbIsueFeeDtcmInf = new StringBuilder("\n닷컴 TASF INF ");
+
+		//--------------------------------------
+		// TASF - 공급수수료
+		//--------------------------------------
+		String splyFeeRuleId = StringUtil.nullConvert(feeDtlNode.path("splyFeeRuleId").textValue());	// 공급수수료룰ID
+		if(StringUtil.isEmpty(splyFeeRuleId)) {
+			sbIsueFeeGnrlAdt.append("공급 - ");
+			sbIsueFeeGnrlChd.append("공급 - ");
+			sbIsueFeeGnrlInf.append("공급 - ");
+			sbIsueFeeDtcmAdt.append("공급 - ");
+			sbIsueFeeDtcmChd.append("공급 - ");
+			sbIsueFeeDtcmInf.append("공급 - ");
+		}else {
+			String splyAdtFeeTrf    = StringUtil.nullConvert(feeDtlNode.path("splyAdtFeeTrf"   ).asText());	// 공급성인수수료요율
+			String splyChdFeeTrf    = StringUtil.nullConvert(feeDtlNode.path("splyChdFeeTrf"   ).asText());	// 공급아동수수료요율
+			String splyInfFeeTrf    = StringUtil.nullConvert(feeDtlNode.path("splyInfFeeTrf"   ).asText());	// 공급유아수수료요율
+			String splyAdtFeeKrwAmt = StringUtil.nullConvert(feeDtlNode.path("splyAdtFeeKrwAmt").asText());	// 공급성인수수료원화금액
+			String splyChdFeeKrwAmt = StringUtil.nullConvert(feeDtlNode.path("splyChdFeeKrwAmt").asText());	// 공급아동수수료원화금액
+			String splyInfFeeKrwAmt = StringUtil.nullConvert(feeDtlNode.path("splyInfFeeKrwAmt").asText());	// 공급유아수수료원화금액
+
+			// 공급수수료적용방식코드 : R - 정률, A - 정액
+			String splyFeeAplMthdCd       = StringUtil.nullConvert(feeDtlNode.path("splyFeeAplMthdCd").textValue());
+			if("R".equals(splyFeeAplMthdCd)) {
+				//------------------------
+				// 정률
+				//------------------------
+				sbIsueFeeGnrlAdt.append("공급 R " + splyAdtFeeTrf +"% / " + NumberUtil.formatNumber(splyAdtFeeKrwAmt, "#,###,###")+" (No."+splyFeeRuleId+") ");
+				sbIsueFeeGnrlChd.append("공급 R " + splyChdFeeTrf +"% / " + NumberUtil.formatNumber(splyChdFeeKrwAmt, "#,###,###")+" (No."+splyFeeRuleId+") ");
+				sbIsueFeeGnrlInf.append("공급 R " + splyInfFeeTrf +"% / " + NumberUtil.formatNumber(splyInfFeeKrwAmt, "#,###,###")+" (No."+splyFeeRuleId+") ");
+				sbIsueFeeDtcmAdt.append("공급 R " + splyAdtFeeTrf +"% / " + NumberUtil.formatNumber(splyAdtFeeKrwAmt, "#,###,###")+" (No."+splyFeeRuleId+") ");
+				sbIsueFeeDtcmChd.append("공급 R " + splyChdFeeTrf +"% / " + NumberUtil.formatNumber(splyChdFeeKrwAmt, "#,###,###")+" (No."+splyFeeRuleId+") ");
+				sbIsueFeeDtcmInf.append("공급 R " + splyInfFeeTrf +"% / " + NumberUtil.formatNumber(splyInfFeeKrwAmt, "#,###,###")+" (No."+splyFeeRuleId+") ");
+			} else if("A".equals(splyFeeAplMthdCd)) {
+				//------------------------
+				// 정액
+				//------------------------
+				sbIsueFeeGnrlAdt.append("공급 A / " + NumberUtil.formatNumber(splyAdtFeeKrwAmt, "#,###,###")+" (No."+splyFeeRuleId+") ");
+				sbIsueFeeGnrlChd.append("공급 A / " + NumberUtil.formatNumber(splyChdFeeKrwAmt, "#,###,###")+" (No."+splyFeeRuleId+") ");
+				sbIsueFeeGnrlInf.append("공급 A / " + NumberUtil.formatNumber(splyInfFeeKrwAmt, "#,###,###")+" (No."+splyFeeRuleId+") ");
+				sbIsueFeeDtcmAdt.append("공급 A / " + NumberUtil.formatNumber(splyAdtFeeKrwAmt, "#,###,###")+" (No."+splyFeeRuleId+") ");
+				sbIsueFeeDtcmChd.append("공급 A / " + NumberUtil.formatNumber(splyChdFeeKrwAmt, "#,###,###")+" (No."+splyFeeRuleId+") ");
+				sbIsueFeeDtcmInf.append("공급 A / " + NumberUtil.formatNumber(splyInfFeeKrwAmt, "#,###,###")+" (No."+splyFeeRuleId+") ");
+			}
+		}
+		//--------------------------------------
+		// TASF - 판매수수료
+		//--------------------------------------
+		String saleFeeRuleId = StringUtil.nullConvert(feeDtlNode.path("saleFeeRuleId").textValue());	// 판매수수료룰ID
+		if(StringUtil.isEmpty(saleFeeRuleId)) {
+			sbIsueFeeGnrlAdt.append(" 판매 - ");
+			sbIsueFeeGnrlChd.append(" 판매 - ");
+			sbIsueFeeGnrlInf.append(" 판매 - ");
+			sbIsueFeeDtcmAdt.append(" 판매 - ");
+			sbIsueFeeDtcmChd.append(" 판매 - ");
+			sbIsueFeeDtcmInf.append(" 판매 - ");
+		}else {
+			String saleAdtFeeTrf        = StringUtil.nullConvert(feeDtlNode.path("saleAdtFeeTrf"       ).asText());	// 판매성인수수료요율
+			String saleChdFeeTrf        = StringUtil.nullConvert(feeDtlNode.path("saleChdFeeTrf"       ).asText());	// 판매아동수수료요율
+			String saleInfFeeTrf        = StringUtil.nullConvert(feeDtlNode.path("saleInfFeeTrf"       ).asText());	// 판매유아수수료요율
+			String saleGnrlAdtFeeKrwAmt = StringUtil.nullConvert(feeDtlNode.path("saleGnrlAdtFeeKrwAmt").asText());	// 판매일반성인수수료원화금액
+			String saleGnrlChdFeeKrwAmt = StringUtil.nullConvert(feeDtlNode.path("saleGnrlChdFeeKrwAmt").asText());	// 판매일반아동수수료원화금액
+			String saleGnrlInfFeeKrwAmt = StringUtil.nullConvert(feeDtlNode.path("saleGnrlInfFeeKrwAmt").asText());	// 판매일반유아수수료원화금액
+			String saleDtcmAdtFeeKrwAmt = StringUtil.nullConvert(feeDtlNode.path("saleDtcmAdtFeeKrwAmt").asText());	// 판매닷컴성인수수료원화금액
+			String saleDtcmChdFeeKrwAmt = StringUtil.nullConvert(feeDtlNode.path("saleDtcmChdFeeKrwAmt").asText());	// 판매닷컴아동수수료원화금액
+			String saleDtcmInfFeeKrwAmt = StringUtil.nullConvert(feeDtlNode.path("saleDtcmInfFeeKrwAmt").asText());	// 판매닷컴유아수수료원화금액
+
+			// 판매수수료적용방식 : R - 정률, A - 정액
+			String saleFeeAplMthdCd = StringUtil.nullConvert(feeDtlNode.path("saleFeeAplMthdCd"   ).asText());
+			if("R".equals(saleFeeAplMthdCd)) {
+				//------------------------
+				// 정률
+				//------------------------
+				sbIsueFeeGnrlAdt.append(" 판매 R " + saleAdtFeeTrf +"% / " + NumberUtil.formatNumber(saleGnrlAdtFeeKrwAmt, "#,###,###")+" (No."+saleFeeRuleId+") ");
+				sbIsueFeeGnrlChd.append(" 판매 R " + saleChdFeeTrf +"% / " + NumberUtil.formatNumber(saleGnrlChdFeeKrwAmt, "#,###,###")+" (No."+saleFeeRuleId+") ");
+				sbIsueFeeGnrlInf.append(" 판매 R " + saleInfFeeTrf +"% / " + NumberUtil.formatNumber(saleGnrlInfFeeKrwAmt, "#,###,###")+" (No."+saleFeeRuleId+") ");
+				sbIsueFeeDtcmAdt.append(" 판매 R " + saleAdtFeeTrf +"% / " + NumberUtil.formatNumber(saleDtcmAdtFeeKrwAmt, "#,###,###")+" (No."+saleFeeRuleId+") ");
+				sbIsueFeeDtcmChd.append(" 판매 R " + saleChdFeeTrf +"% / " + NumberUtil.formatNumber(saleDtcmChdFeeKrwAmt, "#,###,###")+" (No."+saleFeeRuleId+") ");
+				sbIsueFeeDtcmInf.append(" 판매 R " + saleInfFeeTrf +"% / " + NumberUtil.formatNumber(saleDtcmInfFeeKrwAmt, "#,###,###")+" (No."+saleFeeRuleId+") ");
+			} else if("A".equals(saleFeeAplMthdCd)) {
+				//------------------------
+				// 정액
+				//------------------------
+				sbIsueFeeGnrlAdt.append(" 판매 A / " + NumberUtil.formatNumber(saleGnrlAdtFeeKrwAmt, "#,###,###")+" (No."+saleFeeRuleId+") ");
+				sbIsueFeeGnrlChd.append(" 판매 A / " + NumberUtil.formatNumber(saleGnrlChdFeeKrwAmt, "#,###,###")+" (No."+saleFeeRuleId+") ");
+				sbIsueFeeGnrlInf.append(" 판매 A / " + NumberUtil.formatNumber(saleGnrlInfFeeKrwAmt, "#,###,###")+" (No."+saleFeeRuleId+") ");
+				sbIsueFeeDtcmAdt.append(" 판매 A / " + NumberUtil.formatNumber(saleDtcmAdtFeeKrwAmt, "#,###,###")+" (No."+saleFeeRuleId+") ");
+				sbIsueFeeDtcmChd.append(" 판매 A / " + NumberUtil.formatNumber(saleDtcmChdFeeKrwAmt, "#,###,###")+" (No."+saleFeeRuleId+") ");
+				sbIsueFeeDtcmInf.append(" 판매 A / " + NumberUtil.formatNumber(saleDtcmInfFeeKrwAmt, "#,###,###")+" (No."+saleFeeRuleId+") ");
+			}
+		}
+		//--------------------------------------
+		// TASF - 분배
+		//--------------------------------------
+		String dtrbYn = StringUtil.nullConvert(feeDtlNode.path("dtrbYn"   ).asText());
+
+		if("Y".equals(dtrbYn)) {
+			String hanaDtrbRato = StringUtil.nullConvert(feeDtlNode.path("hanaDtrbRato"  ).asText());
+			String agtDtrbRato  = StringUtil.nullConvert(feeDtlNode.path("agtDtrbRato"   ).asText());
+
+			String gnrlAdtHanaDtrbKrwAmt = !"".equals(feeDtlNode.path("gnrlAdtHanaDtrbKrwAmt").asText()) ? NumberUtil.formatNumber(feeDtlNode.path("gnrlAdtHanaDtrbKrwAmt").asText(), "#,###,###") : "";	// 일반성인하나투어분배원화금액
+			String gnrlChdHanaDtrbKrwAmt = !"".equals(feeDtlNode.path("gnrlChdHanaDtrbKrwAmt").asText()) ? NumberUtil.formatNumber(feeDtlNode.path("gnrlChdHanaDtrbKrwAmt").asText(), "#,###,###") : "";	// 일반아동하나투어분배원화금액
+			String gnrlInfHanaDtrbKrwAmt = !"".equals(feeDtlNode.path("gnrlInfHanaDtrbKrwAmt").asText()) ? NumberUtil.formatNumber(feeDtlNode.path("gnrlInfHanaDtrbKrwAmt").asText(), "#,###,###") : "";	// 일반유아하나투어분배원화금액
+			String dtcmAdtHanaDtrbKrwAmt = !"".equals(feeDtlNode.path("dtcmAdtHanaDtrbKrwAmt").asText()) ? NumberUtil.formatNumber(feeDtlNode.path("dtcmAdtHanaDtrbKrwAmt").asText(), "#,###,###") : "";	// 닷컴성인하나투어분배원화금액
+			String dtcmChdHanaDtrbKrwAmt = !"".equals(feeDtlNode.path("dtcmChdHanaDtrbKrwAmt").asText()) ? NumberUtil.formatNumber(feeDtlNode.path("dtcmChdHanaDtrbKrwAmt").asText(), "#,###,###") : "";	// 닷컴아동하나투어분배원화금액
+			String dtcmInfHanaDtrbKrwAmt = !"".equals(feeDtlNode.path("dtcmInfHanaDtrbKrwAmt").asText()) ? NumberUtil.formatNumber(feeDtlNode.path("dtcmInfHanaDtrbKrwAmt").asText(), "#,###,###") : "";	// 닷컴유아하나투어분배원화금액
+			String gnrlAdtAgtDtrbKrwAmt  = !"".equals(feeDtlNode.path("gnrlAdtAgtDtrbKrwAmt" ).asText()) ? NumberUtil.formatNumber(feeDtlNode.path("gnrlAdtAgtDtrbKrwAmt" ).asText(), "#,###,###") : "";	// 일반성인대리점분배원화금액
+			String gnrlChdAgtDtrbKrwAmt  = !"".equals(feeDtlNode.path("gnrlChdAgtDtrbKrwAmt" ).asText()) ? NumberUtil.formatNumber(feeDtlNode.path("gnrlChdAgtDtrbKrwAmt" ).asText(), "#,###,###") : "";	// 일반아동대리점분배원화금액
+			String gnrlInfAgtDtrbKrwAmt  = !"".equals(feeDtlNode.path("gnrlInfAgtDtrbKrwAmt" ).asText()) ? NumberUtil.formatNumber(feeDtlNode.path("gnrlInfAgtDtrbKrwAmt" ).asText(), "#,###,###") : "";	// 일반유아대리점분배원화금액
+			String dtcmAdtAgtDtrbKrwAmt  = !"".equals(feeDtlNode.path("dtcmAdtAgtDtrbKrwAmt" ).asText()) ? NumberUtil.formatNumber(feeDtlNode.path("dtcmAdtAgtDtrbKrwAmt" ).asText(), "#,###,###") : "";	// 닷컴성인대리점분배원화금액
+			String dtcmChdAgtDtrbKrwAmt  = !"".equals(feeDtlNode.path("dtcmChdAgtDtrbKrwAmt" ).asText()) ? NumberUtil.formatNumber(feeDtlNode.path("dtcmChdAgtDtrbKrwAmt" ).asText(), "#,###,###") : "";	// 닷컴아동대리점분배원화금액
+			String dtcmInfAgtDtrbKrwAmt  = !"".equals(feeDtlNode.path("dtcmInfAgtDtrbKrwAmt" ).asText()) ? NumberUtil.formatNumber(feeDtlNode.path("dtcmInfAgtDtrbKrwAmt" ).asText(), "#,###,###") : "";	// 닷컴유아대리점분배원화금액
+
+			sbIsueFeeGnrlAdt.append("(분배" + dtrbYn + " / "+ hanaDtrbRato + " : " + agtDtrbRato +" / "+gnrlAdtHanaDtrbKrwAmt+" : "+gnrlAdtAgtDtrbKrwAmt+")");
+			sbIsueFeeGnrlChd.append("(분배" + dtrbYn + " / "+ hanaDtrbRato + " : " + agtDtrbRato +" / "+gnrlChdHanaDtrbKrwAmt+" : "+gnrlChdAgtDtrbKrwAmt+")");
+			sbIsueFeeGnrlInf.append("(분배" + dtrbYn + " / "+ hanaDtrbRato + " : " + agtDtrbRato +" / "+gnrlInfHanaDtrbKrwAmt+" : "+gnrlInfAgtDtrbKrwAmt+")");
+			sbIsueFeeDtcmAdt.append("(분배" + dtrbYn + " / "+ hanaDtrbRato + " : " + agtDtrbRato +" / "+dtcmAdtHanaDtrbKrwAmt+" : "+dtcmAdtAgtDtrbKrwAmt+")");
+			sbIsueFeeDtcmChd.append("(분배" + dtrbYn + " / "+ hanaDtrbRato + " : " + agtDtrbRato +" / "+dtcmChdHanaDtrbKrwAmt+" : "+dtcmChdAgtDtrbKrwAmt+")");
+			sbIsueFeeDtcmInf.append("(분배" + dtrbYn + " / "+ hanaDtrbRato + " : " + agtDtrbRato +" / "+dtcmInfHanaDtrbKrwAmt+" : "+dtcmInfAgtDtrbKrwAmt+")");
+		} else if("N".equals(dtrbYn)) {
+			sbIsueFeeGnrlAdt.append("(분배" + dtrbYn + ")");
+			sbIsueFeeGnrlChd.append("(분배" + dtrbYn + ")");
+			sbIsueFeeGnrlInf.append("(분배" + dtrbYn + ")");
+			sbIsueFeeDtcmAdt.append("(분배" + dtrbYn + ")");
+			sbIsueFeeDtcmChd.append("(분배" + dtrbYn + ")");
+			sbIsueFeeDtcmInf.append("(분배" + dtrbYn + ")");
+		}
+		//--------------------------------------
+		// TASF - 대리점
+		//--------------------------------------
+		String agtFeeRuleId = StringUtil.nullConvert(feeDtlNode.path("agtFeeRuleId").textValue());	// 대리점수수료룰ID
+		if(StringUtil.isEmpty(agtFeeRuleId)) {
+			sbIsueFeeGnrlAdt.append(" 대리점 - ");
+			sbIsueFeeGnrlChd.append(" 대리점 - ");
+			sbIsueFeeGnrlInf.append(" 대리점 - ");
+			sbIsueFeeDtcmAdt.append(" 대리점 - ");
+			sbIsueFeeDtcmChd.append(" 대리점 - ");
+			sbIsueFeeDtcmInf.append(" 대리점 - ");
+		}else {
+			String agtAdtFeeTrf        = StringUtil.nullConvert(feeDtlNode.path("agtAdtFeeTrf"       ).asText());	// 대리점성인수수료요율
+			String agtChdFeeTrf        = StringUtil.nullConvert(feeDtlNode.path("agtChdFeeTrf"       ).asText());	// 대리점아동수수료요율
+			String agtInfFeeTrf        = StringUtil.nullConvert(feeDtlNode.path("agtInfFeeTrf"       ).asText());	// 대리점유아수수료요율
+			String agtGnrlAdtFeeKrwAmt = StringUtil.nullConvert(feeDtlNode.path("agtGnrlAdtFeeKrwAmt").asText());	// 대리점일반성인수수료원화금액
+			String agtGnrlChdFeeKrwAmt = StringUtil.nullConvert(feeDtlNode.path("agtGnrlChdFeeKrwAmt").asText());	// 대리점일반아동수수료원화금액
+			String agtGnrlInfFeeKrwAmt = StringUtil.nullConvert(feeDtlNode.path("agtGnrlInfFeeKrwAmt").asText());	// 대리점일반유아수수료원화금액
+			String agtDtcmAdtFeeKrwAmt = StringUtil.nullConvert(feeDtlNode.path("agtDtcmAdtFeeKrwAmt").asText());	// 대리점닷컴성인수수료원화금액
+			String agtDtcmChdFeeKrwAmt = StringUtil.nullConvert(feeDtlNode.path("agtDtcmChdFeeKrwAmt").asText());	// 대리점닷컴아동수수료원화금액
+			String agtDtcmInfFeeKrwAmt = StringUtil.nullConvert(feeDtlNode.path("agtDtcmInfFeeKrwAmt").asText());	// 대리점닷컴유아수수료원화금액
+
+			// 대리점수수료적용방식 : R - 정률, A - 정액
+			String agtFeeAplMthdCd = StringUtil.nullConvert(feeDtlNode.path("agtFeeAplMthdCd"   ).asText());
+			if("R".equals(agtFeeAplMthdCd)) {
+				//------------------------
+				// 정률
+				//------------------------
+				sbIsueFeeGnrlAdt.append(" 대리점 R" + agtAdtFeeTrf +"% / " + NumberUtil.formatNumber(agtGnrlAdtFeeKrwAmt, "#,###,###")+" (No."+agtFeeRuleId+") ");
+				sbIsueFeeGnrlChd.append(" 대리점 R" + agtChdFeeTrf +"% / " + NumberUtil.formatNumber(agtGnrlChdFeeKrwAmt, "#,###,###")+" (No."+agtFeeRuleId+") ");
+				sbIsueFeeGnrlInf.append(" 대리점 R" + agtInfFeeTrf +"% / " + NumberUtil.formatNumber(agtGnrlInfFeeKrwAmt, "#,###,###")+" (No."+agtFeeRuleId+") ");
+				sbIsueFeeDtcmAdt.append(" 대리점 R" + agtAdtFeeTrf +"% / " + NumberUtil.formatNumber(agtDtcmAdtFeeKrwAmt, "#,###,###")+" (No."+agtFeeRuleId+") ");
+				sbIsueFeeDtcmChd.append(" 대리점 R" + agtChdFeeTrf +"% / " + NumberUtil.formatNumber(agtDtcmChdFeeKrwAmt, "#,###,###")+" (No."+agtFeeRuleId+") ");
+				sbIsueFeeDtcmInf.append(" 대리점 R" + agtInfFeeTrf +"% / " + NumberUtil.formatNumber(agtDtcmInfFeeKrwAmt, "#,###,###")+" (No."+agtFeeRuleId+") ");
+			} else if("A".equals(agtFeeAplMthdCd)) {
+				//------------------------
+				// 정액
+				//------------------------
+				sbIsueFeeGnrlAdt.append(" 대리점 A / " + NumberUtil.formatNumber(agtGnrlAdtFeeKrwAmt, "#,###,###")+" (No."+agtFeeRuleId+") ");
+				sbIsueFeeGnrlChd.append(" 대리점 A / " + NumberUtil.formatNumber(agtGnrlChdFeeKrwAmt, "#,###,###")+" (No."+agtFeeRuleId+") ");
+				sbIsueFeeGnrlInf.append(" 대리점 A / " + NumberUtil.formatNumber(agtGnrlInfFeeKrwAmt, "#,###,###")+" (No."+agtFeeRuleId+") ");
+				sbIsueFeeDtcmAdt.append(" 대리점 A / " + NumberUtil.formatNumber(agtDtcmAdtFeeKrwAmt, "#,###,###")+" (No."+agtFeeRuleId+") ");
+				sbIsueFeeDtcmChd.append(" 대리점 A / " + NumberUtil.formatNumber(agtDtcmChdFeeKrwAmt, "#,###,###")+" (No."+agtFeeRuleId+") ");
+				sbIsueFeeDtcmInf.append(" 대리점 A / " + NumberUtil.formatNumber(agtDtcmInfFeeKrwAmt, "#,###,###")+" (No."+agtFeeRuleId+") ");
+			}
+		}
+
+
+		return new TasfFeeTexts(sbIsueFeeGnrlAdt, sbIsueFeeGnrlChd, sbIsueFeeGnrlInf, sbIsueFeeDtcmAdt, sbIsueFeeDtcmChd, sbIsueFeeDtcmInf);
+	}
+
+	/** buildTasfFeeTexts()의 결과를 담는 불변 보유체. */
+	private static final class TasfFeeTexts {
+		private final StringBuilder sbIsueFeeGnrlAdt;
+		private final StringBuilder sbIsueFeeGnrlChd;
+		private final StringBuilder sbIsueFeeGnrlInf;
+		private final StringBuilder sbIsueFeeDtcmAdt;
+		private final StringBuilder sbIsueFeeDtcmChd;
+		private final StringBuilder sbIsueFeeDtcmInf;
+
+		private TasfFeeTexts(StringBuilder sbIsueFeeGnrlAdt, StringBuilder sbIsueFeeGnrlChd, StringBuilder sbIsueFeeGnrlInf, StringBuilder sbIsueFeeDtcmAdt, StringBuilder sbIsueFeeDtcmChd, StringBuilder sbIsueFeeDtcmInf) {
+			this.sbIsueFeeGnrlAdt = sbIsueFeeGnrlAdt;
+			this.sbIsueFeeGnrlChd = sbIsueFeeGnrlChd;
+			this.sbIsueFeeGnrlInf = sbIsueFeeGnrlInf;
+			this.sbIsueFeeDtcmAdt = sbIsueFeeDtcmAdt;
+			this.sbIsueFeeDtcmChd = sbIsueFeeDtcmChd;
+			this.sbIsueFeeDtcmInf = sbIsueFeeDtcmInf;
+		}
+	}
+
+
 
 
 
