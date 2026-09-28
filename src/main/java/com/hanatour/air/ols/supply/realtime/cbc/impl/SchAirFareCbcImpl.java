@@ -101,9 +101,9 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 	@Override
 	@ServiceMapping(value = "/air/ols/supply/realtime/cbc/schairfare/getAirFareList/v1.00", method = RequestMethod.POST)
 	public SchAirFareCbcOutVo getAirFareList(SchAirFareCbcInVo schAirFareCbcInVo){
-		String resJsonStr = "";
+		String resJsonStr;
 
-		String jsonString = "";
+		String jsonString;
 		jsonString = this.createReqJsonObj(schAirFareCbcInVo.getSchAirFareSearchVo());
 		resJsonStr = this.callApiService(jsonString);
 		
@@ -133,10 +133,10 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 		//-------------------------------
 		// 20191113 : 소켓타임아웃 - 체크용 시간추가
 		//-------------------------------
-		String sCallApiStartTime = "";
-		String sCallApiEndTime   = "";
-		String sMakeStartTime    = "";
-		String sMakeEndTime      = "";
+		String sCallApiStartTime;
+		String sCallApiEndTime;
+		String sMakeStartTime;
+		String sMakeEndTime;
 		//-------------------------------
 
 		logger.debug("===========================================");
@@ -144,8 +144,8 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 		logger.debug("===========================================");
 		sCallApiStartTime = DateTimeUtils.getSystemCurrentDateTime();
 		
-		String resJsonStr = "";
-		String jsonString = "";
+		String resJsonStr;
+		String jsonString;
 
 		SchAirFareChangeSearchVo schAirFareChangeSearchVo = schAirFareChangeCbcInVo.getSchAirFareChangeSearchVo();
 		logger.info("캐시사용여부========== "+ schAirFareChangeSearchVo.getCacheSearchYn());
@@ -248,9 +248,9 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 		SchAirFareResponseHidStopLstVo responseHidStopLstVoo;
 		//------------------------------
 		
-		String gdsItnrTypeCd = "";	// 룰셋여정타입
-		String apiSupCode = "";
-		String newSplyCd  = "";
+		String gdsItnrTypeCd;	// 룰셋여정타입
+		String apiSupCode;
+		String newSplyCd;
 
 		long farLstCnt = 0;
 		if(node != null && node.path("farLst") != null) {
@@ -263,7 +263,7 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 		//------------------------------
 		JsonNode bizComNode = node.path("bizCom");
 		if(null != bizComNode) {
-			SchAirFareResponseBizComVo responseBizComVo = new SchAirFareResponseBizComVo();		
+			SchAirFareResponseBizComVo responseBizComVo;		
 			responseBizComVo = new Gson().fromJson(bizComNode.toString(), SchAirFareResponseBizComVo.class);			
 				
 			ds_jsonBizCom.add(responseBizComVo);
@@ -390,7 +390,7 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 
 					String alComplexChk = "";
 					String tktAlCode = "";
-					String tktAlName = "";
+					String tktAlName;
 					String pasnType = "";
 
 					sbMktAlCodes = new StringBuilder("");
@@ -572,16 +572,16 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 							Map<String, String> cabinMap = new HashMap<String, String>();
 							Map<String, String> mktAlMap = new HashMap<String, String>();
 
-							String viaCnt = "";	//경유횟수
+							String viaCnt;	//경유횟수
 							nMaxViaCnt = 0;	//경유횟수
-							int nTempViaCnt = 0;//경유횟수
-							String viaStr = "";	//경유횟수텍스트
-							String cabinType = "";		//좌석등급
-							String bookClass = "";		//부킹클래스
-							String fareBasis = "";		//fareBasis
-							String tktDesg = "";
+							int nTempViaCnt;//경유횟수
+							String viaStr;	//경유횟수텍스트
+							String cabinType;		//좌석등급
+							String bookClass;		//부킹클래스
+							String fareBasis;		//fareBasis
+							String tktDesg;
 
-							String fareType = "";		//운임유형
+							String fareType;		//운임유형
 							totFltTime = 0;			//총소요시간
 							totStopTime = 0;		//총환승시간
 
@@ -599,7 +599,7 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 								String ans =  finds.substring(0,idx);
 								String ans2 =  finds.substring(idx+1);
 
-								String sParentRowKey2 = "";
+								String sParentRowKey2;
 
 								if(farIndex==0){
 									responseItnrLstVo = new Gson().fromJson(itnrLstNode.toString(), SchAirFareResponseItnrLstVo.class);
@@ -719,8 +719,8 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 									String oprAlName = StringUtil.nullConvert(fltLstNode.path("oprAlName").textValue());	//운항항공이름
 									String mktFltNo  = StringUtil.nullConvert(fltLstNode.path("mktFltNo" ).textValue());
                                     String eqmtName = StringUtil.nullConvert(fltLstNode.path("eqmtName"  ).textValue());	//기종명
-									String oprAlNmDp   = "";
-									String oprAlCodeDp = "";
+									String oprAlNmDp;
+									String oprAlCodeDp;
 
 									sbMktAlCodes.append(mktAlCode + ",");
 									sbOprAlCodes.append(oprAlCode + ",");
@@ -867,7 +867,7 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 							//-------------------------------------
 							// 직항, 경유 필터 설정 - 운임별로 설정함.
 							//-------------------------------------
-							String viaStr2 = "";
+							String viaStr2;
 							if(nMaxViaCnt > 1) {	//경유횟수:viaCnt=1은 직항을 의미
 								int vi = nMaxViaCnt - 1;
 								viaStr2 = "경유"+vi+"회";
@@ -894,8 +894,7 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 							String pftktSeq      =            StringUtil.nullConvert(farVoLst.path("pftktSeq"     ).textValue());	                                // PF운임룰번호
 							String pfTktYn       = "Y".equals(StringUtil.nullConvert(farVoLst.path("pftktYn"      ).textValue())) ? "[PF] (No."+pftktSeq+") " : "";	// PF티켓여부
 							imdtPayPsblYn =            StringUtil.nullConvert(farVoLst.path("imdtPayPsblYn").textValue());			                  		//즉시결제가능여부
-							gnrlEventCds  = "";	//필터용
-							String gnrlEventCdDp = "";	//화면표시용
+							String gnrlEventCdDp;	//화면표시용
 							sbGnrlEventCdDp = new StringBuilder("");	//화면표시용
 
 							String gnrlEventCd1  = StringUtil.nullConvert(farVoLst.path("gnrlEvent1Cd").textValue());	//일반이벤트코드1
@@ -980,15 +979,6 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 							this.setTimeFilterMap(fareFltrMap, ALL_TAP, totFltTime , FltrType.TOT_TIME);
 							this.setTimeFilterMap(fareFltrMap, ALL_TAP, totStopTime, FltrType.STOP_TIME);
 
-
-							//발권항공사룰운임제외대상여부/MCT룰운임제외대상여부
-							String isueAlirlRuleFarExlsTrgtYn = "Y".equals(StringUtil.nullConvert(farVoLst.path("isueAlirlRuleFarExlsTrgtYn").textValue())) ? "발권항공사룰운임제외대상 " : "";
-							String mctRuleFarExlsTrgtYn       = "Y".equals(StringUtil.nullConvert(farVoLst.path("mctRuleFarExlsTrgtYn"      ).textValue())) ? "MCT룰운임제외대상 " : "";
-							String exlsTargnYnStr = isueAlirlRuleFarExlsTrgtYn+mctRuleFarExlsTrgtYn;
-
-							if(!"".equals(exlsTargnYnStr)) {
-								exlsTargnYnStr = exlsTargnYnStr + "\n";
-							}
 
 							//특별적립마일리지 텍스트 - 편도결합/비결합 공통 로직은 buildSpclColtMlgTexts()로 추출
 							SpclColtMlgTexts spclColtMlgTexts = this.buildSpclColtMlgTexts(farVoLst);
@@ -1218,19 +1208,19 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 						Map<String, String> cabinMap = new HashMap<String, String>();
 						Map<String, String> mktAlMap = new HashMap<String, String>();
 
-						String viaCnt = "";	//경유횟수
+						String viaCnt;	//경유횟수
 						nMaxViaCnt = 0;	//경유횟수
-						int nTempViaCnt = 0;//경유횟수
-						String viaStr = "";	//경유횟수텍스트
+						int nTempViaCnt;//경유횟수
+						String viaStr;	//경유횟수텍스트
 
-						String cabinType = "";		//좌석등급
-						String bookClass = "";		//부킹클래스
+						String cabinType;		//좌석등급
+						String bookClass;		//부킹클래스
 
-						String fareBasis = "";		//fareBasis
-						String tktDesg = "";		//tktDesg
+						String fareBasis;		//fareBasis
+						String tktDesg;		//tktDesg
 
 
-						String fareType = "";		//운임유형
+						String fareType;		//운임유형
 						totFltTime = 0;			//총소요시간
 						totStopTime = 0;		//총환승시간
 
@@ -1353,8 +1343,8 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 								String oprAlName = StringUtil.nullConvert(fltLstNode.path("oprAlName").textValue());	//운항항공이름
 								String mktFltNo  = StringUtil.nullConvert(fltLstNode.path("mktFltNo" ).textValue());
                                 String eqmtName = StringUtil.nullConvert(fltLstNode.path("eqmtName"  ).textValue());	//기종명
-								String oprAlNmDp   = "";
-								String oprAlCodeDp = "";
+								String oprAlNmDp;
+								String oprAlCodeDp;
 
 								sbMktAlCodes.append(mktAlCode + ",");
 								sbOprAlCodes.append(oprAlCode + ",");
@@ -1478,7 +1468,7 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 						//-------------------------------------
 						// 직항, 경유 필터 설정 - 운임별로 설정함.
 						//-------------------------------------
-						String viaStr2 = "";
+						String viaStr2;
 						if(nMaxViaCnt > 1) {	//경유횟수:viaCnt=1은 직항을 의미
 							int vi = nMaxViaCnt - 1;
 							viaStr2 = "경유"+vi+"회";
@@ -1506,8 +1496,7 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 						String pftktSeq      =            StringUtil.nullConvert(farLstNode.path("pftktSeq"     ).textValue());	                                // PF운임룰번호
 						String pfTktYn       = "Y".equals(StringUtil.nullConvert(farLstNode.path("pftktYn"      ).textValue())) ? "[PF] (No."+pftktSeq+") " : "";	// PF티켓여부
 						imdtPayPsblYn =            StringUtil.nullConvert(farLstNode.path("imdtPayPsblYn").textValue());			                  		//즉시결제가능여부
-						gnrlEventCds  = "";	//필터용
-						String gnrlEventCdDp = "";	//화면표시용
+						String gnrlEventCdDp;	//화면표시용
 						sbGnrlEventCdDp = new StringBuilder("");	//화면표시용
 
 						String gnrlEventCd1  = StringUtil.nullConvert(farLstNode.path("gnrlEvent1Cd").textValue());	//일반이벤트코드1
@@ -1583,15 +1572,6 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 						this.setTimeFilterMap(fareFltrMap, ALL_TAP, totFltTime , FltrType.TOT_TIME);
 						this.setTimeFilterMap(fareFltrMap, ALL_TAP, totStopTime, FltrType.STOP_TIME);
 
-
-						//발권항공사룰운임제외대상여부/MCT룰운임제외대상여부
-						String isueAlirlRuleFarExlsTrgtYn = "Y".equals(StringUtil.nullConvert(farLstNode.path("isueAlirlRuleFarExlsTrgtYn").textValue())) ? "발권항공사룰운임제외대상 " : "";
-						String mctRuleFarExlsTrgtYn       = "Y".equals(StringUtil.nullConvert(farLstNode.path("mctRuleFarExlsTrgtYn"      ).textValue())) ? "MCT룰운임제외대상 " : "";
-						String exlsTargnYnStr = isueAlirlRuleFarExlsTrgtYn+mctRuleFarExlsTrgtYn;
-
-						if(!"".equals(exlsTargnYnStr)) {
-							exlsTargnYnStr = exlsTargnYnStr + "\n";
-						}
 
 						//특별적립마일리지 텍스트 - 편도결합/비결합 공통 로직은 buildSpclColtMlgTexts()로 추출
 						SpclColtMlgTexts spclColtMlgTexts = this.buildSpclColtMlgTexts(farLstNode);
@@ -2856,7 +2836,7 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 			}
 		}
 
-		String fareBscInfo = "";
+		String fareBscInfo;
 		StringBuilder sbFareBscInfo = new StringBuilder("");
 		sbFareBscInfo.append("".equals(sbIsueFeeGnrlAdt.toString()) ? "" : sbIsueFeeGnrlAdt.toString() + "\n");
 		sbFareBscInfo.append("".equals(sbIsueFeeDtcmAdt.toString()) ? sbTmpFareBscInfo.toString() : sbIsueFeeDtcmAdt.toString() + "\n" + sbTmpFareBscInfo.toString());
@@ -3299,7 +3279,7 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 			Long gapNum = (fVo.getAmtFltrMaxVal() - fVo.getAmtFltrMinVal()) / 5;
 
 			Long stVal = fVo.getAmtFltrMinVal();
-			Long endVal = 0L;
+			Long endVal;
 			
 			if(gapNum == 0){
 				String fltrTxt = fltrType.getFltrFld() + " >= " + stVal.toString();
@@ -3339,7 +3319,7 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 			Integer totGapNum = (totMaxVal - totMinVal) / 5;
 
 			Integer totStVal = totMinVal;
-			Integer totEndVal = 0;		
+			Integer totEndVal;		
 
 			if(totGapNum == 0){
 				String stStr = this.getTimeStr(totStVal);
@@ -3392,7 +3372,7 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 			Integer stopGapNum = (stopMaxVal - stopMinVal) / 5;
 
 			Integer stopStVal = stopMinVal;
-			Integer stopEndVal = 0;
+			Integer stopEndVal;
 			
 			if(stopGapNum == 0){
 				String stStr = this.getTimeStr(stopStVal);
@@ -3457,7 +3437,7 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 	 * 시간계산용 분 -> 시,분으로 치환
 	 */
 	private String getTimeStr(Integer minVal){
-		String timeStr = "";
+		String timeStr;
 
 		Integer hourStr = minVal / 60;
 		Integer minStr = minVal % 60;
