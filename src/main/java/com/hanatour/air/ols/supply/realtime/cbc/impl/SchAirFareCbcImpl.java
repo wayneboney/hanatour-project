@@ -1085,220 +1085,17 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 							sbChdDtcmDcAmtInfo.append("\n" + pfTktYn + bestFarYn + "닷컴 적용가 CHD " + sbChdDtcmDcAmtInfoTemp.toString());
 							sbInfDtcmDcAmtInfo.append("\n" + pfTktYn + bestFarYn + "닷컴 적용가 INF " + sbInfDtcmDcAmtInfoTemp.toString());
 
-							//######## 카드프로모션정보 #########
-							isExistCardGnrlInfo = "N";
-							isExistCardDtcmInfo = "N";
+							//카드프로모션정보 - 편도결합/비결합 공통 로직은 buildCardPromotionTexts()로 추출
+							CardPromotionTexts cardPromotionTexts = this.buildCardPromotionTexts(farVoLst, feeAmountTexts, pasnType, newSplyCd, fareFltrMap, sbGnrlCardPromId, sbGnrlCardPromEventCd, sbGnrlCardNm, sbGnrlCardDcInfo, sbGnrlCardDcAplAmt, sbGnrlCardDcTotalAmt, sbDtcmCardPromId, sbDtcmCardPromEventCd, sbDtcmCardNm, sbDtcmCardDcInfo, sbDtcmCardDcAplAmt, sbDtcmCardDcTotalAmt, sbCardPromIds);
+							sbCardGnrlAdt = cardPromotionTexts.sbCardGnrlAdt;
+							sbCardGnrlChd = cardPromotionTexts.sbCardGnrlChd;
+							sbCardGnrlInf = cardPromotionTexts.sbCardGnrlInf;
+							sbCardDtcmAdt = cardPromotionTexts.sbCardDtcmAdt;
+							sbCardDtcmChd = cardPromotionTexts.sbCardDtcmChd;
+							sbCardDtcmInf = cardPromotionTexts.sbCardDtcmInf;
+							isExistCardGnrlInfo = cardPromotionTexts.isExistCardGnrlInfo;
+							isExistCardDtcmInfo = cardPromotionTexts.isExistCardDtcmInfo;
 
-							sbCardGnrlAdt = new StringBuilder("");
-							sbCardGnrlChd = new StringBuilder("");
-							sbCardGnrlInf = new StringBuilder("");
-							sbCardDtcmAdt = new StringBuilder("");
-							sbCardDtcmChd = new StringBuilder("");
-							sbCardDtcmInf = new StringBuilder("");
-
-							for(JsonNode cardPromNode : farVoLst.path("cardPromLst")){
-								//일반카드프로모션정보 setting
-								sbGnrlCardPromId.append(     StringUtil.nullConvert(cardPromNode.path("cardPromId").textValue()) + "\n");			//프로모션Id
-								sbGnrlCardPromEventCd.append(StringUtil.nullConvert(cardPromNode.path("eventCd"   ).textValue()) + "\n");			//이벤트코드
-								sbGnrlCardNm.append(         StringUtil.nullConvert(cardPromNode.path("cardNm"    ).textValue()) + "\n");					//카드명
-
-								String gnrlEventNmForFilter = StringUtil.nullConvert(cardPromNode.path("eventNm"   ).textValue());	// 이벤트명   - 필터용
-
-								String gnrlCardDcRate = cardPromNode.path("totDcRate").asText();
-								String gnrlAdtDcAmt = NumberUtil.formatNumber(cardPromNode.path("gnrlAdtDcAmt").asText(), "#,###,###");
-								String gnrlChdDcAmt = NumberUtil.formatNumber(cardPromNode.path("gnrlChdDcAmt").asText(), "#,###,###");
-								String gnrlInfDcAmt = NumberUtil.formatNumber(cardPromNode.path("gnrlInfDcAmt").asText(), "#,###,###");
-								sbGnrlCardDcInfo.append(gnrlCardDcRate + "% / " + gnrlAdtDcAmt + "\n");											//할인정보
-								long cardGnrlAdtDcAplSaleAmtL = cardPromNode.path("gnrlAdtDcAplSaleAmt").asLong(0L);							//할인적용금액
-								long cardGnrlChdDcAplSaleAmtL = cardPromNode.path("gnrlChdDcAplSaleAmt").asLong(0L);							//할인적용금액
-								long cardGnrlInfDcAplSaleAmtL = cardPromNode.path("gnrlInfDcAplSaleAmt").asLong(0L);							//할인적용금액
-								sbGnrlCardDcAplAmt.append(pasnType + " " + NumberUtil.formatNumber(cardGnrlAdtDcAplSaleAmtL, "#,###,###"));
-								long gnrlAdtCardDcTotalAmtL = cardGnrlAdtDcAplSaleAmtL + gnrlAdtEtcAmtL;												//할인적용 총금액
-								long gnrlChdCardDcTotalAmtL = cardGnrlChdDcAplSaleAmtL + gnrlChdEtcAmtL;												//할인적용 총금액
-								long gnrlInfCardDcTotalAmtL = cardGnrlInfDcAplSaleAmtL + gnrlInfEtcAmtL;												//할인적용 총금액
-								sbGnrlCardDcTotalAmt.append(" Total " + NumberUtil.formatNumber(gnrlAdtCardDcTotalAmtL, "#,###,###") + "\n");			//할인적용총요금
-
-								String gnrlAdtCardDcTotalAmt = "Total " + NumberUtil.formatNumber(gnrlAdtCardDcTotalAmtL, "#,###,###");			//할인적용총요금
-								String gnrlChdCardDcTotalAmt = "Total " + NumberUtil.formatNumber(gnrlChdCardDcTotalAmtL, "#,###,###");			//할인적용총요금
-								String gnrlInfCardDcTotalAmt = "Total " + NumberUtil.formatNumber(gnrlInfCardDcTotalAmtL, "#,###,###");			//할인적용총요금
-
-								if(cardGnrlAdtDcAplSaleAmtL != 0){	//더보기 체크용
-									isExistCardGnrlInfo = "Y";
-								}
-
-								//닷컴카드프로모션정보 setting
-								sbDtcmCardPromId.append(     StringUtil.nullConvert(cardPromNode.path("cardPromId").textValue()) + "\n");	//프로모션Id
-								sbDtcmCardPromEventCd.append(StringUtil.nullConvert(cardPromNode.path("eventCd"   ).textValue()) + "\n");	//이벤트코드
-								sbDtcmCardNm.append(         StringUtil.nullConvert(cardPromNode.path("cardNm"    ).textValue()) + "\n");	//카드명
-								String dtcmCardDcRate = cardPromNode.path("totDcRate").asText();
-								String dtcmCardDcAmt = NumberUtil.formatNumber(cardPromNode.path("dtcmAdtDcAmt").asText(), "#,###,###");
-								sbDtcmCardDcInfo.append(dtcmCardDcRate + "% / " + dtcmCardDcAmt + "\n");											//할인정보
-								long cardDtcmAdtDcAplSaleAmtL = cardPromNode.path("dtcmAdtDcAplSaleAmt").asLong(0L);							//할인적용금액
-								long cardDtcmChdDcAplSaleAmtL = cardPromNode.path("dtcmChdDcAplSaleAmt").asLong(0L);							//할인적용금액
-								long cardDtcmInfDcAplSaleAmtL = cardPromNode.path("dtcmInfDcAplSaleAmt").asLong(0L);							//할인적용금액
-								sbDtcmCardDcAplAmt.append(pasnType + " " + NumberUtil.formatNumber(cardDtcmAdtDcAplSaleAmtL, "#,###,###"));
-								long dtcmAdtCardDcTotalAmtL = cardDtcmAdtDcAplSaleAmtL + gnrlAdtEtcAmtL;												//할인적용 총금액
-								long dtcmChdCardDcTotalAmtL = cardDtcmChdDcAplSaleAmtL + gnrlAdtEtcAmtL;												//할인적용 총금액
-								long dtcmInfCardDcTotalAmtL = cardDtcmInfDcAplSaleAmtL + gnrlAdtEtcAmtL;												//할인적용 총금액
-								sbDtcmCardDcTotalAmt.append("Total " + NumberUtil.formatNumber(dtcmAdtCardDcTotalAmtL, "#,###,###") + "\n");		//할인적용총요금
-
-								String dtcmAdtCardDcTotalAmt = "Total " + NumberUtil.formatNumber(dtcmAdtCardDcTotalAmtL, "#,###,###");			//할인적용총요금
-								String dtcmChdCardDcTotalAmt = "Total " + NumberUtil.formatNumber(dtcmChdCardDcTotalAmtL, "#,###,###");			//할인적용총요금
-								String dtcmInfCardDcTotalAmt = "Total " + NumberUtil.formatNumber(dtcmInfCardDcTotalAmtL, "#,###,###");			//할인적용총요금
-
-								if(cardDtcmAdtDcAplSaleAmtL != 0){	//더보기 체크용
-									isExistCardDtcmInfo = "Y";
-								}
-
-								sbCardPromIds.append(sbGnrlCardPromId.toString() +",");	//필터용값
-
-								String cardPromId = StringUtil.nullConvert(cardPromNode.path("cardPromId").textValue());
-								String eventCd    = StringUtil.nullConvert(cardPromNode.path("eventCd"   ).textValue());
-								String cardNm     = StringUtil.nullConvert(cardPromNode.path("cardNm"    ).textValue()) + "         ";
-
-								cardNm = cardNm.substring(0, 9);
-
-								String gnrlAdtDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(cardPromNode.path("gnrlAdtDcAplSaleAmt"   ).asText()), "#,###,###");	//
-								String gnrlChdDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(cardPromNode.path("gnrlChdDcAplSaleAmt"   ).asText()), "#,###,###");	//
-								String gnrlInfDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(cardPromNode.path("gnrlInfDcAplSaleAmt"   ).asText()), "#,###,###");	//
-								String dtcmAdtDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(cardPromNode.path("dtcmAdtDcAplSaleAmt"   ).asText()), "#,###,###");	//
-								String dtcmChdDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(cardPromNode.path("dtcmChdDcAplSaleAmt"   ).asText()), "#,###,###");	//
-								String dtcmInfDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(cardPromNode.path("dtcmInfDcAplSaleAmt"   ).asText()), "#,###,###");	//
-
-								//네이버 스마트
-								String smartGnrlAdtAmt = "";
-								String smartGnrlChdAmt = "";
-								String smartGnrlInfAmt = "";
-								String smartDtcmAdtAmt = "";
-								String smartDtcmChdAmt = "";
-								String smartDtcmInfAmt = "";
-
-								JsonNode smartNode = cardPromNode.path("membershipGrade2");
-
-								if (smartNode.isObject() && !smartNode.isEmpty()) {
-									String smartRate = smartNode.path("totDcRate").asText();
-									String smartAdtDcAmt = NumberUtil.formatNumber(smartNode.path("gnrlAdtDcAmt").asText(), "#,###,###");
-									String smartChdDcAmt = NumberUtil.formatNumber(smartNode.path("gnrlChdDcAmt").asText(), "#,###,###");
-									String smartInfDcAmt = NumberUtil.formatNumber(smartNode.path("gnrlInfDcAmt").asText(), "#,###,###");
-									String smartDtcmAdtDcAmt = NumberUtil.formatNumber(smartNode.path("dtcmAdtDcAmt").asText(), "#,###,###");
-									String smartDtcmChdDcAmt = NumberUtil.formatNumber(smartNode.path("dtcmChdDcAmt").asText(), "#,###,###");
-									String smartDtcmInfDcAmt = NumberUtil.formatNumber(smartNode.path("dtcmInfDcAmt").asText(), "#,###,###");
-									String smartGnrlAdtDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(smartNode.path("gnrlAdtDcAplSaleAmt"   ).asText()), "#,###,###");	//
-									String smartGnrlChdDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(smartNode.path("gnrlChdDcAplSaleAmt"   ).asText()), "#,###,###");	//
-									String smartGnrlInfDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(smartNode.path("gnrlInfDcAplSaleAmt"   ).asText()), "#,###,###");	//
-									String smartDtcmAdtDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(smartNode.path("dtcmAdtDcAplSaleAmt"   ).asText()), "#,###,###");	//
-									String smartDtcmChdDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(smartNode.path("dtcmChdDcAplSaleAmt"   ).asText()), "#,###,###");	//
-									String smartDtcmInfDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(smartNode.path("dtcmInfDcAplSaleAmt"   ).asText()), "#,###,###");	//
-
-									long smartCardGnrlAdtDcAplSaleAmtL = smartNode.path("gnrlAdtDcAplSaleAmt").asLong(0L);
-									long smartGnrlAdtCardDcTotalAmtL = smartCardGnrlAdtDcAplSaleAmtL + gnrlAdtEtcAmtL;												//할인적용 총금액
-									String smartGnrlAdtCardDcTotalAmt = "Total " + NumberUtil.formatNumber(smartGnrlAdtCardDcTotalAmtL, "#,###,###");			//할인적용총요금
-
-									long smartCardGnrlChdDcAplSaleAmtL = smartNode.path("gnrlChdDcAplSaleAmt").asLong(0L);
-									long smartGnrlChdCardDcTotalAmtL = smartCardGnrlChdDcAplSaleAmtL + gnrlChdEtcAmtL;												//할인적용 총금액
-									String smartGnrlChdCardDcTotalAmt = "Total " + NumberUtil.formatNumber(smartGnrlChdCardDcTotalAmtL, "#,###,###");			//할인적용총요금
-
-									long smartCardGnrlInfDcAplSaleAmtL = smartNode.path("gnrlInfDcAplSaleAmt").asLong(0L);
-									long smartGnrlInfCardDcTotalAmtL = smartCardGnrlInfDcAplSaleAmtL + gnrlInfEtcAmtL;												//할인적용 총금액
-									String smartGnrlInfCardDcTotalAmt = "Total " + NumberUtil.formatNumber(smartGnrlInfCardDcTotalAmtL, "#,###,###");			//할인적용총요금
-
-									smartGnrlAdtAmt = "스마트 "+smartRate + "% / " + smartAdtDcAmt +"\tADT "+ smartGnrlAdtDcAplSaleAmt + "\t"+ smartGnrlAdtCardDcTotalAmt;
-									smartGnrlChdAmt = "스마트 "+smartRate + "% / " + smartChdDcAmt +"\tCHD "+ smartGnrlChdDcAplSaleAmt + "\t"+ smartGnrlChdCardDcTotalAmt;
-									smartGnrlInfAmt = "스마트 "+smartRate + "% / " + smartInfDcAmt +"\tINF "+ smartGnrlInfDcAplSaleAmt + "\t"+ smartGnrlInfCardDcTotalAmt;
-
-									long smartCardDtcmAdtDcAplSaleAmtL = smartNode.path("dtcmAdtDcAplSaleAmt").asLong(0L);							//할인적용금액
-									long smartDtcmAdtCardDcTotalAmtL = smartCardDtcmAdtDcAplSaleAmtL + gnrlAdtEtcAmtL;												//할인적용 총금액
-									String smartDtcmAdtCardDcTotalAmt = "Total " + NumberUtil.formatNumber(smartDtcmAdtCardDcTotalAmtL, "#,###,###");			//할인적용총요금
-
-									long smartCardDtcmChdDcAplSaleAmtL = smartNode.path("dtcmChdDcAplSaleAmt").asLong(0L);							//할인적용금액
-									long smartDtcmChdCardDcTotalAmtL = smartCardDtcmChdDcAplSaleAmtL + gnrlChdEtcAmtL;												//할인적용 총금액
-									String smartDtcmChdCardDcTotalAmt = "Total " + NumberUtil.formatNumber(smartDtcmChdCardDcTotalAmtL, "#,###,###");			//할인적용총요금
-
-									long smartCardDtcmInfDcAplSaleAmtL = smartNode.path("dtcmInfDcAplSaleAmt").asLong(0L);							//할인적용금액
-									long smartDtcmInfCardDcTotalAmtL = smartCardDtcmInfDcAplSaleAmtL + gnrlInfEtcAmtL;												//할인적용 총금액
-									String smartDtcmInfCardDcTotalAmt = "Total " + NumberUtil.formatNumber(smartDtcmInfCardDcTotalAmtL, "#,###,###");			//할인적용총요금
-
-									smartDtcmAdtAmt = "스마트 "+smartRate + "% / " + smartDtcmAdtDcAmt +"\tADT "+ smartDtcmAdtDcAplSaleAmt + "\t"+ smartDtcmAdtCardDcTotalAmt;
-									smartDtcmChdAmt = "스마트 "+smartRate + "% / " + smartDtcmChdDcAmt +"\tCHD "+ smartDtcmChdDcAplSaleAmt + "\t"+ smartDtcmChdCardDcTotalAmt;
-									smartDtcmInfAmt = "스마트 "+smartRate + "% / " + smartDtcmInfDcAmt +"\tINF "+ smartDtcmInfDcAplSaleAmt + "\t"+ smartDtcmInfCardDcTotalAmt;
-
-								}
-
-								//네이버 골드
-								String goldGnrlAdtAmt = "";
-								String goldGnrlChdAmt = "";
-								String goldGnrlInfAmt = "";
-								String goldDtcmAdtAmt = "";
-								String goldDtcmChdAmt = "";
-								String goldDtcmInfAmt = "";
-
-								JsonNode goldNode = cardPromNode.path("membershipGrade3");
-
-								if (goldNode.isObject() && !goldNode.isEmpty()) {
-									String goldRate = goldNode.path("totDcRate").asText();
-									String goldAdtDcAmt = NumberUtil.formatNumber(goldNode.path("gnrlAdtDcAmt").asText(), "#,###,###");
-									String goldChdDcAmt = NumberUtil.formatNumber(goldNode.path("gnrlChdDcAmt").asText(), "#,###,###");
-									String goldInfDcAmt = NumberUtil.formatNumber(goldNode.path("gnrlInfDcAmt").asText(), "#,###,###");
-									String goldDtcmAdtDcAmt = NumberUtil.formatNumber(goldNode.path("dtcmAdtDcAmt").asText(), "#,###,###");
-									String goldDtcmChdDcAmt = NumberUtil.formatNumber(goldNode.path("dtcmChdDcAmt").asText(), "#,###,###");
-									String goldDtcmInfDcAmt = NumberUtil.formatNumber(goldNode.path("dtcmInfDcAmt").asText(), "#,###,###");
-									String goldGnrlAdtDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(goldNode.path("gnrlAdtDcAplSaleAmt"   ).asText()), "#,###,###");	//
-									String goldGnrlChdDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(goldNode.path("gnrlChdDcAplSaleAmt"   ).asText()), "#,###,###");	//
-									String goldGnrlInfDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(goldNode.path("gnrlInfDcAplSaleAmt"   ).asText()), "#,###,###");	//
-									String goldDtcmAdtDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(goldNode.path("dtcmAdtDcAplSaleAmt"   ).asText()), "#,###,###");	//
-									String goldDtcmChdDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(goldNode.path("dtcmChdDcAplSaleAmt"   ).asText()), "#,###,###");	//
-									String goldDtcmInfDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(goldNode.path("dtcmInfDcAplSaleAmt"   ).asText()), "#,###,###");	//
-
-									long goldCardGnrlAdtDcAplSaleAmtL = goldNode.path("gnrlAdtDcAplSaleAmt").asLong(0L);
-									long goldGnrlAdtCardDcTotalAmtL = goldCardGnrlAdtDcAplSaleAmtL + gnrlAdtEtcAmtL;												//할인적용 총금액
-									String goldGnrlAdtCardDcTotalAmt = "Total " + NumberUtil.formatNumber(goldGnrlAdtCardDcTotalAmtL, "#,###,###");			//할인적용총요금
-
-									long goldCardGnrlChdDcAplSaleAmtL = goldNode.path("gnrlChdDcAplSaleAmt").asLong(0L);
-									long goldGnrlChdCardDcTotalAmtL = goldCardGnrlChdDcAplSaleAmtL + gnrlChdEtcAmtL;												//할인적용 총금액
-									String goldGnrlChdCardDcTotalAmt = "Total " + NumberUtil.formatNumber(goldGnrlChdCardDcTotalAmtL, "#,###,###");			//할인적용총요금
-
-									long goldCardGnrlInfDcAplSaleAmtL = goldNode.path("gnrlInfDcAplSaleAmt").asLong(0L);
-									long goldGnrlInfCardDcTotalAmtL = goldCardGnrlInfDcAplSaleAmtL + gnrlInfEtcAmtL;												//할인적용 총금액
-									String goldGnrlInfCardDcTotalAmt = "Total " + NumberUtil.formatNumber(goldGnrlInfCardDcTotalAmtL, "#,###,###");			//할인적용총요금
-
-									goldGnrlAdtAmt = "골드 "+goldRate + "% / " + goldAdtDcAmt +"\tADT "+ goldGnrlAdtDcAplSaleAmt + "\t"+ goldGnrlAdtCardDcTotalAmt;
-									goldGnrlChdAmt = "골드 "+goldRate + "% / " + goldChdDcAmt +"\tCHD "+ goldGnrlChdDcAplSaleAmt + "\t"+ goldGnrlChdCardDcTotalAmt;
-									goldGnrlInfAmt = "골드 "+goldRate + "% / " + goldInfDcAmt +"\tINF "+ goldGnrlInfDcAplSaleAmt + "\t"+ goldGnrlInfCardDcTotalAmt;
-
-									long goldCardDtcmAdtDcAplSaleAmtL = goldNode.path("dtcmAdtDcAplSaleAmt").asLong(0L);							//할인적용금액
-									long goldDtcmAdtCardDcTotalAmtL = goldCardDtcmAdtDcAplSaleAmtL + gnrlAdtEtcAmtL;												//할인적용 총금액
-									String goldDtcmAdtCardDcTotalAmt = "Total " + NumberUtil.formatNumber(goldDtcmAdtCardDcTotalAmtL, "#,###,###");			//할인적용총요금
-
-									long goldCardDtcmChdDcAplSaleAmtL = goldNode.path("dtcmChdDcAplSaleAmt").asLong(0L);							//할인적용금액
-									long goldDtcmChdCardDcTotalAmtL = goldCardDtcmChdDcAplSaleAmtL + gnrlChdEtcAmtL;												//할인적용 총금액
-									String goldDtcmChdCardDcTotalAmt = "Total " + NumberUtil.formatNumber(goldDtcmChdCardDcTotalAmtL, "#,###,###");			//할인적용총요금
-
-									long goldCardDtcmInfDcAplSaleAmtL = goldNode.path("dtcmInfDcAplSaleAmt").asLong(0L);							//할인적용금액
-									long goldDtcmInfCardDcTotalAmtL = goldCardDtcmInfDcAplSaleAmtL + gnrlInfEtcAmtL;												//할인적용 총금액
-									String goldDtcmInfCardDcTotalAmt = "Total " + NumberUtil.formatNumber(goldDtcmInfCardDcTotalAmtL, "#,###,###");			//할인적용총요금
-
-									goldDtcmAdtAmt = "골드 "+goldRate + "% / " + goldDtcmAdtDcAmt +"\tADT "+ goldDtcmAdtDcAplSaleAmt + "\t"+ goldDtcmAdtCardDcTotalAmt;
-									goldDtcmChdAmt = "골드 "+goldRate + "% / " + goldDtcmChdDcAmt +"\tCHD "+ goldDtcmChdDcAplSaleAmt + "\t"+ goldDtcmChdCardDcTotalAmt;
-									goldDtcmInfAmt = "골드 "+goldRate + "% / " + goldDtcmInfDcAmt +"\tINF "+ goldDtcmInfDcAplSaleAmt + "\t"+ goldDtcmInfCardDcTotalAmt;
-								}
-
-								sbCardGnrlAdt.append("\n일반 카드 (No." + cardPromId + " - " + eventCd + ") " + cardNm + "\tR " + gnrlCardDcRate + "% / "+ gnrlAdtDcAmt +"\tADT "+ gnrlAdtDcAplSaleAmt + "\t"+ gnrlAdtCardDcTotalAmt+ "	\t"+ smartGnrlAdtAmt + "	\t"+ goldGnrlAdtAmt);
-								sbCardGnrlChd.append("\n일반 카드 (No." + cardPromId + " - " + eventCd + ") " + cardNm + "\tR " + gnrlCardDcRate + "% / "+ gnrlChdDcAmt +"\tCHD "+ gnrlChdDcAplSaleAmt + "\t"+ gnrlChdCardDcTotalAmt+ "	\t"+ smartGnrlChdAmt + "	\t"+ goldGnrlChdAmt);
-								sbCardGnrlInf.append("\n일반 카드 (No." + cardPromId + " - " + eventCd + ") " + cardNm + "\tR " + gnrlCardDcRate + "% / "+ gnrlInfDcAmt +"\tINF "+ gnrlInfDcAplSaleAmt + "\t"+ gnrlInfCardDcTotalAmt+ "	\t"+ smartGnrlInfAmt + "	\t"+ goldGnrlInfAmt);
-								sbCardDtcmAdt.append("\n닷컴 카드 (No." + cardPromId + " - " + eventCd + ") " + cardNm + "\tR " + gnrlCardDcRate + "% / "+ gnrlAdtDcAmt +"\tADT "+ dtcmAdtDcAplSaleAmt + "\t"+ dtcmAdtCardDcTotalAmt+ "	\t"+ smartDtcmAdtAmt + "	\t"+ goldDtcmAdtAmt);
-								sbCardDtcmChd.append("\n닷컴 카드 (No." + cardPromId + " - " + eventCd + ") " + cardNm + "\tR " + gnrlCardDcRate + "% / "+ gnrlChdDcAmt +"\tCHD "+ dtcmChdDcAplSaleAmt + "\t"+ dtcmChdCardDcTotalAmt+ "	\t"+ smartDtcmChdAmt + "	\t"+ goldDtcmChdAmt);
-								sbCardDtcmInf.append("\n닷컴 카드 (No." + cardPromId + " - " + eventCd + ") " + cardNm + "\tR " + gnrlCardDcRate + "% / "+ gnrlInfDcAmt +"\tINF "+ dtcmInfDcAplSaleAmt + "\t"+ dtcmInfCardDcTotalAmt+ "	\t"+ smartDtcmInfAmt + "	\t"+ goldDtcmInfAmt);
-
-								this.setFilterMap(fareFltrMap, newSplyCd, eventCd, gnrlEventNmForFilter, 0L, FltrType.CARD_PROM_IDS);	//개별탭-필터설정 : 카드프로모션Id
-								this.setFilterMap(fareFltrMap, ALL_TAP  , eventCd, gnrlEventNmForFilter, 0L, FltrType.CARD_PROM_IDS);	//통합탭-필터설정 : 카드프로모션Id
-							}//카드프로모션정보
-
-							if(StringUtil.isEmpty(sbCardGnrlAdt.toString())) sbCardGnrlAdt.append("\n일반 카드 - \tADT - ");
-							if(StringUtil.isEmpty(sbCardGnrlChd.toString())) sbCardGnrlChd.append("\n일반 카드 - \tCHD - ");
-							if(StringUtil.isEmpty(sbCardGnrlInf.toString())) sbCardGnrlInf.append("\n일반 카드 - \tINF - ");
-							if(StringUtil.isEmpty(sbCardDtcmAdt.toString())) sbCardDtcmAdt.append("\n닷컴 카드 - \tADT - ");
-							if(StringUtil.isEmpty(sbCardDtcmChd.toString())) sbCardDtcmChd.append("\n닷컴 카드 - \tCHD - ");
-							if(StringUtil.isEmpty(sbCardDtcmInf.toString())) sbCardDtcmInf.append("\n닷컴 카드 - \tINF - ");
 
 							//#### 발권수수료정보 #####
 							JsonNode feeDtlNode = farVoLst.path("feeDtl");
@@ -2365,220 +2162,17 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 						sbChdDtcmDcAmtInfo.append("\n" + pfTktYn + bestFarYn + "닷컴 적용가 CHD " + sbChdDtcmDcAmtInfoTemp.toString());
 						sbInfDtcmDcAmtInfo.append("\n" + pfTktYn + bestFarYn + "닷컴 적용가 INF " + sbInfDtcmDcAmtInfoTemp.toString());
 
-						//######## 카드프로모션정보 #########
+						//카드프로모션정보 - 편도결합/비결합 공통 로직은 buildCardPromotionTexts()로 추출
+						CardPromotionTexts cardPromotionTexts = this.buildCardPromotionTexts(farLstNode, feeAmountTexts, pasnType, newSplyCd, fareFltrMap, sbGnrlCardPromId, sbGnrlCardPromEventCd, sbGnrlCardNm, sbGnrlCardDcInfo, sbGnrlCardDcAplAmt, sbGnrlCardDcTotalAmt, sbDtcmCardPromId, sbDtcmCardPromEventCd, sbDtcmCardNm, sbDtcmCardDcInfo, sbDtcmCardDcAplAmt, sbDtcmCardDcTotalAmt, sbCardPromIds);
+						sbCardGnrlAdt = cardPromotionTexts.sbCardGnrlAdt;
+						sbCardGnrlChd = cardPromotionTexts.sbCardGnrlChd;
+						sbCardGnrlInf = cardPromotionTexts.sbCardGnrlInf;
+						sbCardDtcmAdt = cardPromotionTexts.sbCardDtcmAdt;
+						sbCardDtcmChd = cardPromotionTexts.sbCardDtcmChd;
+						sbCardDtcmInf = cardPromotionTexts.sbCardDtcmInf;
+						isExistCardGnrlInfo = cardPromotionTexts.isExistCardGnrlInfo;
+						isExistCardDtcmInfo = cardPromotionTexts.isExistCardDtcmInfo;
 
-						isExistCardGnrlInfo = "N";
-						isExistCardDtcmInfo = "N";
-
-						sbCardGnrlAdt = new StringBuilder("");
-						sbCardGnrlChd = new StringBuilder("");
-						sbCardGnrlInf = new StringBuilder("");
-						sbCardDtcmAdt = new StringBuilder("");
-						sbCardDtcmChd = new StringBuilder("");
-						sbCardDtcmInf = new StringBuilder("");
-
-						for(JsonNode cardPromNode : farLstNode.path("cardPromLst")){
-							//일반카드프로모션정보 setting
-							sbGnrlCardPromId.append(     StringUtil.nullConvert(cardPromNode.path("cardPromId").textValue()) + "\n");			//프로모션Id
-							sbGnrlCardPromEventCd.append(StringUtil.nullConvert(cardPromNode.path("eventCd"   ).textValue()) + "\n");			//이벤트코드
-							sbGnrlCardNm.append(         StringUtil.nullConvert(cardPromNode.path("cardNm"    ).textValue()) + "\n");					//카드명
-
-							String gnrlEventNmForFilter = StringUtil.nullConvert(cardPromNode.path("eventNm"   ).textValue());	// 이벤트명   - 필터용
-
-							String gnrlCardDcRate = cardPromNode.path("totDcRate").asText();
-							String gnrlAdtDcAmt = NumberUtil.formatNumber(cardPromNode.path("gnrlAdtDcAmt").asText(), "#,###,###");
-							String gnrlChdDcAmt = NumberUtil.formatNumber(cardPromNode.path("gnrlChdDcAmt").asText(), "#,###,###");
-							String gnrlInfDcAmt = NumberUtil.formatNumber(cardPromNode.path("gnrlInfDcAmt").asText(), "#,###,###");
-							sbGnrlCardDcInfo.append(gnrlCardDcRate + "% / " + gnrlAdtDcAmt + "\n");											//할인정보
-							long cardGnrlAdtDcAplSaleAmtL = cardPromNode.path("gnrlAdtDcAplSaleAmt").asLong(0L);							//할인적용금액
-							long cardGnrlChdDcAplSaleAmtL = cardPromNode.path("gnrlChdDcAplSaleAmt").asLong(0L);							//할인적용금액
-							long cardGnrlInfDcAplSaleAmtL = cardPromNode.path("gnrlInfDcAplSaleAmt").asLong(0L);							//할인적용금액
-							sbGnrlCardDcAplAmt.append(pasnType + " " + NumberUtil.formatNumber(cardGnrlAdtDcAplSaleAmtL, "#,###,###"));
-							long gnrlAdtCardDcTotalAmtL = cardGnrlAdtDcAplSaleAmtL + gnrlAdtEtcAmtL;												//할인적용 총금액
-							long gnrlChdCardDcTotalAmtL = cardGnrlChdDcAplSaleAmtL + gnrlChdEtcAmtL;												//할인적용 총금액
-							long gnrlInfCardDcTotalAmtL = cardGnrlInfDcAplSaleAmtL + gnrlInfEtcAmtL;												//할인적용 총금액
-							sbGnrlCardDcTotalAmt.append(" Total " + NumberUtil.formatNumber(gnrlAdtCardDcTotalAmtL, "#,###,###") + "\n");			//할인적용총요금
-
-							String gnrlAdtCardDcTotalAmt = "Total " + NumberUtil.formatNumber(gnrlAdtCardDcTotalAmtL, "#,###,###");			//할인적용총요금
-							String gnrlChdCardDcTotalAmt = "Total " + NumberUtil.formatNumber(gnrlChdCardDcTotalAmtL, "#,###,###");			//할인적용총요금
-							String gnrlInfCardDcTotalAmt = "Total " + NumberUtil.formatNumber(gnrlInfCardDcTotalAmtL, "#,###,###");			//할인적용총요금
-
-							if(cardGnrlAdtDcAplSaleAmtL != 0){	//더보기 체크용
-								isExistCardGnrlInfo = "Y";
-							}
-
-							//닷컴카드프로모션정보 setting
-							sbDtcmCardPromId.append(     StringUtil.nullConvert(cardPromNode.path("cardPromId").textValue()) + "\n");	//프로모션Id
-							sbDtcmCardPromEventCd.append(StringUtil.nullConvert(cardPromNode.path("eventCd"   ).textValue()) + "\n");	//이벤트코드
-							sbDtcmCardNm.append(         StringUtil.nullConvert(cardPromNode.path("cardNm"    ).textValue()) + "\n");	//카드명
-							String dtcmCardDcRate = cardPromNode.path("totDcRate").asText();
-							String dtcmCardDcAmt = NumberUtil.formatNumber(cardPromNode.path("dtcmAdtDcAmt").asText(), "#,###,###");
-							sbDtcmCardDcInfo.append(dtcmCardDcRate + "% / " + dtcmCardDcAmt + "\n");											//할인정보
-							long cardDtcmAdtDcAplSaleAmtL = cardPromNode.path("dtcmAdtDcAplSaleAmt").asLong(0L);							//할인적용금액
-							long cardDtcmChdDcAplSaleAmtL = cardPromNode.path("dtcmChdDcAplSaleAmt").asLong(0L);							//할인적용금액
-							long cardDtcmInfDcAplSaleAmtL = cardPromNode.path("dtcmInfDcAplSaleAmt").asLong(0L);							//할인적용금액
-							sbDtcmCardDcAplAmt.append(pasnType + " " + NumberUtil.formatNumber(cardDtcmAdtDcAplSaleAmtL, "#,###,###"));
-							long dtcmAdtCardDcTotalAmtL = cardDtcmAdtDcAplSaleAmtL + gnrlAdtEtcAmtL;												//할인적용 총금액
-							long dtcmChdCardDcTotalAmtL = cardDtcmChdDcAplSaleAmtL + gnrlAdtEtcAmtL;												//할인적용 총금액
-							long dtcmInfCardDcTotalAmtL = cardDtcmInfDcAplSaleAmtL + gnrlAdtEtcAmtL;												//할인적용 총금액
-							sbDtcmCardDcTotalAmt.append("Total " + NumberUtil.formatNumber(dtcmAdtCardDcTotalAmtL, "#,###,###") + "\n");		//할인적용총요금
-
-							String dtcmAdtCardDcTotalAmt = "Total " + NumberUtil.formatNumber(dtcmAdtCardDcTotalAmtL, "#,###,###");			//할인적용총요금
-							String dtcmChdCardDcTotalAmt = "Total " + NumberUtil.formatNumber(dtcmChdCardDcTotalAmtL, "#,###,###");			//할인적용총요금
-							String dtcmInfCardDcTotalAmt = "Total " + NumberUtil.formatNumber(dtcmInfCardDcTotalAmtL, "#,###,###");			//할인적용총요금
-
-							if(cardDtcmAdtDcAplSaleAmtL != 0){	//더보기 체크용
-								isExistCardDtcmInfo = "Y";
-							}
-
-							sbCardPromIds.append(sbGnrlCardPromId.toString() +",");	//필터용값
-
-							String cardPromId = StringUtil.nullConvert(cardPromNode.path("cardPromId").textValue());
-							String eventCd    = StringUtil.nullConvert(cardPromNode.path("eventCd"   ).textValue());
-							String cardNm     = StringUtil.nullConvert(cardPromNode.path("cardNm"    ).textValue()) + "         ";
-
-							cardNm = cardNm.substring(0, 9);
-
-							String gnrlAdtDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(cardPromNode.path("gnrlAdtDcAplSaleAmt"   ).asText()), "#,###,###");	//
-							String gnrlChdDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(cardPromNode.path("gnrlChdDcAplSaleAmt"   ).asText()), "#,###,###");	//
-							String gnrlInfDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(cardPromNode.path("gnrlInfDcAplSaleAmt"   ).asText()), "#,###,###");	//
-							String dtcmAdtDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(cardPromNode.path("dtcmAdtDcAplSaleAmt"   ).asText()), "#,###,###");	//
-							String dtcmChdDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(cardPromNode.path("dtcmChdDcAplSaleAmt"   ).asText()), "#,###,###");	//
-							String dtcmInfDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(cardPromNode.path("dtcmInfDcAplSaleAmt"   ).asText()), "#,###,###");	//
-
-							//네이버 스마트
-							String smartGnrlAdtAmt = "";
-							String smartGnrlChdAmt = "";
-							String smartGnrlInfAmt = "";
-							String smartDtcmAdtAmt = "";
-							String smartDtcmChdAmt = "";
-							String smartDtcmInfAmt = "";
-
-							JsonNode smartNode = cardPromNode.path("membershipGrade2");
-
-							if (smartNode.isObject() && !smartNode.isEmpty()) {
-								String smartRate = smartNode.path("totDcRate").asText();
-								String smartAdtDcAmt = NumberUtil.formatNumber(smartNode.path("gnrlAdtDcAmt").asText(), "#,###,###");
-								String smartChdDcAmt = NumberUtil.formatNumber(smartNode.path("gnrlChdDcAmt").asText(), "#,###,###");
-								String smartInfDcAmt = NumberUtil.formatNumber(smartNode.path("gnrlInfDcAmt").asText(), "#,###,###");
-								String smartDtcmAdtDcAmt = NumberUtil.formatNumber(smartNode.path("dtcmAdtDcAmt").asText(), "#,###,###");
-								String smartDtcmChdDcAmt = NumberUtil.formatNumber(smartNode.path("dtcmChdDcAmt").asText(), "#,###,###");
-								String smartDtcmInfDcAmt = NumberUtil.formatNumber(smartNode.path("dtcmInfDcAmt").asText(), "#,###,###");
-								String smartGnrlAdtDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(smartNode.path("gnrlAdtDcAplSaleAmt"   ).asText()), "#,###,###");	//
-								String smartGnrlChdDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(smartNode.path("gnrlChdDcAplSaleAmt"   ).asText()), "#,###,###");	//
-								String smartGnrlInfDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(smartNode.path("gnrlInfDcAplSaleAmt"   ).asText()), "#,###,###");	//
-								String smartDtcmAdtDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(smartNode.path("dtcmAdtDcAplSaleAmt"   ).asText()), "#,###,###");	//
-								String smartDtcmChdDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(smartNode.path("dtcmChdDcAplSaleAmt"   ).asText()), "#,###,###");	//
-								String smartDtcmInfDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(smartNode.path("dtcmInfDcAplSaleAmt"   ).asText()), "#,###,###");	//
-
-								long smartCardGnrlAdtDcAplSaleAmtL = smartNode.path("gnrlAdtDcAplSaleAmt").asLong(0L);
-								long smartGnrlAdtCardDcTotalAmtL = smartCardGnrlAdtDcAplSaleAmtL + gnrlAdtEtcAmtL;												//할인적용 총금액
-								String smartGnrlAdtCardDcTotalAmt = "Total " + NumberUtil.formatNumber(smartGnrlAdtCardDcTotalAmtL, "#,###,###");			//할인적용총요금
-
-								long smartCardGnrlChdDcAplSaleAmtL = smartNode.path("gnrlChdDcAplSaleAmt").asLong(0L);
-								long smartGnrlChdCardDcTotalAmtL = smartCardGnrlChdDcAplSaleAmtL + gnrlChdEtcAmtL;												//할인적용 총금액
-								String smartGnrlChdCardDcTotalAmt = "Total " + NumberUtil.formatNumber(smartGnrlChdCardDcTotalAmtL, "#,###,###");			//할인적용총요금
-
-								long smartCardGnrlInfDcAplSaleAmtL = smartNode.path("gnrlInfDcAplSaleAmt").asLong(0L);
-								long smartGnrlInfCardDcTotalAmtL = smartCardGnrlInfDcAplSaleAmtL + gnrlInfEtcAmtL;												//할인적용 총금액
-								String smartGnrlInfCardDcTotalAmt = "Total " + NumberUtil.formatNumber(smartGnrlInfCardDcTotalAmtL, "#,###,###");			//할인적용총요금
-
-								smartGnrlAdtAmt = "스마트 "+smartRate + "% / " + smartAdtDcAmt +"\tADT "+ smartGnrlAdtDcAplSaleAmt + "\t"+ smartGnrlAdtCardDcTotalAmt;
-								smartGnrlChdAmt = "스마트 "+smartRate + "% / " + smartChdDcAmt +"\tCHD "+ smartGnrlChdDcAplSaleAmt + "\t"+ smartGnrlChdCardDcTotalAmt;
-								smartGnrlInfAmt = "스마트 "+smartRate + "% / " + smartInfDcAmt +"\tINF "+ smartGnrlInfDcAplSaleAmt + "\t"+ smartGnrlInfCardDcTotalAmt;
-
-								long smartCardDtcmAdtDcAplSaleAmtL = smartNode.path("dtcmAdtDcAplSaleAmt").asLong(0L);							//할인적용금액
-								long smartDtcmAdtCardDcTotalAmtL = smartCardDtcmAdtDcAplSaleAmtL + gnrlAdtEtcAmtL;												//할인적용 총금액
-								String smartDtcmAdtCardDcTotalAmt = "Total " + NumberUtil.formatNumber(smartDtcmAdtCardDcTotalAmtL, "#,###,###");			//할인적용총요금
-
-								long smartCardDtcmChdDcAplSaleAmtL = smartNode.path("dtcmChdDcAplSaleAmt").asLong(0L);							//할인적용금액
-								long smartDtcmChdCardDcTotalAmtL = smartCardDtcmChdDcAplSaleAmtL + gnrlChdEtcAmtL;												//할인적용 총금액
-								String smartDtcmChdCardDcTotalAmt = "Total " + NumberUtil.formatNumber(smartDtcmChdCardDcTotalAmtL, "#,###,###");			//할인적용총요금
-
-								long smartCardDtcmInfDcAplSaleAmtL = smartNode.path("dtcmInfDcAplSaleAmt").asLong(0L);							//할인적용금액
-								long smartDtcmInfCardDcTotalAmtL = smartCardDtcmInfDcAplSaleAmtL + gnrlInfEtcAmtL;												//할인적용 총금액
-								String smartDtcmInfCardDcTotalAmt = "Total " + NumberUtil.formatNumber(smartDtcmInfCardDcTotalAmtL, "#,###,###");			//할인적용총요금
-
-								smartDtcmAdtAmt = "스마트 "+smartRate + "% / " + smartDtcmAdtDcAmt +"\tADT "+ smartDtcmAdtDcAplSaleAmt + "\t"+ smartDtcmAdtCardDcTotalAmt;
-								smartDtcmChdAmt = "스마트 "+smartRate + "% / " + smartDtcmChdDcAmt +"\tCHD "+ smartDtcmChdDcAplSaleAmt + "\t"+ smartDtcmChdCardDcTotalAmt;
-								smartDtcmInfAmt = "스마트 "+smartRate + "% / " + smartDtcmInfDcAmt +"\tINF "+ smartDtcmInfDcAplSaleAmt + "\t"+ smartDtcmInfCardDcTotalAmt;
-							}
-
-							//네이버 골드
-							String goldGnrlAdtAmt = "";
-							String goldGnrlChdAmt = "";
-							String goldGnrlInfAmt = "";
-							String goldDtcmAdtAmt = "";
-							String goldDtcmChdAmt = "";
-							String goldDtcmInfAmt = "";
-
-							JsonNode goldNode = cardPromNode.path("membershipGrade3");
-
-							if (goldNode.isObject() && !goldNode.isEmpty()) {
-								String goldRate = goldNode.path("totDcRate").asText();
-								String goldAdtDcAmt = NumberUtil.formatNumber(goldNode.path("gnrlAdtDcAmt").asText(), "#,###,###");
-								String goldChdDcAmt = NumberUtil.formatNumber(goldNode.path("gnrlChdDcAmt").asText(), "#,###,###");
-								String goldInfDcAmt = NumberUtil.formatNumber(goldNode.path("gnrlInfDcAmt").asText(), "#,###,###");
-								String goldDtcmAdtDcAmt = NumberUtil.formatNumber(goldNode.path("dtcmAdtDcAmt").asText(), "#,###,###");
-								String goldDtcmChdDcAmt = NumberUtil.formatNumber(goldNode.path("dtcmChdDcAmt").asText(), "#,###,###");
-								String goldDtcmInfDcAmt = NumberUtil.formatNumber(goldNode.path("dtcmInfDcAmt").asText(), "#,###,###");
-								String goldGnrlAdtDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(goldNode.path("gnrlAdtDcAplSaleAmt"   ).asText()), "#,###,###");	//
-								String goldGnrlChdDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(goldNode.path("gnrlChdDcAplSaleAmt"   ).asText()), "#,###,###");	//
-								String goldGnrlInfDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(goldNode.path("gnrlInfDcAplSaleAmt"   ).asText()), "#,###,###");	//
-								String goldDtcmAdtDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(goldNode.path("dtcmAdtDcAplSaleAmt"   ).asText()), "#,###,###");	//
-								String goldDtcmChdDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(goldNode.path("dtcmChdDcAplSaleAmt"   ).asText()), "#,###,###");	//
-								String goldDtcmInfDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(goldNode.path("dtcmInfDcAplSaleAmt"   ).asText()), "#,###,###");	//
-
-								long goldCardGnrlAdtDcAplSaleAmtL = goldNode.path("gnrlAdtDcAplSaleAmt").asLong(0L);
-								long goldGnrlAdtCardDcTotalAmtL = goldCardGnrlAdtDcAplSaleAmtL + gnrlAdtEtcAmtL;												//할인적용 총금액
-								String goldGnrlAdtCardDcTotalAmt = "Total " + NumberUtil.formatNumber(goldGnrlAdtCardDcTotalAmtL, "#,###,###");			//할인적용총요금
-
-								long goldCardGnrlChdDcAplSaleAmtL = goldNode.path("gnrlChdDcAplSaleAmt").asLong(0L);
-								long goldGnrlChdCardDcTotalAmtL = goldCardGnrlChdDcAplSaleAmtL + gnrlChdEtcAmtL;												//할인적용 총금액
-								String goldGnrlChdCardDcTotalAmt = "Total " + NumberUtil.formatNumber(goldGnrlChdCardDcTotalAmtL, "#,###,###");			//할인적용총요금
-
-								long goldCardGnrlInfDcAplSaleAmtL = goldNode.path("gnrlInfDcAplSaleAmt").asLong(0L);
-								long goldGnrlInfCardDcTotalAmtL = goldCardGnrlInfDcAplSaleAmtL + gnrlInfEtcAmtL;												//할인적용 총금액
-								String goldGnrlInfCardDcTotalAmt = "Total " + NumberUtil.formatNumber(goldGnrlInfCardDcTotalAmtL, "#,###,###");			//할인적용총요금
-
-								goldGnrlAdtAmt = "골드 "+goldRate + "% / " + goldAdtDcAmt +"\tADT "+ goldGnrlAdtDcAplSaleAmt + "\t"+ goldGnrlAdtCardDcTotalAmt;
-								goldGnrlChdAmt = "골드 "+goldRate + "% / " + goldChdDcAmt +"\tCHD "+ goldGnrlChdDcAplSaleAmt + "\t"+ goldGnrlChdCardDcTotalAmt;
-								goldGnrlInfAmt = "골드 "+goldRate + "% / " + goldInfDcAmt +"\tINF "+ goldGnrlInfDcAplSaleAmt + "\t"+ goldGnrlInfCardDcTotalAmt;
-
-								long goldCardDtcmAdtDcAplSaleAmtL = goldNode.path("dtcmAdtDcAplSaleAmt").asLong(0L);							//할인적용금액
-								long goldDtcmAdtCardDcTotalAmtL = goldCardDtcmAdtDcAplSaleAmtL + gnrlAdtEtcAmtL;												//할인적용 총금액
-								String goldDtcmAdtCardDcTotalAmt = "Total " + NumberUtil.formatNumber(goldDtcmAdtCardDcTotalAmtL, "#,###,###");			//할인적용총요금
-
-								long goldCardDtcmChdDcAplSaleAmtL = goldNode.path("dtcmChdDcAplSaleAmt").asLong(0L);							//할인적용금액
-								long goldDtcmChdCardDcTotalAmtL = goldCardDtcmChdDcAplSaleAmtL + gnrlChdEtcAmtL;												//할인적용 총금액
-								String goldDtcmChdCardDcTotalAmt = "Total " + NumberUtil.formatNumber(goldDtcmChdCardDcTotalAmtL, "#,###,###");			//할인적용총요금
-
-								long goldCardDtcmInfDcAplSaleAmtL = goldNode.path("dtcmInfDcAplSaleAmt").asLong(0L);							//할인적용금액
-								long goldDtcmInfCardDcTotalAmtL = goldCardDtcmInfDcAplSaleAmtL + gnrlInfEtcAmtL;												//할인적용 총금액
-								String goldDtcmInfCardDcTotalAmt = "Total " + NumberUtil.formatNumber(goldDtcmInfCardDcTotalAmtL, "#,###,###");			//할인적용총요금
-
-								goldDtcmAdtAmt = "골드 "+goldRate + "% / " + goldDtcmAdtDcAmt +"\tADT "+ goldDtcmAdtDcAplSaleAmt + "\t"+ goldDtcmAdtCardDcTotalAmt;
-								goldDtcmChdAmt = "골드 "+goldRate + "% / " + goldDtcmChdDcAmt +"\tCHD "+ goldDtcmChdDcAplSaleAmt + "\t"+ goldDtcmChdCardDcTotalAmt;
-								goldDtcmInfAmt = "골드 "+goldRate + "% / " + goldDtcmInfDcAmt +"\tINF "+ goldDtcmInfDcAplSaleAmt + "\t"+ goldDtcmInfCardDcTotalAmt;
-							}
-
-							sbCardGnrlAdt.append("\n일반 카드 (No." + cardPromId + " - " + eventCd + ") " + cardNm + "\tR " + gnrlCardDcRate + "% / "+ gnrlAdtDcAmt +"\tADT "+ gnrlAdtDcAplSaleAmt + "\t"+ gnrlAdtCardDcTotalAmt+ "	\t"+ smartGnrlAdtAmt + "	\t"+ goldGnrlAdtAmt);
-							sbCardGnrlChd.append("\n일반 카드 (No." + cardPromId + " - " + eventCd + ") " + cardNm + "\tR " + gnrlCardDcRate + "% / "+ gnrlChdDcAmt +"\tCHD "+ gnrlChdDcAplSaleAmt + "\t"+ gnrlChdCardDcTotalAmt+ "	\t"+ smartGnrlChdAmt + "	\t"+ goldGnrlChdAmt);
-							sbCardGnrlInf.append("\n일반 카드 (No." + cardPromId + " - " + eventCd + ") " + cardNm + "\tR " + gnrlCardDcRate + "% / "+ gnrlInfDcAmt +"\tINF "+ gnrlInfDcAplSaleAmt + "\t"+ gnrlInfCardDcTotalAmt+ "	\t"+ smartGnrlInfAmt + "	\t"+ goldGnrlInfAmt);
-							sbCardDtcmAdt.append("\n닷컴 카드 (No." + cardPromId + " - " + eventCd + ") " + cardNm + "\tR " + gnrlCardDcRate + "% / "+ gnrlAdtDcAmt +"\tADT "+ dtcmAdtDcAplSaleAmt + "\t"+ dtcmAdtCardDcTotalAmt+ "	\t"+ smartDtcmAdtAmt + "	\t"+ goldDtcmAdtAmt);
-							sbCardDtcmChd.append("\n닷컴 카드 (No." + cardPromId + " - " + eventCd + ") " + cardNm + "\tR " + gnrlCardDcRate + "% / "+ gnrlChdDcAmt +"\tCHD "+ dtcmChdDcAplSaleAmt + "\t"+ dtcmChdCardDcTotalAmt+ "	\t"+ smartDtcmChdAmt + "	\t"+ goldDtcmChdAmt);
-							sbCardDtcmInf.append("\n닷컴 카드 (No." + cardPromId + " - " + eventCd + ") " + cardNm + "\tR " + gnrlCardDcRate + "% / "+ gnrlInfDcAmt +"\tINF "+ dtcmInfDcAplSaleAmt + "\t"+ dtcmInfCardDcTotalAmt+ "	\t"+ smartDtcmInfAmt + "	\t"+ goldDtcmInfAmt);
-
-							this.setFilterMap(fareFltrMap, newSplyCd, eventCd, gnrlEventNmForFilter, 0L, FltrType.CARD_PROM_IDS);	//개별탭-필터설정 : 카드프로모션Id
-							this.setFilterMap(fareFltrMap, ALL_TAP  , eventCd, gnrlEventNmForFilter, 0L, FltrType.CARD_PROM_IDS);	//통합탭-필터설정 : 카드프로모션Id
-						}//카드프로모션정보
-
-						if(StringUtil.isEmpty(sbCardGnrlAdt.toString())) sbCardGnrlAdt.append("\n일반 카드 - \tADT - ");
-						if(StringUtil.isEmpty(sbCardGnrlChd.toString())) sbCardGnrlChd.append("\n일반 카드 - \tCHD - ");
-						if(StringUtil.isEmpty(sbCardGnrlInf.toString())) sbCardGnrlInf.append("\n일반 카드 - \tINF - ");
-						if(StringUtil.isEmpty(sbCardDtcmAdt.toString())) sbCardDtcmAdt.append("\n닷컴 카드 - \tADT - ");
-						if(StringUtil.isEmpty(sbCardDtcmChd.toString())) sbCardDtcmChd.append("\n닷컴 카드 - \tCHD - ");
-						if(StringUtil.isEmpty(sbCardDtcmInf.toString())) sbCardDtcmInf.append("\n닷컴 카드 - \tINF - ");
 
 						//#### 발권수수료정보 #####
 						JsonNode feeDtlNode = farLstNode.path("feeDtl");
@@ -3579,6 +3173,255 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 			this.infTamt = infTamt;
 		}
 	}
+	/**
+	 * 카드프로모션(일반/닷컴, 스마트/골드 등급 포함) 텍스트를 조립하고 카드프로모션 필터를 설정한다.
+	 * farVoLst(편도결합)/farLstNode(비결합)는 필드명이 동일하므로 fareNode 하나로 통일. 원본 로직 무변경.
+	 * sbGnrlCardProm, sbDtcmCardProm, sbCardPromIds 계열은 호출측이 이미 가진 StringBuilder를 그대로 넘겨받아 append만 하므로 반환값에 포함하지 않는다.
+	 */
+	private CardPromotionTexts buildCardPromotionTexts(JsonNode fareNode, FeeAmountTexts feeAmountTexts, String pasnType, String newSplyCd, Map<String, SchAirFareResultFilterVo> fareFltrMap, StringBuilder sbGnrlCardPromId, StringBuilder sbGnrlCardPromEventCd, StringBuilder sbGnrlCardNm, StringBuilder sbGnrlCardDcInfo, StringBuilder sbGnrlCardDcAplAmt, StringBuilder sbGnrlCardDcTotalAmt, StringBuilder sbDtcmCardPromId, StringBuilder sbDtcmCardPromEventCd, StringBuilder sbDtcmCardNm, StringBuilder sbDtcmCardDcInfo, StringBuilder sbDtcmCardDcAplAmt, StringBuilder sbDtcmCardDcTotalAmt, StringBuilder sbCardPromIds) {
+		//######## 카드프로모션정보 #########
+
+		String isExistCardGnrlInfo = "N";
+		String isExistCardDtcmInfo = "N";
+
+		StringBuilder sbCardGnrlAdt = new StringBuilder("");
+		StringBuilder sbCardGnrlChd = new StringBuilder("");
+		StringBuilder sbCardGnrlInf = new StringBuilder("");
+		StringBuilder sbCardDtcmAdt = new StringBuilder("");
+		StringBuilder sbCardDtcmChd = new StringBuilder("");
+		StringBuilder sbCardDtcmInf = new StringBuilder("");
+
+		for(JsonNode cardPromNode : fareNode.path("cardPromLst")){
+			//일반카드프로모션정보 setting
+			sbGnrlCardPromId.append(     StringUtil.nullConvert(cardPromNode.path("cardPromId").textValue()) + "\n");			//프로모션Id
+			sbGnrlCardPromEventCd.append(StringUtil.nullConvert(cardPromNode.path("eventCd"   ).textValue()) + "\n");			//이벤트코드
+			sbGnrlCardNm.append(         StringUtil.nullConvert(cardPromNode.path("cardNm"    ).textValue()) + "\n");					//카드명
+
+			String gnrlEventNmForFilter = StringUtil.nullConvert(cardPromNode.path("eventNm"   ).textValue());	// 이벤트명   - 필터용
+
+			String gnrlCardDcRate = cardPromNode.path("totDcRate").asText();
+			String gnrlAdtDcAmt = NumberUtil.formatNumber(cardPromNode.path("gnrlAdtDcAmt").asText(), "#,###,###");
+			String gnrlChdDcAmt = NumberUtil.formatNumber(cardPromNode.path("gnrlChdDcAmt").asText(), "#,###,###");
+			String gnrlInfDcAmt = NumberUtil.formatNumber(cardPromNode.path("gnrlInfDcAmt").asText(), "#,###,###");
+			sbGnrlCardDcInfo.append(gnrlCardDcRate + "% / " + gnrlAdtDcAmt + "\n");											//할인정보
+			long cardGnrlAdtDcAplSaleAmtL = cardPromNode.path("gnrlAdtDcAplSaleAmt").asLong(0L);							//할인적용금액
+			long cardGnrlChdDcAplSaleAmtL = cardPromNode.path("gnrlChdDcAplSaleAmt").asLong(0L);							//할인적용금액
+			long cardGnrlInfDcAplSaleAmtL = cardPromNode.path("gnrlInfDcAplSaleAmt").asLong(0L);							//할인적용금액
+			sbGnrlCardDcAplAmt.append(pasnType + " " + NumberUtil.formatNumber(cardGnrlAdtDcAplSaleAmtL, "#,###,###"));
+			long gnrlAdtCardDcTotalAmtL = cardGnrlAdtDcAplSaleAmtL + feeAmountTexts.gnrlAdtEtcAmtL;												//할인적용 총금액
+			long gnrlChdCardDcTotalAmtL = cardGnrlChdDcAplSaleAmtL + feeAmountTexts.gnrlChdEtcAmtL;												//할인적용 총금액
+			long gnrlInfCardDcTotalAmtL = cardGnrlInfDcAplSaleAmtL + feeAmountTexts.gnrlInfEtcAmtL;												//할인적용 총금액
+			sbGnrlCardDcTotalAmt.append(" Total " + NumberUtil.formatNumber(gnrlAdtCardDcTotalAmtL, "#,###,###") + "\n");			//할인적용총요금
+
+			String gnrlAdtCardDcTotalAmt = "Total " + NumberUtil.formatNumber(gnrlAdtCardDcTotalAmtL, "#,###,###");			//할인적용총요금
+			String gnrlChdCardDcTotalAmt = "Total " + NumberUtil.formatNumber(gnrlChdCardDcTotalAmtL, "#,###,###");			//할인적용총요금
+			String gnrlInfCardDcTotalAmt = "Total " + NumberUtil.formatNumber(gnrlInfCardDcTotalAmtL, "#,###,###");			//할인적용총요금
+
+			if(cardGnrlAdtDcAplSaleAmtL != 0){	//더보기 체크용
+				isExistCardGnrlInfo = "Y";
+			}
+
+			//닷컴카드프로모션정보 setting
+			sbDtcmCardPromId.append(     StringUtil.nullConvert(cardPromNode.path("cardPromId").textValue()) + "\n");	//프로모션Id
+			sbDtcmCardPromEventCd.append(StringUtil.nullConvert(cardPromNode.path("eventCd"   ).textValue()) + "\n");	//이벤트코드
+			sbDtcmCardNm.append(         StringUtil.nullConvert(cardPromNode.path("cardNm"    ).textValue()) + "\n");	//카드명
+			String dtcmCardDcRate = cardPromNode.path("totDcRate").asText();
+			String dtcmCardDcAmt = NumberUtil.formatNumber(cardPromNode.path("dtcmAdtDcAmt").asText(), "#,###,###");
+			sbDtcmCardDcInfo.append(dtcmCardDcRate + "% / " + dtcmCardDcAmt + "\n");											//할인정보
+			long cardDtcmAdtDcAplSaleAmtL = cardPromNode.path("dtcmAdtDcAplSaleAmt").asLong(0L);							//할인적용금액
+			long cardDtcmChdDcAplSaleAmtL = cardPromNode.path("dtcmChdDcAplSaleAmt").asLong(0L);							//할인적용금액
+			long cardDtcmInfDcAplSaleAmtL = cardPromNode.path("dtcmInfDcAplSaleAmt").asLong(0L);							//할인적용금액
+			sbDtcmCardDcAplAmt.append(pasnType + " " + NumberUtil.formatNumber(cardDtcmAdtDcAplSaleAmtL, "#,###,###"));
+			long dtcmAdtCardDcTotalAmtL = cardDtcmAdtDcAplSaleAmtL + feeAmountTexts.gnrlAdtEtcAmtL;												//할인적용 총금액
+			long dtcmChdCardDcTotalAmtL = cardDtcmChdDcAplSaleAmtL + feeAmountTexts.gnrlAdtEtcAmtL;												//할인적용 총금액
+			long dtcmInfCardDcTotalAmtL = cardDtcmInfDcAplSaleAmtL + feeAmountTexts.gnrlAdtEtcAmtL;												//할인적용 총금액
+			sbDtcmCardDcTotalAmt.append("Total " + NumberUtil.formatNumber(dtcmAdtCardDcTotalAmtL, "#,###,###") + "\n");		//할인적용총요금
+
+			String dtcmAdtCardDcTotalAmt = "Total " + NumberUtil.formatNumber(dtcmAdtCardDcTotalAmtL, "#,###,###");			//할인적용총요금
+			String dtcmChdCardDcTotalAmt = "Total " + NumberUtil.formatNumber(dtcmChdCardDcTotalAmtL, "#,###,###");			//할인적용총요금
+			String dtcmInfCardDcTotalAmt = "Total " + NumberUtil.formatNumber(dtcmInfCardDcTotalAmtL, "#,###,###");			//할인적용총요금
+
+			if(cardDtcmAdtDcAplSaleAmtL != 0){	//더보기 체크용
+				isExistCardDtcmInfo = "Y";
+			}
+
+			sbCardPromIds.append(sbGnrlCardPromId.toString() +",");	//필터용값
+
+			String cardPromId = StringUtil.nullConvert(cardPromNode.path("cardPromId").textValue());
+			String eventCd    = StringUtil.nullConvert(cardPromNode.path("eventCd"   ).textValue());
+			String cardNm     = StringUtil.nullConvert(cardPromNode.path("cardNm"    ).textValue()) + "         ";
+
+			cardNm = cardNm.substring(0, 9);
+
+			String gnrlAdtDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(cardPromNode.path("gnrlAdtDcAplSaleAmt"   ).asText()), "#,###,###");	//
+			String gnrlChdDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(cardPromNode.path("gnrlChdDcAplSaleAmt"   ).asText()), "#,###,###");	//
+			String gnrlInfDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(cardPromNode.path("gnrlInfDcAplSaleAmt"   ).asText()), "#,###,###");	//
+			String dtcmAdtDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(cardPromNode.path("dtcmAdtDcAplSaleAmt"   ).asText()), "#,###,###");	//
+			String dtcmChdDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(cardPromNode.path("dtcmChdDcAplSaleAmt"   ).asText()), "#,###,###");	//
+			String dtcmInfDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(cardPromNode.path("dtcmInfDcAplSaleAmt"   ).asText()), "#,###,###");	//
+
+			//네이버 스마트
+			String smartGnrlAdtAmt = "";
+			String smartGnrlChdAmt = "";
+			String smartGnrlInfAmt = "";
+			String smartDtcmAdtAmt = "";
+			String smartDtcmChdAmt = "";
+			String smartDtcmInfAmt = "";
+
+			JsonNode smartNode = cardPromNode.path("membershipGrade2");
+
+			if (smartNode.isObject() && !smartNode.isEmpty()) {
+				String smartRate = smartNode.path("totDcRate").asText();
+				String smartAdtDcAmt = NumberUtil.formatNumber(smartNode.path("gnrlAdtDcAmt").asText(), "#,###,###");
+				String smartChdDcAmt = NumberUtil.formatNumber(smartNode.path("gnrlChdDcAmt").asText(), "#,###,###");
+				String smartInfDcAmt = NumberUtil.formatNumber(smartNode.path("gnrlInfDcAmt").asText(), "#,###,###");
+				String smartDtcmAdtDcAmt = NumberUtil.formatNumber(smartNode.path("dtcmAdtDcAmt").asText(), "#,###,###");
+				String smartDtcmChdDcAmt = NumberUtil.formatNumber(smartNode.path("dtcmChdDcAmt").asText(), "#,###,###");
+				String smartDtcmInfDcAmt = NumberUtil.formatNumber(smartNode.path("dtcmInfDcAmt").asText(), "#,###,###");
+				String smartGnrlAdtDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(smartNode.path("gnrlAdtDcAplSaleAmt"   ).asText()), "#,###,###");	//
+				String smartGnrlChdDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(smartNode.path("gnrlChdDcAplSaleAmt"   ).asText()), "#,###,###");	//
+				String smartGnrlInfDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(smartNode.path("gnrlInfDcAplSaleAmt"   ).asText()), "#,###,###");	//
+				String smartDtcmAdtDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(smartNode.path("dtcmAdtDcAplSaleAmt"   ).asText()), "#,###,###");	//
+				String smartDtcmChdDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(smartNode.path("dtcmChdDcAplSaleAmt"   ).asText()), "#,###,###");	//
+				String smartDtcmInfDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(smartNode.path("dtcmInfDcAplSaleAmt"   ).asText()), "#,###,###");	//
+
+				long smartCardGnrlAdtDcAplSaleAmtL = smartNode.path("gnrlAdtDcAplSaleAmt").asLong(0L);
+				long smartGnrlAdtCardDcTotalAmtL = smartCardGnrlAdtDcAplSaleAmtL + feeAmountTexts.gnrlAdtEtcAmtL;												//할인적용 총금액
+				String smartGnrlAdtCardDcTotalAmt = "Total " + NumberUtil.formatNumber(smartGnrlAdtCardDcTotalAmtL, "#,###,###");			//할인적용총요금
+
+				long smartCardGnrlChdDcAplSaleAmtL = smartNode.path("gnrlChdDcAplSaleAmt").asLong(0L);
+				long smartGnrlChdCardDcTotalAmtL = smartCardGnrlChdDcAplSaleAmtL + feeAmountTexts.gnrlChdEtcAmtL;												//할인적용 총금액
+				String smartGnrlChdCardDcTotalAmt = "Total " + NumberUtil.formatNumber(smartGnrlChdCardDcTotalAmtL, "#,###,###");			//할인적용총요금
+
+				long smartCardGnrlInfDcAplSaleAmtL = smartNode.path("gnrlInfDcAplSaleAmt").asLong(0L);
+				long smartGnrlInfCardDcTotalAmtL = smartCardGnrlInfDcAplSaleAmtL + feeAmountTexts.gnrlInfEtcAmtL;												//할인적용 총금액
+				String smartGnrlInfCardDcTotalAmt = "Total " + NumberUtil.formatNumber(smartGnrlInfCardDcTotalAmtL, "#,###,###");			//할인적용총요금
+
+				smartGnrlAdtAmt = "스마트 "+smartRate + "% / " + smartAdtDcAmt +"\tADT "+ smartGnrlAdtDcAplSaleAmt + "\t"+ smartGnrlAdtCardDcTotalAmt;
+				smartGnrlChdAmt = "스마트 "+smartRate + "% / " + smartChdDcAmt +"\tCHD "+ smartGnrlChdDcAplSaleAmt + "\t"+ smartGnrlChdCardDcTotalAmt;
+				smartGnrlInfAmt = "스마트 "+smartRate + "% / " + smartInfDcAmt +"\tINF "+ smartGnrlInfDcAplSaleAmt + "\t"+ smartGnrlInfCardDcTotalAmt;
+
+				long smartCardDtcmAdtDcAplSaleAmtL = smartNode.path("dtcmAdtDcAplSaleAmt").asLong(0L);							//할인적용금액
+				long smartDtcmAdtCardDcTotalAmtL = smartCardDtcmAdtDcAplSaleAmtL + feeAmountTexts.gnrlAdtEtcAmtL;												//할인적용 총금액
+				String smartDtcmAdtCardDcTotalAmt = "Total " + NumberUtil.formatNumber(smartDtcmAdtCardDcTotalAmtL, "#,###,###");			//할인적용총요금
+
+				long smartCardDtcmChdDcAplSaleAmtL = smartNode.path("dtcmChdDcAplSaleAmt").asLong(0L);							//할인적용금액
+				long smartDtcmChdCardDcTotalAmtL = smartCardDtcmChdDcAplSaleAmtL + feeAmountTexts.gnrlChdEtcAmtL;												//할인적용 총금액
+				String smartDtcmChdCardDcTotalAmt = "Total " + NumberUtil.formatNumber(smartDtcmChdCardDcTotalAmtL, "#,###,###");			//할인적용총요금
+
+				long smartCardDtcmInfDcAplSaleAmtL = smartNode.path("dtcmInfDcAplSaleAmt").asLong(0L);							//할인적용금액
+				long smartDtcmInfCardDcTotalAmtL = smartCardDtcmInfDcAplSaleAmtL + feeAmountTexts.gnrlInfEtcAmtL;												//할인적용 총금액
+				String smartDtcmInfCardDcTotalAmt = "Total " + NumberUtil.formatNumber(smartDtcmInfCardDcTotalAmtL, "#,###,###");			//할인적용총요금
+
+				smartDtcmAdtAmt = "스마트 "+smartRate + "% / " + smartDtcmAdtDcAmt +"\tADT "+ smartDtcmAdtDcAplSaleAmt + "\t"+ smartDtcmAdtCardDcTotalAmt;
+				smartDtcmChdAmt = "스마트 "+smartRate + "% / " + smartDtcmChdDcAmt +"\tCHD "+ smartDtcmChdDcAplSaleAmt + "\t"+ smartDtcmChdCardDcTotalAmt;
+				smartDtcmInfAmt = "스마트 "+smartRate + "% / " + smartDtcmInfDcAmt +"\tINF "+ smartDtcmInfDcAplSaleAmt + "\t"+ smartDtcmInfCardDcTotalAmt;
+			}
+
+			//네이버 골드
+			String goldGnrlAdtAmt = "";
+			String goldGnrlChdAmt = "";
+			String goldGnrlInfAmt = "";
+			String goldDtcmAdtAmt = "";
+			String goldDtcmChdAmt = "";
+			String goldDtcmInfAmt = "";
+
+			JsonNode goldNode = cardPromNode.path("membershipGrade3");
+
+			if (goldNode.isObject() && !goldNode.isEmpty()) {
+				String goldRate = goldNode.path("totDcRate").asText();
+				String goldAdtDcAmt = NumberUtil.formatNumber(goldNode.path("gnrlAdtDcAmt").asText(), "#,###,###");
+				String goldChdDcAmt = NumberUtil.formatNumber(goldNode.path("gnrlChdDcAmt").asText(), "#,###,###");
+				String goldInfDcAmt = NumberUtil.formatNumber(goldNode.path("gnrlInfDcAmt").asText(), "#,###,###");
+				String goldDtcmAdtDcAmt = NumberUtil.formatNumber(goldNode.path("dtcmAdtDcAmt").asText(), "#,###,###");
+				String goldDtcmChdDcAmt = NumberUtil.formatNumber(goldNode.path("dtcmChdDcAmt").asText(), "#,###,###");
+				String goldDtcmInfDcAmt = NumberUtil.formatNumber(goldNode.path("dtcmInfDcAmt").asText(), "#,###,###");
+				String goldGnrlAdtDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(goldNode.path("gnrlAdtDcAplSaleAmt"   ).asText()), "#,###,###");	//
+				String goldGnrlChdDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(goldNode.path("gnrlChdDcAplSaleAmt"   ).asText()), "#,###,###");	//
+				String goldGnrlInfDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(goldNode.path("gnrlInfDcAplSaleAmt"   ).asText()), "#,###,###");	//
+				String goldDtcmAdtDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(goldNode.path("dtcmAdtDcAplSaleAmt"   ).asText()), "#,###,###");	//
+				String goldDtcmChdDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(goldNode.path("dtcmChdDcAplSaleAmt"   ).asText()), "#,###,###");	//
+				String goldDtcmInfDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(goldNode.path("dtcmInfDcAplSaleAmt"   ).asText()), "#,###,###");	//
+
+				long goldCardGnrlAdtDcAplSaleAmtL = goldNode.path("gnrlAdtDcAplSaleAmt").asLong(0L);
+				long goldGnrlAdtCardDcTotalAmtL = goldCardGnrlAdtDcAplSaleAmtL + feeAmountTexts.gnrlAdtEtcAmtL;												//할인적용 총금액
+				String goldGnrlAdtCardDcTotalAmt = "Total " + NumberUtil.formatNumber(goldGnrlAdtCardDcTotalAmtL, "#,###,###");			//할인적용총요금
+
+				long goldCardGnrlChdDcAplSaleAmtL = goldNode.path("gnrlChdDcAplSaleAmt").asLong(0L);
+				long goldGnrlChdCardDcTotalAmtL = goldCardGnrlChdDcAplSaleAmtL + feeAmountTexts.gnrlChdEtcAmtL;												//할인적용 총금액
+				String goldGnrlChdCardDcTotalAmt = "Total " + NumberUtil.formatNumber(goldGnrlChdCardDcTotalAmtL, "#,###,###");			//할인적용총요금
+
+				long goldCardGnrlInfDcAplSaleAmtL = goldNode.path("gnrlInfDcAplSaleAmt").asLong(0L);
+				long goldGnrlInfCardDcTotalAmtL = goldCardGnrlInfDcAplSaleAmtL + feeAmountTexts.gnrlInfEtcAmtL;												//할인적용 총금액
+				String goldGnrlInfCardDcTotalAmt = "Total " + NumberUtil.formatNumber(goldGnrlInfCardDcTotalAmtL, "#,###,###");			//할인적용총요금
+
+				goldGnrlAdtAmt = "골드 "+goldRate + "% / " + goldAdtDcAmt +"\tADT "+ goldGnrlAdtDcAplSaleAmt + "\t"+ goldGnrlAdtCardDcTotalAmt;
+				goldGnrlChdAmt = "골드 "+goldRate + "% / " + goldChdDcAmt +"\tCHD "+ goldGnrlChdDcAplSaleAmt + "\t"+ goldGnrlChdCardDcTotalAmt;
+				goldGnrlInfAmt = "골드 "+goldRate + "% / " + goldInfDcAmt +"\tINF "+ goldGnrlInfDcAplSaleAmt + "\t"+ goldGnrlInfCardDcTotalAmt;
+
+				long goldCardDtcmAdtDcAplSaleAmtL = goldNode.path("dtcmAdtDcAplSaleAmt").asLong(0L);							//할인적용금액
+				long goldDtcmAdtCardDcTotalAmtL = goldCardDtcmAdtDcAplSaleAmtL + feeAmountTexts.gnrlAdtEtcAmtL;												//할인적용 총금액
+				String goldDtcmAdtCardDcTotalAmt = "Total " + NumberUtil.formatNumber(goldDtcmAdtCardDcTotalAmtL, "#,###,###");			//할인적용총요금
+
+				long goldCardDtcmChdDcAplSaleAmtL = goldNode.path("dtcmChdDcAplSaleAmt").asLong(0L);							//할인적용금액
+				long goldDtcmChdCardDcTotalAmtL = goldCardDtcmChdDcAplSaleAmtL + feeAmountTexts.gnrlChdEtcAmtL;												//할인적용 총금액
+				String goldDtcmChdCardDcTotalAmt = "Total " + NumberUtil.formatNumber(goldDtcmChdCardDcTotalAmtL, "#,###,###");			//할인적용총요금
+
+				long goldCardDtcmInfDcAplSaleAmtL = goldNode.path("dtcmInfDcAplSaleAmt").asLong(0L);							//할인적용금액
+				long goldDtcmInfCardDcTotalAmtL = goldCardDtcmInfDcAplSaleAmtL + feeAmountTexts.gnrlInfEtcAmtL;												//할인적용 총금액
+				String goldDtcmInfCardDcTotalAmt = "Total " + NumberUtil.formatNumber(goldDtcmInfCardDcTotalAmtL, "#,###,###");			//할인적용총요금
+
+				goldDtcmAdtAmt = "골드 "+goldRate + "% / " + goldDtcmAdtDcAmt +"\tADT "+ goldDtcmAdtDcAplSaleAmt + "\t"+ goldDtcmAdtCardDcTotalAmt;
+				goldDtcmChdAmt = "골드 "+goldRate + "% / " + goldDtcmChdDcAmt +"\tCHD "+ goldDtcmChdDcAplSaleAmt + "\t"+ goldDtcmChdCardDcTotalAmt;
+				goldDtcmInfAmt = "골드 "+goldRate + "% / " + goldDtcmInfDcAmt +"\tINF "+ goldDtcmInfDcAplSaleAmt + "\t"+ goldDtcmInfCardDcTotalAmt;
+			}
+
+			sbCardGnrlAdt.append("\n일반 카드 (No." + cardPromId + " - " + eventCd + ") " + cardNm + "\tR " + gnrlCardDcRate + "% / "+ gnrlAdtDcAmt +"\tADT "+ gnrlAdtDcAplSaleAmt + "\t"+ gnrlAdtCardDcTotalAmt+ "	\t"+ smartGnrlAdtAmt + "	\t"+ goldGnrlAdtAmt);
+			sbCardGnrlChd.append("\n일반 카드 (No." + cardPromId + " - " + eventCd + ") " + cardNm + "\tR " + gnrlCardDcRate + "% / "+ gnrlChdDcAmt +"\tCHD "+ gnrlChdDcAplSaleAmt + "\t"+ gnrlChdCardDcTotalAmt+ "	\t"+ smartGnrlChdAmt + "	\t"+ goldGnrlChdAmt);
+			sbCardGnrlInf.append("\n일반 카드 (No." + cardPromId + " - " + eventCd + ") " + cardNm + "\tR " + gnrlCardDcRate + "% / "+ gnrlInfDcAmt +"\tINF "+ gnrlInfDcAplSaleAmt + "\t"+ gnrlInfCardDcTotalAmt+ "	\t"+ smartGnrlInfAmt + "	\t"+ goldGnrlInfAmt);
+			sbCardDtcmAdt.append("\n닷컴 카드 (No." + cardPromId + " - " + eventCd + ") " + cardNm + "\tR " + gnrlCardDcRate + "% / "+ gnrlAdtDcAmt +"\tADT "+ dtcmAdtDcAplSaleAmt + "\t"+ dtcmAdtCardDcTotalAmt+ "	\t"+ smartDtcmAdtAmt + "	\t"+ goldDtcmAdtAmt);
+			sbCardDtcmChd.append("\n닷컴 카드 (No." + cardPromId + " - " + eventCd + ") " + cardNm + "\tR " + gnrlCardDcRate + "% / "+ gnrlChdDcAmt +"\tCHD "+ dtcmChdDcAplSaleAmt + "\t"+ dtcmChdCardDcTotalAmt+ "	\t"+ smartDtcmChdAmt + "	\t"+ goldDtcmChdAmt);
+			sbCardDtcmInf.append("\n닷컴 카드 (No." + cardPromId + " - " + eventCd + ") " + cardNm + "\tR " + gnrlCardDcRate + "% / "+ gnrlInfDcAmt +"\tINF "+ dtcmInfDcAplSaleAmt + "\t"+ dtcmInfCardDcTotalAmt+ "	\t"+ smartDtcmInfAmt + "	\t"+ goldDtcmInfAmt);
+
+			this.setFilterMap(fareFltrMap, newSplyCd, eventCd, gnrlEventNmForFilter, 0L, FltrType.CARD_PROM_IDS);	//개별탭-필터설정 : 카드프로모션Id
+			this.setFilterMap(fareFltrMap, ALL_TAP  , eventCd, gnrlEventNmForFilter, 0L, FltrType.CARD_PROM_IDS);	//통합탭-필터설정 : 카드프로모션Id
+		}//카드프로모션정보
+
+		if(StringUtil.isEmpty(sbCardGnrlAdt.toString())) sbCardGnrlAdt.append("\n일반 카드 - \tADT - ");
+		if(StringUtil.isEmpty(sbCardGnrlChd.toString())) sbCardGnrlChd.append("\n일반 카드 - \tCHD - ");
+		if(StringUtil.isEmpty(sbCardGnrlInf.toString())) sbCardGnrlInf.append("\n일반 카드 - \tINF - ");
+		if(StringUtil.isEmpty(sbCardDtcmAdt.toString())) sbCardDtcmAdt.append("\n닷컴 카드 - \tADT - ");
+		if(StringUtil.isEmpty(sbCardDtcmChd.toString())) sbCardDtcmChd.append("\n닷컴 카드 - \tCHD - ");
+		if(StringUtil.isEmpty(sbCardDtcmInf.toString())) sbCardDtcmInf.append("\n닷컴 카드 - \tINF - ");
+
+
+		return new CardPromotionTexts(sbCardGnrlAdt, sbCardGnrlChd, sbCardGnrlInf, sbCardDtcmAdt, sbCardDtcmChd, sbCardDtcmInf, isExistCardGnrlInfo, isExistCardDtcmInfo);
+	}
+
+	/** buildCardPromotionTexts()의 결과를 담는 불변 보유체. */
+	private static final class CardPromotionTexts {
+		private final StringBuilder sbCardGnrlAdt;
+		private final StringBuilder sbCardGnrlChd;
+		private final StringBuilder sbCardGnrlInf;
+		private final StringBuilder sbCardDtcmAdt;
+		private final StringBuilder sbCardDtcmChd;
+		private final StringBuilder sbCardDtcmInf;
+		private final String isExistCardGnrlInfo;
+		private final String isExistCardDtcmInfo;
+
+		private CardPromotionTexts(StringBuilder sbCardGnrlAdt, StringBuilder sbCardGnrlChd, StringBuilder sbCardGnrlInf, StringBuilder sbCardDtcmAdt, StringBuilder sbCardDtcmChd, StringBuilder sbCardDtcmInf, String isExistCardGnrlInfo, String isExistCardDtcmInfo) {
+			this.sbCardGnrlAdt = sbCardGnrlAdt;
+			this.sbCardGnrlChd = sbCardGnrlChd;
+			this.sbCardGnrlInf = sbCardGnrlInf;
+			this.sbCardDtcmAdt = sbCardDtcmAdt;
+			this.sbCardDtcmChd = sbCardDtcmChd;
+			this.sbCardDtcmInf = sbCardDtcmInf;
+			this.isExistCardGnrlInfo = isExistCardGnrlInfo;
+			this.isExistCardDtcmInfo = isExistCardDtcmInfo;
+		}
+	}
+
+
 
 
 
