@@ -2315,7 +2315,6 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 				String smartChdDcAmt = NumberUtil.formatNumber(smartNode.path("gnrlChdDcAmt").asText(), "#,###,###");
 				String smartDtcmAdtDcAmt = NumberUtil.formatNumber(smartNode.path("dtcmAdtDcAmt").asText(), "#,###,###");
 				String smartDtcmChdDcAmt = NumberUtil.formatNumber(smartNode.path("dtcmChdDcAmt").asText(), "#,###,###");
-				String smartDtcmInfDcAmt = NumberUtil.formatNumber(smartNode.path("dtcmInfDcAmt").asText(), "#,###,###");
 				String smartGnrlAdtDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(smartNode.path("gnrlAdtDcAplSaleAmt"   ).asText()), "#,###,###");	//
 				String smartGnrlChdDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(smartNode.path("gnrlChdDcAplSaleAmt"   ).asText()), "#,###,###");	//
 				String smartDtcmAdtDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(smartNode.path("dtcmAdtDcAplSaleAmt"   ).asText()), "#,###,###");	//
@@ -2360,7 +2359,6 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 				String goldChdDcAmt = NumberUtil.formatNumber(goldNode.path("gnrlChdDcAmt").asText(), "#,###,###");
 				String goldDtcmAdtDcAmt = NumberUtil.formatNumber(goldNode.path("dtcmAdtDcAmt").asText(), "#,###,###");
 				String goldDtcmChdDcAmt = NumberUtil.formatNumber(goldNode.path("dtcmChdDcAmt").asText(), "#,###,###");
-				String goldDtcmInfDcAmt = NumberUtil.formatNumber(goldNode.path("dtcmInfDcAmt").asText(), "#,###,###");
 				String goldGnrlAdtDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(goldNode.path("gnrlAdtDcAplSaleAmt"   ).asText()), "#,###,###");	//
 				String goldGnrlChdDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(goldNode.path("gnrlChdDcAplSaleAmt"   ).asText()), "#,###,###");	//
 				String goldDtcmAdtDcAplSaleAmt = NumberUtil.formatNumber(StringUtil.nullConvert(goldNode.path("dtcmAdtDcAplSaleAmt"   ).asText()), "#,###,###");	//
