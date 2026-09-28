@@ -591,42 +591,17 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 							sbSiteRuleDtcmInf = siteRuleTexts.sbSiteRuleDtcmInf;
 							dcEventCd = siteRuleTexts.dcEventCd;
 							String dcEventNm = siteRuleTexts.dcEventNm;
-							//#################### 일반할인요금정보 ###################################
-							sbAdtGnrlDcAmtInfoTemp = new StringBuilder("");
-							sbChdGnrlDcAmtInfoTemp = new StringBuilder("");
-							sbInfGnrlDcAmtInfoTemp = new StringBuilder("");
-							sbAdtDtcmDcAmtInfoTemp = new StringBuilder("");
-							sbChdDtcmDcAmtInfoTemp = new StringBuilder("");
-							sbInfDtcmDcAmtInfoTemp = new StringBuilder("");
-
-							long gnrlAdtDcAplSaleAmtL = farVoLst.path("gnrlAdtDcAplSaleAmt").asLong(0);	//계산용-일반성인할인적용판매금액
-							long gnrlChdDcAplSaleAmtL = farVoLst.path("gnrlChdDcAplSaleAmt").asLong(0);	//계산용-일반성인할인적용판매금액
-							long gnrlInfDcAplSaleAmtL = farVoLst.path("gnrlInfDcAplSaleAmt").asLong(0);	//계산용-일반성인할인적용판매금액
-							long dtcmAdtDcAplSaleAmtL = farVoLst.path("dtcmAdtDcAplSaleAmt").asLong(0);	//계산용-닷컴성인할인적용판매금액
-							long dtcmChdDcAplSaleAmtL = farVoLst.path("dtcmChdDcAplSaleAmt").asLong(0);	//계산용-닷컴성인할인적용판매금액
-							long dtcmInfDcAplSaleAmtL = farVoLst.path("dtcmInfDcAplSaleAmt").asLong(0);	//계산용-닷컴성인할인적용판매금액
-
-							long gnrlDcAdtTotalAmt = gnrlAdtDcAplSaleAmtL + gnrlAdtEtcAmtL;		//일반할인 최종요금
-							long gnrlDcChdTotalAmt = gnrlChdDcAplSaleAmtL + gnrlChdEtcAmtL;		//일반할인 최종요금
-							long gnrlDcInfTotalAmt = gnrlInfDcAplSaleAmtL + gnrlInfEtcAmtL;		//일반할인 최종요금
-							long dtcmAdtDcTotalAmt = dtcmAdtDcAplSaleAmtL + dtcmAdtEtcAmtL;		//닷컴판매룰할인 최종요금
-							long dtcmChdDcTotalAmt = dtcmChdDcAplSaleAmtL + dtcmChdEtcAmtL;		//닷컴판매룰할인 최종요금
-							long dtcmInfDcTotalAmt = dtcmInfDcAplSaleAmtL + dtcmInfEtcAmtL;		//닷컴판매룰할인 최종요금
-
-							// 20200305 : SocketTimeoutException 회피를 위한 성능개선(String 객체 StringBuilder 변경)
-							sbAdtGnrlDcAmtInfoTemp.append(NumberUtil.formatNumber(String.valueOf(gnrlAdtDcAplSaleAmtL), "#,###,###") + " (" + adtQchrgAmtStr + adtFuelExchgAmtStr + adtTaxAmtStr + gnrlAdtIsueFeeAmtStr + ")" + " Total " + NumberUtil.formatNumber(String.valueOf(gnrlDcAdtTotalAmt), "#,###,###"));
-							sbChdGnrlDcAmtInfoTemp.append(NumberUtil.formatNumber(String.valueOf(gnrlChdDcAplSaleAmtL), "#,###,###") + " (" + chdQchrgAmtStr + chdFuelExchgAmtStr + chdTaxAmtStr + gnrlChdIsueFeeAmtStr + ")" + " Total " + NumberUtil.formatNumber(String.valueOf(gnrlDcChdTotalAmt), "#,###,###"));
-							sbInfGnrlDcAmtInfoTemp.append(NumberUtil.formatNumber(String.valueOf(gnrlInfDcAplSaleAmtL), "#,###,###") + " (" + infQchrgAmtStr + infFuelExchgAmtStr + infTaxAmtStr + gnrlInfIsueFeeAmtStr + ")" + " Total " + NumberUtil.formatNumber(String.valueOf(gnrlDcInfTotalAmt), "#,###,###"));
-							sbAdtDtcmDcAmtInfoTemp.append(NumberUtil.formatNumber(String.valueOf(dtcmAdtDcAplSaleAmtL), "#,###,###") + " (" + adtQchrgAmtStr + adtFuelExchgAmtStr + adtTaxAmtStr + dtcmAdtIsueFeeAmtStr + ")" + " Total " + NumberUtil.formatNumber(String.valueOf(dtcmAdtDcTotalAmt), "#,###,###"));
-							sbChdDtcmDcAmtInfoTemp.append(NumberUtil.formatNumber(String.valueOf(dtcmChdDcAplSaleAmtL), "#,###,###") + " (" + chdQchrgAmtStr + chdFuelExchgAmtStr + chdTaxAmtStr + dtcmChdIsueFeeAmtStr + ")" + " Total " + NumberUtil.formatNumber(String.valueOf(dtcmChdDcTotalAmt), "#,###,###"));
-							sbInfDtcmDcAmtInfoTemp.append(NumberUtil.formatNumber(String.valueOf(dtcmInfDcAplSaleAmtL), "#,###,###") + " (" + infQchrgAmtStr + infFuelExchgAmtStr + infTaxAmtStr + dtcmInfIsueFeeAmtStr + ")" + " Total " + NumberUtil.formatNumber(String.valueOf(dtcmInfDcTotalAmt), "#,###,###"));
-
-							//###################### 닷컴할인요금정보 ####################################
-
-							//필터링에 사용할 최종금액 설정
-							adtTamt = gnrlDcAdtTotalAmt;
-							chdTamt = gnrlDcChdTotalAmt;
-							infTamt = gnrlDcInfTotalAmt;
+							//일반할인요금정보 + 필터용 최종금액 - 편도결합/비결합 공통 로직은 computeGeneralDiscountFareTexts()로 추출
+							GeneralDiscountFareTexts generalDiscountFareTexts = this.computeGeneralDiscountFareTexts(farVoLst, feeAmountTexts);
+							sbAdtGnrlDcAmtInfoTemp = generalDiscountFareTexts.sbAdtGnrlDcAmtInfoTemp;
+							sbChdGnrlDcAmtInfoTemp = generalDiscountFareTexts.sbChdGnrlDcAmtInfoTemp;
+							sbInfGnrlDcAmtInfoTemp = generalDiscountFareTexts.sbInfGnrlDcAmtInfoTemp;
+							sbAdtDtcmDcAmtInfoTemp = generalDiscountFareTexts.sbAdtDtcmDcAmtInfoTemp;
+							sbChdDtcmDcAmtInfoTemp = generalDiscountFareTexts.sbChdDtcmDcAmtInfoTemp;
+							sbInfDtcmDcAmtInfoTemp = generalDiscountFareTexts.sbInfDtcmDcAmtInfoTemp;
+							adtTamt = generalDiscountFareTexts.adtTamt;
+							chdTamt = generalDiscountFareTexts.chdTamt;
+							infTamt = generalDiscountFareTexts.infTamt;
 
 							cabinComplexChk = "N";	//좌석결합여부 체크용
 							alComplexChk = "N";		//항공사결합여부 체크용
@@ -1940,42 +1915,17 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 						sbSiteRuleDtcmInf = siteRuleTexts.sbSiteRuleDtcmInf;
 						dcEventCd = siteRuleTexts.dcEventCd;
 						String dcEventNm = siteRuleTexts.dcEventNm;
-						//#################### 일반할인요금정보 ###################################
-						sbAdtGnrlDcAmtInfoTemp = new StringBuilder("");
-						sbChdGnrlDcAmtInfoTemp = new StringBuilder("");
-						sbInfGnrlDcAmtInfoTemp = new StringBuilder("");
-						sbAdtDtcmDcAmtInfoTemp = new StringBuilder("");
-						sbChdDtcmDcAmtInfoTemp = new StringBuilder("");
-						sbInfDtcmDcAmtInfoTemp = new StringBuilder("");
-
-						long gnrlAdtDcAplSaleAmtL = farLstNode.path("gnrlAdtDcAplSaleAmt").asLong(0);	//계산용-일반성인할인적용판매금액
-						long gnrlChdDcAplSaleAmtL = farLstNode.path("gnrlChdDcAplSaleAmt").asLong(0);	//계산용-일반성인할인적용판매금액
-						long gnrlInfDcAplSaleAmtL = farLstNode.path("gnrlInfDcAplSaleAmt").asLong(0);	//계산용-일반성인할인적용판매금액
-						long dtcmAdtDcAplSaleAmtL = farLstNode.path("dtcmAdtDcAplSaleAmt").asLong(0);	//계산용-닷컴성인할인적용판매금액
-						long dtcmChdDcAplSaleAmtL = farLstNode.path("dtcmChdDcAplSaleAmt").asLong(0);	//계산용-닷컴성인할인적용판매금액
-						long dtcmInfDcAplSaleAmtL = farLstNode.path("dtcmInfDcAplSaleAmt").asLong(0);	//계산용-닷컴성인할인적용판매금액
-
-						long gnrlDcAdtTotalAmt = gnrlAdtDcAplSaleAmtL + gnrlAdtEtcAmtL;		//일반할인 최종요금
-						long gnrlDcChdTotalAmt = gnrlChdDcAplSaleAmtL + gnrlChdEtcAmtL;		//일반할인 최종요금
-						long gnrlDcInfTotalAmt = gnrlInfDcAplSaleAmtL + gnrlInfEtcAmtL;		//일반할인 최종요금
-						long dtcmAdtDcTotalAmt = dtcmAdtDcAplSaleAmtL + dtcmAdtEtcAmtL;		//닷컴판매룰할인 최종요금
-						long dtcmChdDcTotalAmt = dtcmChdDcAplSaleAmtL + dtcmChdEtcAmtL;		//닷컴판매룰할인 최종요금
-						long dtcmInfDcTotalAmt = dtcmInfDcAplSaleAmtL + dtcmInfEtcAmtL;		//닷컴판매룰할인 최종요금
-
-						// 20200305 : SocketTimeoutException 회피를 위한 성능개선(String 객체 StringBuilder 변경)
-						sbAdtGnrlDcAmtInfoTemp.append(NumberUtil.formatNumber(String.valueOf(gnrlAdtDcAplSaleAmtL), "#,###,###") + " (" + adtQchrgAmtStr + adtFuelExchgAmtStr + adtTaxAmtStr + gnrlAdtIsueFeeAmtStr + ")" + " Total " + NumberUtil.formatNumber(String.valueOf(gnrlDcAdtTotalAmt), "#,###,###"));
-						sbChdGnrlDcAmtInfoTemp.append(NumberUtil.formatNumber(String.valueOf(gnrlChdDcAplSaleAmtL), "#,###,###") + " (" + chdQchrgAmtStr + chdFuelExchgAmtStr + chdTaxAmtStr + gnrlChdIsueFeeAmtStr + ")" + " Total " + NumberUtil.formatNumber(String.valueOf(gnrlDcChdTotalAmt), "#,###,###"));
-						sbInfGnrlDcAmtInfoTemp.append(NumberUtil.formatNumber(String.valueOf(gnrlInfDcAplSaleAmtL), "#,###,###") + " (" + infQchrgAmtStr + infFuelExchgAmtStr + infTaxAmtStr + gnrlInfIsueFeeAmtStr + ")" + " Total " + NumberUtil.formatNumber(String.valueOf(gnrlDcInfTotalAmt), "#,###,###"));
-						sbAdtDtcmDcAmtInfoTemp.append(NumberUtil.formatNumber(String.valueOf(dtcmAdtDcAplSaleAmtL), "#,###,###") + " (" + adtQchrgAmtStr + adtFuelExchgAmtStr + adtTaxAmtStr + dtcmAdtIsueFeeAmtStr + ")" + " Total " + NumberUtil.formatNumber(String.valueOf(dtcmAdtDcTotalAmt), "#,###,###"));
-						sbChdDtcmDcAmtInfoTemp.append(NumberUtil.formatNumber(String.valueOf(dtcmChdDcAplSaleAmtL), "#,###,###") + " (" + chdQchrgAmtStr + chdFuelExchgAmtStr + chdTaxAmtStr + dtcmChdIsueFeeAmtStr + ")" + " Total " + NumberUtil.formatNumber(String.valueOf(dtcmChdDcTotalAmt), "#,###,###"));
-						sbInfDtcmDcAmtInfoTemp.append(NumberUtil.formatNumber(String.valueOf(dtcmInfDcAplSaleAmtL), "#,###,###") + " (" + infQchrgAmtStr + infFuelExchgAmtStr + infTaxAmtStr + dtcmInfIsueFeeAmtStr + ")" + " Total " + NumberUtil.formatNumber(String.valueOf(dtcmInfDcTotalAmt), "#,###,###"));
-
-						//###################### 닷컴할인요금정보 ####################################
-
-						//필터링에 사용할 최종금액 설정
-						adtTamt = gnrlDcAdtTotalAmt;
-						chdTamt = gnrlDcChdTotalAmt;
-						infTamt = gnrlDcInfTotalAmt;
+						//일반할인요금정보 + 필터용 최종금액 - 편도결합/비결합 공통 로직은 computeGeneralDiscountFareTexts()로 추출
+						GeneralDiscountFareTexts generalDiscountFareTexts = this.computeGeneralDiscountFareTexts(farLstNode, feeAmountTexts);
+						sbAdtGnrlDcAmtInfoTemp = generalDiscountFareTexts.sbAdtGnrlDcAmtInfoTemp;
+						sbChdGnrlDcAmtInfoTemp = generalDiscountFareTexts.sbChdGnrlDcAmtInfoTemp;
+						sbInfGnrlDcAmtInfoTemp = generalDiscountFareTexts.sbInfGnrlDcAmtInfoTemp;
+						sbAdtDtcmDcAmtInfoTemp = generalDiscountFareTexts.sbAdtDtcmDcAmtInfoTemp;
+						sbChdDtcmDcAmtInfoTemp = generalDiscountFareTexts.sbChdDtcmDcAmtInfoTemp;
+						sbInfDtcmDcAmtInfoTemp = generalDiscountFareTexts.sbInfDtcmDcAmtInfoTemp;
+						adtTamt = generalDiscountFareTexts.adtTamt;
+						chdTamt = generalDiscountFareTexts.chdTamt;
+						infTamt = generalDiscountFareTexts.infTamt;
 
 						cabinComplexChk = "N";	//좌석결합여부 체크용
 						alComplexChk = "N";		//항공사결합여부 체크용
@@ -3560,6 +3510,77 @@ public class SchAirFareCbcImpl implements SchAirFareCbc {
 			this.dtcmInfIsueFeeAmtStr = dtcmInfIsueFeeAmtStr;
 		}
 	}
+	/**
+	 * 일반/닷컴 할인적용 요금 텍스트와 필터용 최종금액(adt/chd/infTamt)을 계산한다.
+	 * farVoLst(편도결합)/farLstNode(비결합)는 필드명이 동일하므로 fareNode 하나로 통일. 원본 로직 무변경.
+	 */
+	private GeneralDiscountFareTexts computeGeneralDiscountFareTexts(JsonNode fareNode, FeeAmountTexts feeAmountTexts) {
+		//#################### 일반할인요금정보 ###################################
+		StringBuilder sbAdtGnrlDcAmtInfoTemp = new StringBuilder("");
+		StringBuilder sbChdGnrlDcAmtInfoTemp = new StringBuilder("");
+		StringBuilder sbInfGnrlDcAmtInfoTemp = new StringBuilder("");
+		StringBuilder sbAdtDtcmDcAmtInfoTemp = new StringBuilder("");
+		StringBuilder sbChdDtcmDcAmtInfoTemp = new StringBuilder("");
+		StringBuilder sbInfDtcmDcAmtInfoTemp = new StringBuilder("");
+
+		long gnrlAdtDcAplSaleAmtL = fareNode.path("gnrlAdtDcAplSaleAmt").asLong(0);	//계산용-일반성인할인적용판매금액
+		long gnrlChdDcAplSaleAmtL = fareNode.path("gnrlChdDcAplSaleAmt").asLong(0);	//계산용-일반성인할인적용판매금액
+		long gnrlInfDcAplSaleAmtL = fareNode.path("gnrlInfDcAplSaleAmt").asLong(0);	//계산용-일반성인할인적용판매금액
+		long dtcmAdtDcAplSaleAmtL = fareNode.path("dtcmAdtDcAplSaleAmt").asLong(0);	//계산용-닷컴성인할인적용판매금액
+		long dtcmChdDcAplSaleAmtL = fareNode.path("dtcmChdDcAplSaleAmt").asLong(0);	//계산용-닷컴성인할인적용판매금액
+		long dtcmInfDcAplSaleAmtL = fareNode.path("dtcmInfDcAplSaleAmt").asLong(0);	//계산용-닷컴성인할인적용판매금액
+
+		long gnrlDcAdtTotalAmt = gnrlAdtDcAplSaleAmtL + feeAmountTexts.gnrlAdtEtcAmtL;		//일반할인 최종요금
+		long gnrlDcChdTotalAmt = gnrlChdDcAplSaleAmtL + feeAmountTexts.gnrlChdEtcAmtL;		//일반할인 최종요금
+		long gnrlDcInfTotalAmt = gnrlInfDcAplSaleAmtL + feeAmountTexts.gnrlInfEtcAmtL;		//일반할인 최종요금
+		long dtcmAdtDcTotalAmt = dtcmAdtDcAplSaleAmtL + feeAmountTexts.dtcmAdtEtcAmtL;		//닷컴판매룰할인 최종요금
+		long dtcmChdDcTotalAmt = dtcmChdDcAplSaleAmtL + feeAmountTexts.dtcmChdEtcAmtL;		//닷컴판매룰할인 최종요금
+		long dtcmInfDcTotalAmt = dtcmInfDcAplSaleAmtL + feeAmountTexts.dtcmInfEtcAmtL;		//닷컴판매룰할인 최종요금
+
+		// 20200305 : SocketTimeoutException 회피를 위한 성능개선(String 객체 StringBuilder 변경)
+		sbAdtGnrlDcAmtInfoTemp.append(NumberUtil.formatNumber(String.valueOf(gnrlAdtDcAplSaleAmtL), "#,###,###") + " (" + feeAmountTexts.adtQchrgAmtStr + feeAmountTexts.adtFuelExchgAmtStr + feeAmountTexts.adtTaxAmtStr + feeAmountTexts.gnrlAdtIsueFeeAmtStr + ")" + " Total " + NumberUtil.formatNumber(String.valueOf(gnrlDcAdtTotalAmt), "#,###,###"));
+		sbChdGnrlDcAmtInfoTemp.append(NumberUtil.formatNumber(String.valueOf(gnrlChdDcAplSaleAmtL), "#,###,###") + " (" + feeAmountTexts.chdQchrgAmtStr + feeAmountTexts.chdFuelExchgAmtStr + feeAmountTexts.chdTaxAmtStr + feeAmountTexts.gnrlChdIsueFeeAmtStr + ")" + " Total " + NumberUtil.formatNumber(String.valueOf(gnrlDcChdTotalAmt), "#,###,###"));
+		sbInfGnrlDcAmtInfoTemp.append(NumberUtil.formatNumber(String.valueOf(gnrlInfDcAplSaleAmtL), "#,###,###") + " (" + feeAmountTexts.infQchrgAmtStr + feeAmountTexts.infFuelExchgAmtStr + feeAmountTexts.infTaxAmtStr + feeAmountTexts.gnrlInfIsueFeeAmtStr + ")" + " Total " + NumberUtil.formatNumber(String.valueOf(gnrlDcInfTotalAmt), "#,###,###"));
+		sbAdtDtcmDcAmtInfoTemp.append(NumberUtil.formatNumber(String.valueOf(dtcmAdtDcAplSaleAmtL), "#,###,###") + " (" + feeAmountTexts.adtQchrgAmtStr + feeAmountTexts.adtFuelExchgAmtStr + feeAmountTexts.adtTaxAmtStr + feeAmountTexts.dtcmAdtIsueFeeAmtStr + ")" + " Total " + NumberUtil.formatNumber(String.valueOf(dtcmAdtDcTotalAmt), "#,###,###"));
+		sbChdDtcmDcAmtInfoTemp.append(NumberUtil.formatNumber(String.valueOf(dtcmChdDcAplSaleAmtL), "#,###,###") + " (" + feeAmountTexts.chdQchrgAmtStr + feeAmountTexts.chdFuelExchgAmtStr + feeAmountTexts.chdTaxAmtStr + feeAmountTexts.dtcmChdIsueFeeAmtStr + ")" + " Total " + NumberUtil.formatNumber(String.valueOf(dtcmChdDcTotalAmt), "#,###,###"));
+		sbInfDtcmDcAmtInfoTemp.append(NumberUtil.formatNumber(String.valueOf(dtcmInfDcAplSaleAmtL), "#,###,###") + " (" + feeAmountTexts.infQchrgAmtStr + feeAmountTexts.infFuelExchgAmtStr + feeAmountTexts.infTaxAmtStr + feeAmountTexts.dtcmInfIsueFeeAmtStr + ")" + " Total " + NumberUtil.formatNumber(String.valueOf(dtcmInfDcTotalAmt), "#,###,###"));
+
+		//###################### 닷컴할인요금정보 ####################################
+
+		//필터링에 사용할 최종금액 설정
+
+
+		return new GeneralDiscountFareTexts(sbAdtGnrlDcAmtInfoTemp, sbChdGnrlDcAmtInfoTemp, sbInfGnrlDcAmtInfoTemp,
+			sbAdtDtcmDcAmtInfoTemp, sbChdDtcmDcAmtInfoTemp, sbInfDtcmDcAmtInfoTemp,
+			gnrlDcAdtTotalAmt, gnrlDcChdTotalAmt, gnrlDcInfTotalAmt);
+	}
+
+	/** computeGeneralDiscountFareTexts()의 결과를 담는 불변 보유체. */
+	private static final class GeneralDiscountFareTexts {
+		private final StringBuilder sbAdtGnrlDcAmtInfoTemp;
+		private final StringBuilder sbChdGnrlDcAmtInfoTemp;
+		private final StringBuilder sbInfGnrlDcAmtInfoTemp;
+		private final StringBuilder sbAdtDtcmDcAmtInfoTemp;
+		private final StringBuilder sbChdDtcmDcAmtInfoTemp;
+		private final StringBuilder sbInfDtcmDcAmtInfoTemp;
+		private final long adtTamt;
+		private final long chdTamt;
+		private final long infTamt;
+
+		private GeneralDiscountFareTexts(StringBuilder sbAdtGnrlDcAmtInfoTemp, StringBuilder sbChdGnrlDcAmtInfoTemp, StringBuilder sbInfGnrlDcAmtInfoTemp, StringBuilder sbAdtDtcmDcAmtInfoTemp, StringBuilder sbChdDtcmDcAmtInfoTemp, StringBuilder sbInfDtcmDcAmtInfoTemp, long adtTamt, long chdTamt, long infTamt) {
+			this.sbAdtGnrlDcAmtInfoTemp = sbAdtGnrlDcAmtInfoTemp;
+			this.sbChdGnrlDcAmtInfoTemp = sbChdGnrlDcAmtInfoTemp;
+			this.sbInfGnrlDcAmtInfoTemp = sbInfGnrlDcAmtInfoTemp;
+			this.sbAdtDtcmDcAmtInfoTemp = sbAdtDtcmDcAmtInfoTemp;
+			this.sbChdDtcmDcAmtInfoTemp = sbChdDtcmDcAmtInfoTemp;
+			this.sbInfDtcmDcAmtInfoTemp = sbInfDtcmDcAmtInfoTemp;
+			this.adtTamt = adtTamt;
+			this.chdTamt = chdTamt;
+			this.infTamt = infTamt;
+		}
+	}
+
+
 
 
 
