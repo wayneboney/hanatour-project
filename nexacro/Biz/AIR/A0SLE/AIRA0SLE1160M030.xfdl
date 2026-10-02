@@ -7,7 +7,7 @@
           <Layouts>
             <Layout>
               <Static id="stc00" taborder="0" text="예약정보입력" left="0" top="0" width="120" height="35" cssclass="sta_WF_SubTitle02" fittocontents="width"/>
-              <Div id="div00" taborder="1" text="div00" left="0" cssclass="div_WF_Detail_m" right="0" top="stc00:0" height="79">
+              <Div id="div00" taborder="1" text="div00" left="0" cssclass="div_WF_Detail_m" right="divPayType:10" top="stc00:0" height="79">
                 <Layouts>
                   <Layout>
                     <Static id="stc02" taborder="2" left="0" top="25" right="0" cssclass="sta_WF_Detail" bottom="0" text="stc02"/>
@@ -35,8 +35,14 @@
                     <Combo id="cboSiteMgr" taborder="6" text="" left="134" top="51" width="450" height="23" value="" index="-1" codecolumn="codeVal" datacolumn="codeNm" onitemchanged="divPaxInfo_div00_cboSiteMgr_onitemchanged"/>
                     <Combo id="cboSelectedSiteCats" taborder="7" text="cboSelectedSiteCats" left="370" top="1" width="320" height="23" readonly="false" visible="false" value="" index="-1" codecolumn="codeVal" datacolumn="codeNm"/>
                     <Combo id="cboSiteCats" taborder="5" text="" left="370" top="1" width="320" height="23" readonly="false" visible="false" codecolumn="codeVal" datacolumn="codeNm" onitemchanged="divPaxInfo_div00_cboSiteCats_onitemchanged"/>
-                    <Static id="stc01" taborder="8" text="결제방식 선택" left="695" top="0" width="131" cssclass="sta_WF_DtlLabel" height="26"/>
-                    <Radio id="rdoResDv00" taborder="9" left="834" top="1" width="167" height="23" innerdataset="innerdataset" codecolumn="codecolumn" datacolumn="datacolumn" direction="vertical" index="0" text="일반예약">
+                  </Layout>
+                </Layouts>
+              </Div>
+              <Div id="divPayType" taborder="11" text="" right="0" top="5" width="370" height="120" border="1px solid #d9d6e8" background="#ffffff" formscrollbartype="none none">
+                <Layouts>
+                  <Layout>
+                    <Static id="stc01" taborder="0" text="결제방식 선택" left="0" top="0" right="0" height="33" padding="0px 12px" background="#f4f2fb" color="#4b3c8c" font="bold 12px/normal &quot;NanumGothic&quot;" border="0px none, 0px none, 1px solid #d9d6e8, 0px none"/>
+                    <Radio id="rdoPayType" taborder="1" left="12" top="41" width="88" height="72" innerdataset="innerdataset" codecolumn="codecolumn" datacolumn="datacolumn" direction="vertical" rowcount="2" columncount="1" index="1" value="2" text="나중결제" font="bold 12px/normal &quot;NanumGothic&quot;">
                       <Dataset id="innerdataset">
                         <ColumnInfo>
                           <Column id="codecolumn" size="256"/>
@@ -54,6 +60,9 @@
                         </Rows>
                       </Dataset>
                     </Radio>
+                    <Static id="stcImdtPayDesc" taborder="2" text="( 카드 승인 즉시 발권 )" left="rdoPayType:0" top="41" right="8" height="36" color="#888888"/>
+                    <Static id="stcAftPayDesc" taborder="3" text="( 예약만 생성, 발권시한 내 발권요청 필수 )" left="rdoPayType:0" top="78" right="8" height="35" color="#888888"/>
+                    <Static id="stcPayTypeLine" taborder="4" left="12" right="12" top="77" height="1" background="#e5e5e5"/>
                   </Layout>
                 </Layouts>
               </Div>
@@ -1063,6 +1072,7 @@ this.fv_cboMgrIdx = 0; //웹사이트지정 하나허브 콤보박스 선택 idx
 this.fv_cboHomePageIdx = 0; //웹사이트지정 홈페이지 콤보박스 선택 idx
 this.fv_cboDotComIdx = 0; //웹사이트지정 닷컴 콤보박스 선택 idx
 this.fv_cboCallCenterIdx = 0; //웹사이트지정 콜센터 콤보박스 선택 idx
+this.fv_payTypeGap = 0; //결제방식 영역(divPayType)이 예약정보(div00) 아래로 내려온 높이(px)
 //NDC 추가 함수
 this.fareTypeNdc = this.getOwnerFrame().form.div_work.form.ds_lastChcItnrFarAmt.getColumn(0, "apiSupCode");//M:아마데우스, G:갈릴레오, B:세이버, I:에어아시아, V:하나투어 인벤토리(RT), N:NDC, R:누아(NUUA)
 this.fv_ndcOldCell = "";//grid이전 cell정보
@@ -3024,10 +3034,13 @@ this.fn_addBdngInfo = function(adtCnt, chdCnt, infCnt, pasnType)
 		ndcTextStcHeight = 75;
 	}
 	
+	//결제방식 영역이 예약정보 아래로 내려온 높이 반영
+	this.fn_adjustPayTypeGap();
+
 	//예약정보 입력 화면 높이 설정
 	this.divPaxInfo.form.div01.form.grdBdngInfo.setOffsetHeight(34+ndcHeigth+(parseHeight*parseInt(BdngInfoCnt))+2);
     this.divPaxInfo.form.div01.setOffsetHeight(37+ndcHeigth+(parseHeight*parseInt(BdngInfoCnt)));
-    this.divPaxInfo.setOffsetHeight(291+ndcHeigth+ndcTextStcHeight+ndcStayDivHeight+(parseHeight*parseInt(BdngInfoCnt)-26+2));	
+    this.divPaxInfo.setOffsetHeight(291+ndcHeigth+ndcTextStcHeight+ndcStayDivHeight+(parseHeight*parseInt(BdngInfoCnt)-26+2)+this.fv_payTypeGap);
 	
 	//최종선택여정 화면 높이 설정
 	this.parent.setOffsetHeight(parseInt(this.divPaxInfo.getOffsetHeight()));
@@ -3356,6 +3369,50 @@ this.fn_searchInit = function()
 	this.getOwnerFrame().form.div_work.form.div_srch_btn_reset_onclick();
 };
 
+/***************************************************************************
+ * 함  수  명   : fn_adjustPayTypeGap
+ * 기      능   : 결제방식 영역(divPayType)이 예약정보(div00) 아래로 내려온 높이만큼
+ *                승객정보입력 타이틀 영역을 아래로 내려 겹치지 않게 조정
+ *                (일반예약/법인예약 전환 시 div00 높이가 바뀌므로 매번 호출)
+ * 인      자   : 없음
+ * 리  턴  값   : 이전 대비 변경된 높이(px) - 상위 Div 높이 보정에 더해서 사용
+ ***************************************************************************/
+this.fn_adjustPayTypeGap = function()
+{
+	var objPaxForm = this.divPaxInfo.form;
+	var nDiv00Bottom = objPaxForm.div00.getOffsetTop() + objPaxForm.div00.getOffsetHeight();
+	var nPayTypeBottom = objPaxForm.divPayType.getOffsetTop() + objPaxForm.divPayType.getOffsetHeight();
+	var nNewGap = 0;
+	var nGapDiff = 0;
+	var arrComp = null;
+	var i = 0;
+
+	//결제방식 영역이 더 아래로 내려온 경우에만 차이만큼 확보
+	if(nPayTypeBottom > nDiv00Bottom){
+		nNewGap = nPayTypeBottom - nDiv00Bottom;
+	}
+
+	nGapDiff = nNewGap - this.fv_payTypeGap;
+	if(nGapDiff == 0){
+		return 0;
+	}
+
+	//div00 기준으로 배치된 승객정보입력 타이틀 줄 컴포넌트 [컴포넌트, 레이아웃상 기본 top 오프셋]
+	//stc01 이하(div01, div03, div02, div_btn)는 stc01 기준 상대배치라 함께 내려감
+	arrComp = [
+		[objPaxForm.stc01,   0],	//승객정보입력 타이틀
+		[objPaxForm.stc02,   0],	//영문명 검증 메세지
+		[objPaxForm.chk00,   11],	//여권정보 나중에 입력(전체)
+		[objPaxForm.wbs_ocr, 5]		//OCR
+	];
+	for(i = 0; i < arrComp.length; i++){
+		arrComp[i][0].set_top("div00:" + (arrComp[i][1] + nNewGap));
+	}
+
+	this.fv_payTypeGap = nNewGap;
+	return nGapDiff;
+};
+
 //**************************************************************************
 // [ PART 5 ] 컴포넌트 함수 정의
 //**************************************************************************
@@ -3366,6 +3423,7 @@ this.fn_searchInit = function()
 this.divPaxInfo_div00_rdoResDv_onitemchanged = function(obj:nexacro.Radio,e:nexacro.ItemChangeEventInfo)
 {
 	var chkResInfo = this.divPaxInfo.form.div00.form.rdoResDv.value;//예약구분
+	var nPayTypeGapDiff = 0;//결제방식 영역 높이 보정값
 	if(chkResInfo == "BASIC") {
 		//예약구분상세 영역 추가
 		this.divPaxInfo.form.div02.setOffsetHeight(27);
@@ -3419,6 +3477,7 @@ this.divPaxInfo_div00_rdoResDv_onitemchanged = function(obj:nexacro.Radio,e:nexa
 		var webSiteSelect = this.divPaxInfo.form.div00.getOffsetHeight();
 		this.divPaxInfo.form.div00.setOffsetHeight(webSiteSelect + 52);
 		this.divPaxInfo.setOffsetHeight(this.divPaxInfo.getOffsetHeight() + 52);
+		nPayTypeGapDiff = this.fn_adjustPayTypeGap();//결제방식 영역이 div00 아래로 내려온 높이 변화량
 		
 		this.divPaxInfo.form.div00.form.cboSiteCats.set_visible(false);
 		this.divPaxInfo.form.div02.form.stcBizPurpose.set_visible(false);
@@ -3426,19 +3485,19 @@ this.divPaxInfo_div00_rdoResDv_onitemchanged = function(obj:nexacro.Radio,e:nexa
 		var bizPurpose = this.divPaxInfo.form.div02.getOffsetHeight();
 		this.divPaxInfo.form.div02.setOffsetHeight(bizPurpose);
 		//승객예약Div 높이 조정
-		this.divPaxInfo.setOffsetHeight(this.divPaxInfo.getOffsetHeight()+27);
+		this.divPaxInfo.setOffsetHeight(this.divPaxInfo.getOffsetHeight()+27+nPayTypeGapDiff);
 		//최종선택여정 승객예약 Div 높이 조정
 		var divBdngInfoHeight = this.parent.getOffsetHeight();
-		this.parent.setOffsetHeight(divBdngInfoHeight+27);
+		this.parent.setOffsetHeight(divBdngInfoHeight+27+nPayTypeGapDiff);
 		//최종선택여정 Div 높이 조정
 		var divLastItnrHeight = this.parent.parent.parent.getOffsetHeight();
-		this.parent.parent.parent.setOffsetHeight(divLastItnrHeight+27);
+		this.parent.parent.parent.setOffsetHeight(divLastItnrHeight+27+nPayTypeGapDiff);
 		//운임조회 최종선택여정 Div 높이 조정
 		var divLastChcItnrHeight = this.getOwnerFrame().form.div_work.form.div_cntnt.form.div01.form.divLastChcItnr.getOffsetHeight();
-		this.getOwnerFrame().form.div_work.form.div_cntnt.form.div01.form.divLastChcItnr.setOffsetHeight(divLastChcItnrHeight+27);
+		this.getOwnerFrame().form.div_work.form.div_cntnt.form.div01.form.divLastChcItnr.setOffsetHeight(divLastChcItnrHeight+27+nPayTypeGapDiff);
 		//운임조회 검색결과(우측) Div 높이 조정
 		var div01Height = this.getOwnerFrame().form.div_work.form.div_cntnt.form.div01.getOffsetHeight();
-		this.getOwnerFrame().form.div_work.form.div_cntnt.form.div01.setOffsetHeight(div01Height+27);
+		this.getOwnerFrame().form.div_work.form.div_cntnt.form.div01.setOffsetHeight(div01Height+27+nPayTypeGapDiff);
 		
 	} else if(chkResInfo == "ST06"){
 		/*
@@ -3453,6 +3512,7 @@ this.divPaxInfo_div00_rdoResDv_onitemchanged = function(obj:nexacro.Radio,e:nexa
 		this.divPaxInfo.form.div00.form.cboSiteMgr.set_visible(false);
 		var webSiteSelect = this.divPaxInfo.form.div00.getOffsetHeight();
 		this.divPaxInfo.form.div00.setOffsetHeight(webSiteSelect - 52);//웹사이트 지정 영역 비활성화
+		nPayTypeGapDiff = this.fn_adjustPayTypeGap();//결제방식 영역이 div00 아래로 내려온 높이 변화량
 		
 		this.divPaxInfo.form.div00.form.cboSiteCats.set_visible(true);
 		this.divPaxInfo.form.div02.form.stcBizPurpose.set_visible(true);
@@ -3471,19 +3531,19 @@ this.divPaxInfo_div00_rdoResDv_onitemchanged = function(obj:nexacro.Radio,e:nexa
 			this.divPaxInfo.form.div00.form.cboSiteCats.set_index(0);
 		}
 		//승객예약Div 높이 조정
-		this.divPaxInfo.setOffsetHeight(this.divPaxInfo.getOffsetHeight()-26);
+		this.divPaxInfo.setOffsetHeight(this.divPaxInfo.getOffsetHeight()-26+nPayTypeGapDiff);
 		//최종선택여정 승객예약 Div 높이 조정
 		var divBdngInfoHeight = this.parent.getOffsetHeight();
-		this.parent.setOffsetHeight(divBdngInfoHeight-26);
+		this.parent.setOffsetHeight(divBdngInfoHeight-26+nPayTypeGapDiff);
 		//최종선택여정 Div 높이 조정
 		var divLastItnrHeight = this.parent.parent.parent.getOffsetHeight();
-		this.parent.parent.parent.setOffsetHeight(divLastItnrHeight-26);
+		this.parent.parent.parent.setOffsetHeight(divLastItnrHeight-26+nPayTypeGapDiff);
 		//운임조회 최종선택여정 Div 높이 조정
 		var divLastChcItnrHeight = this.getOwnerFrame().form.div_work.form.div_cntnt.form.div01.form.divLastChcItnr.getOffsetHeight();
-		this.getOwnerFrame().form.div_work.form.div_cntnt.form.div01.form.divLastChcItnr.setOffsetHeight(divLastChcItnrHeight-26);
+		this.getOwnerFrame().form.div_work.form.div_cntnt.form.div01.form.divLastChcItnr.setOffsetHeight(divLastChcItnrHeight-26+nPayTypeGapDiff);
 		//운임조회 검색결과(우측) Div 높이 조정
 		var div01Height = this.getOwnerFrame().form.div_work.form.div_cntnt.form.div01.getOffsetHeight();
-		this.getOwnerFrame().form.div_work.form.div_cntnt.form.div01.setOffsetHeight(div01Height-26);
+		this.getOwnerFrame().form.div_work.form.div_cntnt.form.div01.setOffsetHeight(div01Height-26+nPayTypeGapDiff);
 	}
 	this.getOwnerFrame().form.div_work.form.div_cntnt.form.resetScroll();
 };
