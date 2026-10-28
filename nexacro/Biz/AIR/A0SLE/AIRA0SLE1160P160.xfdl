@@ -1,0 +1,707 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<FDL version="2.0">
+  <Form id="AIRA0SLE1160P160" width="900" height="520" titletext="결제정보 입력" onload="form_onload">
+    <Script type="xscript5.1"><![CDATA[/***************************************************************************
+ * Program ID    : AIRA0SLE1160P160
+ * Program Name  : 결제정보 입력(팝업) - 즉시결제
+ * Author        : A02347
+ * Created Date  : 2026.10.06
+ *
+ * =========================================================================
+ * 수정일자     수정자    내    용
+ * =========================================================================
+ * 2026.10.06   A02347    최초작성 (목업 b2b_pay_popup_20261002_v18_1 기준)
+ *
+ * [ 동작 요약 ]
+ *  - 승객정보 등 검증을 마친 뒤 즉시결제(P)일 때 오프너(AIRA0SLE1160M030)가 이 팝업을 연다.
+ *  - [결제하기] : 팝업 입력값 검증 후 결제정보를 오프너로 반환한다.
+ *                 오프너는 반환값으로 예약+결제를 진행한다.
+ *
+ * [ 보안 주의 ]
+ *  - 카드정보(카드번호/비밀번호/유효기간/생년월일)는 trace/로그에 남기지 않는다.
+ *  - 반환 dataset(ds_payRet)은 오프너가 서버 전송 직후(성공/실패 무관) 즉시 clearData 해야 한다.
+ *  - 금액/TASF 한도는 화면 검증용이다. 서버가 반드시 재검증해야 한다.
+ **************************************************************************/
+
+//**************************************************************************
+// [ PART 1 ] Form에서 Include 할 라이브러리(xjs)파일 정의
+//**************************************************************************
+include "Biz_AIR_JS::RsvCommon.xjs";
+include "Biz_AIR_JS::AirInvCommon.xjs";
+
+//**************************************************************************
+// [ PART 2 ] Form에서 사용될 전역변수를 선언
+//**************************************************************************
+this.fv_objApp = this.gfn_getApplication();		// Application 오브젝트.
+this.fv_busy = false;							// [결제하기] 처리 중 여부 (중복 클릭 방지)
+this.fv_tasfAlerted = {};						// TASF 한도 초과 안내창 행별 중복 방지
+this.TASF_LIMIT_PCT = 7;						// TASF 한도 = 탑승객 기본운임의 7%
+
+//**************************************************************************
+// [ PART 3 ] Form Event 정의
+//**************************************************************************
+this.form_onload = function(obj:nexacro.Form,e:nexacro.LoadEventInfo)
+{
+	// 화면 초기화를 위한 공통함수 호출(필수)
+	this.gfn_formOnLoad(obj);
+};
+
+/***************************************************************************
+ * 함  수  명   : fn_formInit
+ * 기      능   : 개발자정의 폼 초기화
+ * 인      자   : obj 		- Form Object
+ * 리  턴  값   : 없음
+ ***************************************************************************/
+this.fn_formInit = function(obj:nexacro.Form)
+{
+	// 인증방식
+	this.gfn_getCommonCode(this, "CRTT_MTHD_DV_CD", this.ds_certType, "certType", "fn_callBack", "");
+
+	//이벤트카드사코드
+	this.gfn_getCommonCode(this, "RI_PROM_CCCO_CD", this.ds_riPromCccoCd, "riPromCccoCd", "fn_callBack", {"filterColumn":"useYn", "filterValue":"Y"});
+
+	//성별
+	this.gfn_getCommonCode(this, "GNDR_DV_CD", this.ds_gndrDvCd, "gndrDvCd", "fn_callBack", "");
+
+	// 할부기간구분코드
+	this.gfn_getCommonCode(this, "INSM_PRD_DV_CD", this.ds_insmPrdDvCd, "insmPrdDvCd", "fn_callBack", "");
+
+	//TODO ds_main(탑승객별 운임)을 채운 직후 this.fn_checkTasf(); 를 호출한다. (TASF 합계/금액 요약 표시)
+};
+
+//**************************************************************************
+// [ PART 4 ] 사용자정의함수 정의
+//**************************************************************************
+/***************************************************************************
+ * 함  수  명   : fn_callBack
+ * 기      능   : Transaction 후 처리
+ * 인      자   : sSvcId          - Transaction 고유ID
+ *                nErrorCode        - 에러코드
+ *                sErrorMsg         - 에러메세지
+ * 리  턴  값   : 없음
+ ***************************************************************************/
+this.fn_callBack = function(sSvcId, nErrorCode, sErrorMsg)
+{
+	// 에러시 처리
+	if(nErrorCode != 0)
+	{
+		this.fv_busy = false;
+		// 메시지 관련 처리
+		this.alert("에러아이디: " + sSvcId + "\n에러코드: " + nErrorCode + "\n에러메시지: " + sErrorMsg);
+		return;
+	}
+
+	// 정상일때 서비스ID별 처리
+	switch (sSvcId)
+	{
+		case "fn_getBspCardCrtt" :
+			trace(this.ds_airResult.saveXML());
+			if( this.ds_airResult.getColumn(0, "resultCode" ) == '0000' ){
+				this.div_card.form.divCd.form.stc11.set_color('#6495ed');
+				this.div_card.form.divCd.form.stc11.set_text('인증완료');
+			}else{
+				this.gfn_alert(this, "[인증실패] : " + this.ds_airResult.getColumn(0, "resultMsg" ) , "", "E",function(sId, sVal){
+					this.div_card.form.divCd.form.stc11.set_color('#ff0000');
+					this.div_card.form.divCd.form.stc11.set_text('인증실패');
+				},'fn_getBspCardCrtt');
+			}
+			break;
+
+		default:
+			break;
+	}
+};
+
+/***************************************************************************
+ * 함  수  명   : fn_toNum
+ * 기      능   : 문자열 -> 정수 (숫자가 아니면 0)
+ ***************************************************************************/
+this.fn_toNum = function(sVal)
+{
+	var nVal = parseInt(sVal, 10);
+
+	if(isNaN(nVal)){
+		return 0;
+	}
+	return nVal;
+};
+
+/***************************************************************************
+ * 함  수  명   : fn_fmt
+ * 기      능   : 천단위 콤마 포맷
+ ***************************************************************************/
+this.fn_fmt = function(nVal)
+{
+	return String(nVal).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+};
+
+/***************************************************************************
+ * 함  수  명   : fn_getTasfLimit
+ * 기      능   : 탑승객(행)별 TASF 한도 = 기본운임 * 7% (원 미만 절사)
+ * 인      자   : nRow - ds_main 행 번호
+ ***************************************************************************/
+this.fn_getTasfLimit = function(nRow)
+{
+	return Math.floor(this.fn_toNum(this.ds_main.getColumn(nRow, "bscAmt")) * this.TASF_LIMIT_PCT / 100);
+};
+
+/***************************************************************************
+ * 함  수  명   : fn_checkTasf
+ * 기      능   : 탑승객별 TASF 한도 검증 + 한도초과 표시(tasfOver) + 합계/금액 요약 표시
+ * 리  턴  값   : true - 모두 한도 이내, false - 한도 초과 존재
+ ***************************************************************************/
+this.fn_checkTasf = function()
+{
+	var bOk = true;
+	var nSum = 0;
+	var nVal = 0;
+	var sOver = "N";
+	var i = 0;
+
+	for(i = 0; i < this.ds_main.getRowCount(); i++){
+		nVal = this.fn_toNum(this.ds_main.getColumn(i, "tasfAmt"));
+		nSum = nSum + nVal;
+
+		if(nVal > this.fn_getTasfLimit(i)){
+			bOk = false;
+			sOver = "Y";
+		}else{
+			sOver = "N";
+		}
+
+		//값이 같으면 setColumn 이 이벤트를 발생시키지 않으므로 비교 후 설정
+		if(this.ds_main.getColumn(i, "tasfOver") != sOver){
+			this.ds_main.setColumn(i, "tasfOver", sOver);
+		}
+	}
+
+	this.div_main.form.sta_tasfSum.set_text("TASF 합계 " + this.fn_fmt(nSum) + "원");
+	if(bOk){
+		this.div_main.form.sta_tasfSum.set_color("#1a6fd4");
+	}else{
+		this.div_main.form.sta_tasfSum.set_color("#e02020");
+	}
+
+	this.fn_calcAmt();
+
+	return bOk;
+};
+
+/***************************************************************************
+ * 함  수  명   : fn_calcAmt
+ * 기      능   : 결제대상금액 + TASF = 카드 승인금액 계산 및 표시 (표시용, 서버가 재검증)
+ ***************************************************************************/
+this.fn_calcAmt = function()
+{
+	var nPayAmt = 0;
+	var nTasfAmt = 0;
+	var i = 0;
+
+	for(i = 0; i < this.ds_main.getRowCount(); i++){
+		nPayAmt = nPayAmt + this.fn_toNum(this.ds_main.getColumn(i, "payAmtExcl"));
+		nTasfAmt = nTasfAmt + this.fn_toNum(this.ds_main.getColumn(i, "tasfAmt"));
+	}
+
+	this.div_card.form.divCd.form.div_total.form.stc10.set_text("결제대상금액 " + this.fn_fmt(nPayAmt) + "원 + TASF " + this.fn_fmt(nTasfAmt) + "원 =");
+	this.div_card.form.divCd.form.div_total.form.stc_total.set_text("카드 승인 금액 <fc v='red'>" + this.fn_fmt(nPayAmt + nTasfAmt) + "원</fc>");
+};
+
+/***************************************************************************
+ * 함  수  명   : fn_closePopup
+ * 기      능   : 팝업 닫기 (오프너 콜백으로 결과 반환)
+ * 인      자   : sConfirmYn - Y:결제정보 입력 완료, N:취소
+ * 비      고   : Y 일 때 카드정보가 반환 dataset에 담긴다.
+ *                오프너는 서버 전송 직후 반드시 폐기해야 한다.
+ ***************************************************************************/
+this.fn_closePopup = function(sConfirmYn)
+{
+	var sTasfList = "";
+	var sXml = "";
+	var nRow = 0;
+	var i = 0;
+
+	this.ds_payRet.clearData();
+	nRow = this.ds_payRet.addRow();
+	this.ds_payRet.setColumn(nRow, "confirmYN", sConfirmYn);
+
+	if(sConfirmYn == "Y"){
+		//탑승객별 TASF (탑승객 순서, 콤마 구분)
+		for(i = 0; i < this.ds_main.getRowCount(); i++){
+			if(i > 0){
+				sTasfList = sTasfList + ",";
+			}
+			sTasfList = sTasfList + String(this.fn_toNum(this.ds_main.getColumn(i, "tasfAmt")));
+		}
+
+		this.ds_payRet.setColumn(nRow, "tasfList", sTasfList);
+
+		//카드정보
+		this.ds_payRet.setColumn(nRow, "authType", this.div_card.form.divCd.form.rdo_certType.value);
+		this.ds_payRet.setColumn(nRow, "cardCoCd", this.div_card.form.divCd.form.cbo_cccoKndCd.value);
+		this.ds_payRet.setColumn(nRow, "cardNo", this.div_card.form.divCd.form.edt_cdNum1.value
+		                                       + this.div_card.form.divCd.form.edt_cdNum2.value
+		                                       + this.div_card.form.divCd.form.edt_cdNum3.value
+		                                       + this.div_card.form.divCd.form.edt_cdNum4.value);
+		this.ds_payRet.setColumn(nRow, "instMm", this.div_card.form.divCd.form.cbo_insmPrdDvCd.value);
+		this.ds_payRet.setColumn(nRow, "birthDay", this.div_card.form.divCd.form.cal_bthd.value);
+		this.ds_payRet.setColumn(nRow, "cardPw", this.div_card.form.divCd.form.edt_cdPw.value);
+		this.ds_payRet.setColumn(nRow, "expMm", this.div_card.form.divCd.form.edt_cdMM.value);
+		this.ds_payRet.setColumn(nRow, "expYy", this.div_card.form.divCd.form.edt_cdYY.value);
+		this.ds_payRet.setColumn(nRow, "ownerNm", this.div_card.form.divCd.form.edt_cardOwnr.value);
+		this.ds_payRet.setColumn(nRow, "gender", this.div_card.form.divCd.form.rdo_gndrDvCd.value);
+	}
+
+	//반환 문자열 생성 후 반환 dataset의 카드정보 즉시 폐기
+	sXml = this.ds_payRet.saveXML();
+	this.ds_payRet.clearData();
+
+	this.close(sXml);
+};
+
+/***************************************************************************
+ * 함  수  명   : divCd_btn_cdAuth_onclick
+ * 기      능   : 인증버튼
+ ***************************************************************************/
+this.divCd_btn_cdAuth_onclick = function(obj:nexacro.Button,e:nexacro.ClickEventInfo)
+{
+	if( !this.fn_validateCard( 'crtt') ){
+		return;
+	}
+	this.ds_airCrtt.clearData();
+	var nRow = this.ds_airCrtt.addRow();
+
+	this.ds_airCrtt.setColumn(nRow,'cardCd', this.div_card.form.divCd.form.cbo_cccoKndCd.value );
+	this.ds_airCrtt.setColumn(nRow,'cardOwnrBthd',  this.div_card.form.divCd.form.cal_bthd.value );
+	this.ds_airCrtt.setColumn(nRow,'cardOwnrNm',  this.div_card.form.divCd.form.edt_cardOwnr.value );
+	var cardNum = this.div_card.form.divCd.form.edt_cdNum1.value
+				+ this.div_card.form.divCd.form.edt_cdNum2.value
+				+ this.div_card.form.divCd.form.edt_cdNum3.value
+				+ this.div_card.form.divCd.form.edt_cdNum4.value;
+	this.ds_airCrtt.setColumn(nRow,'ccn', cardNum );
+	this.ds_airCrtt.setColumn(nRow,'vldtPrdYm', '20' + this.div_card.form.divCd.form.edt_cdYY.value + this.div_card.form.divCd.form.edt_cdMM.value );
+	this.ds_airCrtt.setColumn(nRow,'card2FgrsPwd',  this.div_card.form.divCd.form.edt_cdPw.value );
+	this.ds_airCrtt.setColumn(nRow,'chnlReqYn',  'Y');
+
+	//TODO 샘플 화면의 ds_rsvAirUnifyResM 에서 가져오던 값 (예약 생성 전이라 값이 없음 - 서버 확인 필요)
+	//this.ds_airCrtt.setColumn( 0 , 'airSaleChnlCd', this.ds_rsvAirUnifyResM.getColumn( 0 , 'airSaleChnlCd') );
+	//this.ds_airCrtt.setColumn( 0 , 'resPathCd', this.ds_rsvAirUnifyResM.getColumn( 0 , 'resPathCd') );
+	//this.ds_airCrtt.setColumn( 0 , 'airSiteCd', this.ds_rsvAirUnifyResM.getColumn( 0 , 'airSiteCd') );
+	//this.ds_airCrtt.setColumn( 0 , 'memcSiteCd', this.ds_rsvAirUnifyResM.getColumn( 0 , 'memcSiteCd') );
+	//this.ds_airCrtt.setColumn( 0 , 'saleAgtPtnCd', this.ds_rsvAirUnifyResM.getColumn( 0 , 'saleAgtPtnCd') );
+
+	this.fn_getBspCardCrtt();
+};
+
+/***************************************************************************
+ * 함  수  명   : fn_getBspCardCrtt
+ * 기      능   : BSP 카드 인증
+ * 인      자   : 없음
+ * 리  턴  값   : 없음
+ ***************************************************************************/
+this.fn_getBspCardCrtt = function()
+{
+	var sSvcId  		= "fn_getBspCardCrtt"; //서비스ID(콜백시 처리)
+	var sInDs   		= "body=ds_airCrtt:A"; //조회시 자바로 보낼 데이터셋
+	var sOutDs  		= "ds_airResult=body"; //자바에서 받아올 데이터셋
+	var svcTrncId       = "/air/ols/reserve/authPay/authpay/getBspCardCrtt/v1.00";		// 헤더_서비스 처리_서비스거래ID
+
+	//트렌젝션처리
+	this.ifn_collTran(sSvcId, sInDs, sOutDs, svcTrncId);
+};
+
+/***************************************************************************
+ * 함  수  명   : fn_validateCard
+ * 기      능   : 카드유효성 검증
+ ***************************************************************************/
+this.fn_validateCard = function(vType)
+{
+	if( vType == 'crtt' ){
+		var val = this.div_card.form.divCd.form.edt_cdNum1.value;
+		if( this.gfn_isNull( val ) || val.length != 4 ){
+			this.gfn_alert(this, "올바른 카드번호를 입력해주세요", "", "E",function(sId, sVal){
+				this.div_card.form.divCd.form.edt_cdNum1.setFocus();
+			},'validate');
+			return false;
+		}
+
+		val = this.div_card.form.divCd.form.edt_cdNum2.value;
+		if( this.gfn_isNull( val ) || val.length != 4 ){
+			this.gfn_alert(this, "올바른 카드번호를 입력해주세요", "", "E",function(sId, sVal){
+				this.div_card.form.divCd.form.edt_cdNum2.setFocus();
+			},'validate');
+			return false;
+		}
+
+		val = this.div_card.form.divCd.form.edt_cdNum3.value;
+		if( this.gfn_isNull( val ) || val.length != 4 ){
+			this.gfn_alert(this, "올바른 카드번호를 입력해주세요", "", "E",function(sId, sVal){
+				this.div_card.form.divCd.form.edt_cdNum3.setFocus();
+			},'validate');
+			return false;
+		}
+
+		val = this.div_card.form.divCd.form.edt_cdNum4.value;
+		// 2020.05.20 PDJ AX, DC카드는 14자리,15자리여서 validation 수정 (val.length != 4 -> val.length < 2)
+		if( this.gfn_isNull( val ) || val.length < 2 ){
+			this.gfn_alert(this, "올바른 카드번호를 입력해주세요.", "", "E",function(sId, sVal){
+				this.div_card.form.divCd.form.edt_cdNum4.setFocus();
+			},'validate');
+			return false;
+		}
+
+		if( this.gfn_isNull( this.div_card.form.divCd.form.cal_bthd.value )  ){
+			this.gfn_alert(this, "IUISYS000011", [this.div_card.form.divCd.form.stc04.text , ""], "",function(sId, sVal){
+				this.div_card.form.divCd.form.cal_bthd.setFocus();
+			},'validate');
+			return false;
+		}
+
+		val = this.div_card.form.divCd.form.edt_cdPw.value;
+		if( this.gfn_isNull( val ) || val.length != 2 ){
+			this.gfn_alert(this, "IUISYS000011", [this.div_card.form.divCd.form.stc01.text , ""], "",function(sId, sVal){
+				this.div_card.form.divCd.form.edt_cdPw.setFocus();
+			},'validate');
+			return false;
+		}
+
+		val = this.div_card.form.divCd.form.edt_cdMM.value;
+		if( this.gfn_isNull( val ) || val.length != 2 || nexacro.toNumber(val) > 12 ){
+			this.gfn_alert(this, "올바른 유효기간을 입력해주세요." , "", "E",function(sId, sVal){
+				this.div_card.form.divCd.form.edt_cdMM.setFocus();
+			},'validate');
+			return false;
+		}
+
+		val = this.div_card.form.divCd.form.edt_cdYY.value;
+		if( this.gfn_isNull( val ) || val.length != 2 ){
+			this.gfn_alert(this, "올바른 유효기간을 입력해주세요." , "", "E",function(sId, sVal){
+				this.div_card.form.divCd.form.edt_cdYY.setFocus();
+			},'validate');
+			return false;
+		}
+
+		if( this.gfn_isNull( this.div_card.form.divCd.form.edt_cardOwnr.value )  ){
+			this.gfn_alert(this, "IUISYS000011", [this.div_card.form.divCd.form.stc06.text , ""], "",function(sId, sVal){
+				this.div_card.form.divCd.form.edt_cardOwnr.setFocus();
+			},'validate');
+			return false;
+		}
+	}
+	return true;
+};
+
+//**************************************************************************
+// [ PART 5 ] Dataset 관련 Event 정의
+//**************************************************************************
+/***************************************************************************
+ * 함  수  명   : ds_main_oncolumnchanged
+ * 기      능   : TASF 입력 시 숫자만 허용 + 한도 초과 안내 + 합계/금액 재계산
+ ***************************************************************************/
+this.ds_main_oncolumnchanged = function(obj:nexacro.NormalDataset,e:nexacro.DSColChangeEventInfo)
+{
+	var sVal = "";
+	var sClean = "";
+	var nVal = 0;
+	var nLimit = 0;
+	var sKey = "";
+
+	if(e.columnid != "tasfAmt"){
+		return;
+	}
+
+	//숫자만 허용 (숫자 외 문자는 지우고 다시 반영)
+	sVal = (e.newvalue == null || e.newvalue == undefined) ? "" : String(e.newvalue);
+	sClean = sVal.replace(/[^0-9]/g, "");
+	if(sVal != sClean){
+		obj.setColumn(e.row, "tasfAmt", sClean);
+		return;
+	}
+
+	nVal = this.fn_toNum(sClean);
+	nLimit = this.fn_getTasfLimit(e.row);
+	sKey = "r" + e.row;
+
+	if(nVal > nLimit){
+		//한도 초과 안내는 행별로 한 번만 표시
+		if(this.fv_tasfAlerted[sKey] != "Y"){
+			this.fv_tasfAlerted[sKey] = "Y";
+			this.fn_checkTasf();
+			this.gfn_alert(this, "TASF 입력 한도를 초과했습니다.\n\n"
+				+ "· 탑승객 : " + obj.getColumn(e.row, "tustKoNm") + " (" + obj.getColumn(e.row, "ageNm") + ")\n"
+				+ "· 기본운임 : " + this.fn_fmt(this.fn_toNum(obj.getColumn(e.row, "bscAmt"))) + "원\n"
+				+ "· 입력 한도 : " + this.fn_fmt(nLimit) + "원 (기본운임의 " + this.TASF_LIMIT_PCT + "%)\n"
+				+ "· 입력 금액 : " + this.fn_fmt(nVal) + "원");
+			return;
+		}
+	}else{
+		this.fv_tasfAlerted[sKey] = "N";
+	}
+
+	this.fn_checkTasf();
+};
+
+//**************************************************************************
+// [ PART 6 ] Component Event 정의
+//**************************************************************************
+/***************************************************************************
+ * 함  수  명   : btn_pay_onclick
+ * 기      능   : 결제하기 - 카드정보/TASF 한도 검증 후 결제정보를 오프너로 반환
+ ***************************************************************************/
+this.btn_pay_onclick = function(obj:nexacro.Button,e:nexacro.ClickEventInfo)
+{
+	if(this.fv_busy){
+		return;
+	}
+
+	//카드정보 검증
+	if(!this.fn_validateCard('crtt')){
+		return;
+	}
+
+	//TASF 탑승객별 한도 확인
+	if(!this.fn_checkTasf()){
+		this.gfn_alert(this, "TASF 금액이 탑승객별 한도(기본운임의 7%)를 초과했습니다.\n\n빨간색으로 표시된 TASF 입력값을 확인해 주세요.");
+		return;
+	}
+
+	this.gfn_confirm(this, "입력하신 정보로 결제를 진행하시겠습니까?", ["", ""], "C", function (sId, sVal)
+	{
+		if(sVal){
+			this.fv_busy = true;
+			this.fn_closePopup("Y");
+		}
+	});
+};
+
+/***************************************************************************
+ * 함  수  명   : btn_cancel_onclick / btnPdvClose_onclick
+ * 기      능   : 취소 / 닫기
+ ***************************************************************************/
+this.btn_cancel_onclick = function(obj:nexacro.Button,e:nexacro.ClickEventInfo)
+{
+	this.fn_closePopup("N");
+};
+
+this.btnPdvClose_onclick = function(obj:nexacro.Button,e:nexacro.ClickEventInfo)
+{
+	this.fn_closePopup("N");
+};]]></Script>
+    <Layouts>
+      <Layout height="520" mobileorientation="landscape" width="900">
+        <Static id="sta00" taborder="0" text="결제정보 입력" left="0" top="0" height="40" cssclass="sta_POP_Title" right="0"/>
+        <Button id="btnPdvClose" taborder="1" top="0" width="40" height="40" right="0" onclick="btnPdvClose_onclick" cssclass="btn_POP_Close" visible="true"/>
+        <Static id="sta02" taborder="2" text="20" top="40" visible="false" width="20" bottom="0" left="0" cssclass="sta_GA_Bg"/>
+        <Static id="sta01" taborder="3" text="20" top="40" visible="false" width="20" bottom="0" left="880" cssclass="sta_GA_Bg"/>
+        <Div id="div_main" taborder="4" left="20" right="20" top="47" formscrollbartype="auto none" height="175">
+          <Layouts>
+            <Layout>
+              <Static id="sta_paxTitle" taborder="0" text="▶ 탑승객정보" left="16" top="0" width="200" height="24" font="bold 12px/normal &quot;NanumGothic&quot;"/>
+              <Grid id="grd_main" taborder="1" left="16" right="16" top="sta_paxTitle:2" height="122" binddataset="ds_main" autofittype="col" autoenter="select">
+                <Formats>
+                  <Format id="default">
+                    <Columns>
+                      <Column size="40"/>
+                      <Column size="100"/>
+                      <Column size="56"/>
+                      <Column size="100"/>
+                      <Column size="100"/>
+                      <Column size="100"/>
+                      <Column size="110"/>
+                      <Column size="120"/>
+                    </Columns>
+                    <Rows>
+                      <Row size="30" band="head"/>
+                      <Row size="28"/>
+                    </Rows>
+                    <Band id="head">
+                      <Cell text=""/>
+                      <Cell col="1" text="탑승객명"/>
+                      <Cell col="2" text="구분"/>
+                      <Cell col="3" text="기본운임"/>
+                      <Cell col="4" text="유류할증료"/>
+                      <Cell col="5" text="제세공과금"/>
+                      <Cell col="6" text="총액"/>
+                      <Cell col="7" text="TASF"/>
+                    </Band>
+                    <Band id="body">
+                      <Cell displaytype="text" expr="currow+1"/>
+                      <Cell col="1" displaytype="text" textAlign="left" text="bind:tustKoNm"/>
+                      <Cell col="2" displaytype="text" text="bind:ageNm"/>
+                      <Cell col="3" displaytype="number" textAlign="right" text="bind:bscAmt"/>
+                      <Cell col="4" displaytype="number" textAlign="right" text="bind:fuelAmt"/>
+                      <Cell col="5" displaytype="number" textAlign="right" text="bind:taxAmt"/>
+                      <Cell col="6" displaytype="number" textAlign="right" text="bind:payAmtExcl"/>
+                      <Cell col="7" displaytype="editcontrol" edittype="text" editinputtype="digit" editmaxlength="9" textAlign="right" text="bind:tasfAmt" background="#ffffff" cssclass="expr:tasfOver==&quot;Y&quot; ? &quot;Red&quot; : &quot;&quot;"/>
+                    </Band>
+                  </Format>
+                </Formats>
+              </Grid>
+              <Static id="sta_tasfSum" taborder="2" text="TASF 합계 0원" left="16" top="grd_main:4" width="400" height="22" color="#1a6fd4" font="bold 12px/normal &quot;NanumGothic&quot;"/>
+            </Layout>
+          </Layouts>
+        </Div>
+        <Div id="div_card" taborder="5" left="20" right="20" formscrollbartype="auto none" height="224" top="div_main:5">
+          <Layouts>
+            <Layout>
+              <Div id="divCd" taborder="1" text="div카드" left="16" formscrollbartype="none" cssclass="div_WF_Detail_m" right="16" bottom="0" height="197">
+                <Layouts>
+                  <Layout>
+                    <Static id="stc02" taborder="8" text="인증방법" left="0" top="0" width="140" height="26" cssclass="sta_WF_DtlLabel" onclick="div01_stc05_onclick"/>
+                    <Static id="stc03" taborder="9" left="0" top="26" width="140" height="26" cssclass="sta_WF_DtlLabel" onclick="div01_stc05_onclick" text="카드정보"/>
+                    <Static id="stc04" taborder="10" text="생년월일" left="300" top="78" width="140" height="26" cssclass="sta_WF_DtlLabel" onclick="div01_stc05_onclick"/>
+                    <Static id="stc05" taborder="11" text="유효기간" left="0" top="52" width="140" height="26" cssclass="sta_WF_DtlLabel" onclick="div01_stc05_onclick"/>
+                    <Static id="stc01" taborder="12" text="비밀번호" left="300" top="52" width="155" height="26" cssclass="sta_WF_DtlLabel" onclick="div01_stc05_onclick"/>
+                    <Radio id="rdo_certType" taborder="0" left="stc02:3" top="1" width="292" height="23" innerdataset="ds_certType" codecolumn="comDtlCd" datacolumn="comDtlCdNm" direction="vertical" index="0" text="ARS" value="B"/>
+                    <Combo id="cbo_cccoKndCd" taborder="1" text="선택" left="stc03:3" top="27" width="156" height="23" value="" index="-1" innerdataset="ds_riPromCccoCd" datacolumn="comDtlCdNm" codecolumn="comDtlCd"/>
+                    <Edit id="edt_cdPw" taborder="3" left="stc01:3" top="53" width="40" height="23" inputtype="digit,number" maxlength="2" text="12" autoskip="true"/>
+                    <Static id="stc06" taborder="13" text="소유주" left="0" top="78" width="140" height="26" cssclass="sta_WF_DtlLabel" onclick="div01_stc05_onclick"/>
+                    <Button id="btn_cdAuth" taborder="7" text="카드인증" top="105" width="92" height="23" cssclass="btn_WF_Custom" fittocontents="width" onclick="divCd_btn_cdAuth_onclick" right="430"/>
+                    <Static id="stc_cdPw34" taborder="14" text="**" left="edt_cdPw:0" top="53" width="34" height="23" textAlign="left"/>
+                    <Edit id="edt_cardOwnr" taborder="6" left="stc06:3" top="79" width="157" height="23" inputtype="normal" maxlength="30"/>
+                    <Calendar id="cal_bthd" taborder="2" left="stc04:3" top="79" width="156" height="23" dateformat="yyyy-MM-dd" editformat="yyyy-MM-dd" autoselect="true" displaynulltext="YYYY-MM-DD"/>
+                    <Static id="stc10" taborder="15" text="/" left="188" top="53" width="15" height="23"/>
+                    <Edit id="edt_cdMM" taborder="4" left="stc05:3" top="53" width="40" height="23" inputtype="digit,number" maxlength="2" autoskip="true"/>
+                    <Edit id="edt_cdYY" taborder="5" left="199" top="53" width="40" height="23" inputtype="digit,number" maxlength="2" autoskip="true"/>
+                    <Edit id="edt_cdNum1" taborder="16" top="27" width="55" height="23" inputtype="digit,number" maxlength="4" autoskip="true" left="cbo_cccoKndCd:1"/>
+                    <Edit id="edt_cdNum2" taborder="17" left="edt_cdNum1:1" top="27" width="55" height="23" inputtype="digit,number" maxlength="4" autoskip="true"/>
+                    <Edit id="edt_cdNum3" taborder="18" left="edt_cdNum2:1" top="27" width="55" height="23" inputtype="digit,number" maxlength="4" autoskip="true"/>
+                    <Edit id="edt_cdNum4" taborder="19" left="edt_cdNum3:1" top="27" width="55" height="23" inputtype="digit,number" text="1234" maxlength="4" autoskip="true"/>
+                    <Combo id="cbo_insmPrdDvCd" taborder="20" text="선택" left="edt_cdNum4:1" top="27" width="65" height="23" value="" index="-1" innerdataset="ds_insmPrdDvCd" datacolumn="comDtlCdNm" codecolumn="comDtlCd" displayrowcount="12"/>
+                    <Static id="stc11" taborder="21" left="526" top="131" width="50" height="23" textAlign="center" color="red" font="bold 12px/normal &quot;NanumGothic&quot;"/>
+                    <Static id="stc00" taborder="22" text="성별" left="0" top="104" width="140" height="26" cssclass="sta_WF_DtlLabel" onclick="div01_stc05_onclick"/>
+                    <Div id="div_total" taborder="23" left="2" right="-2" top="162" height="30" border="1px solid #d5d8de" formscrollbartype="none none">
+                      <Layouts>
+                        <Layout>
+                          <Static id="sta_gh" taborder="0" left="0" top="0" right="0" background="#eef1f6" text="" bottom="-1" cssclass="sta_WF_DtlLabel"/>
+                          <Static id="stc_total" taborder="1" text="카드 승인 금액 &lt;fc v='red'&gt;800,000원&lt;/fc&gt;" top="3" width="251" height="23" textAlign="right" left="568" onclick="divMg01_stc_vldtPrdYm00_onclick" usedecorate="true"/>
+                          <Static id="stc10" taborder="2" top="3" height="23" width="418" text="결제대상금액 808,880원 + TASF 0원 - 마일리지 0M =" left="3"/>
+                        </Layout>
+                      </Layouts>
+                    </Div>
+                    <Radio id="rdo_gndrDvCd" taborder="24" left="stc00:3" top="106" width="157" height="23" innerdataset="ds_gndrDvCd" codecolumn="comDtlCd" datacolumn="comDtlCdNm" direction="vertical" index="0" text="ARS" value="B"/>
+                    <Static id="stc07" taborder="25" text="TASF 승인처" left="0" top="130" width="140" height="26" cssclass="sta_WF_DtlLabel" onclick="div01_stc05_onclick"/>
+                    <Static id="stc08" taborder="26" text="하나투어" left="stc07:5" top="130" width="120" height="26"/>
+                  </Layout>
+                </Layouts>
+              </Div>
+              <Static id="sta_paxTitle" taborder="1" text="▶ 카드결제" left="16" top="0" width="200" height="24" font="bold 12px/normal &quot;NanumGothic&quot;"/>
+            </Layout>
+          </Layouts>
+        </Div>
+        <Div id="div_button" taborder="6" left="20" top="div_card:5" height="43" right="20">
+          <Layouts>
+            <Layout>
+              <Button id="btn_pay" taborder="0" text="결제하기" left="300" bottom="0" width="130" height="38" cssclass="btn_WF_Save" onclick="btn_pay_onclick"/>
+              <Button id="btn_cancel" taborder="1" text="취소" left="440" bottom="0" width="90" height="38" cssclass="btn_WF_Custom" onclick="btn_cancel_onclick"/>
+            </Layout>
+          </Layouts>
+        </Div>
+      </Layout>
+    </Layouts>
+    <Objects>
+      <Dataset id="ds_dumy"/>
+      <Dataset id="ds_main" oncolumnchanged="ds_main_oncolumnchanged">
+        <ColumnInfo>
+          <Column id="psngrSeq" type="STRING" size="256"/>
+          <Column id="tustKoNm" type="STRING" size="256"/>
+          <Column id="ageNm" type="STRING" size="256"/>
+          <Column id="bscAmt" type="STRING" size="256"/>
+          <Column id="fuelAmt" type="STRING" size="256"/>
+          <Column id="taxAmt" type="STRING" size="256"/>
+          <Column id="payAmtExcl" type="STRING" size="256"/>
+          <Column id="payAmtIncl" type="STRING" size="256"/>
+          <Column id="tasfAmt" type="STRING" size="256"/>
+          <Column id="tasfLimit" type="STRING" size="256"/>
+          <Column id="tasfOver" type="STRING" size="256"/>
+        </ColumnInfo>
+      </Dataset>
+      <Dataset id="ds_certType">
+        <ColumnInfo>
+          <Column id="comBscCd" type="STRING" size="256"/>
+          <Column id="comDtlCd" type="STRING" size="256"/>
+          <Column id="comDtlCdNm" type="STRING" size="256"/>
+        </ColumnInfo>
+      </Dataset>
+      <Dataset id="ds_riPromCccoCd">
+        <ColumnInfo>
+          <Column id="comBscCd" type="STRING" size="256"/>
+          <Column id="comDtlCd" type="STRING" size="256"/>
+          <Column id="comDtlCdNm" type="STRING" size="256"/>
+          <Column id="useYn" type="STRING" size="256"/>
+        </ColumnInfo>
+      </Dataset>
+      <Dataset id="ds_airCrtt">
+        <ColumnInfo>
+          <Column id="resCd" type="STRING" size="256" description="예약코드"/>
+          <Column id="cardPromYn" type="STRING" size="256" description="카드프로모션여부"/>
+          <Column id="cardCd" type="STRING" size="256" description="카드사코드"/>
+          <Column id="cardOwnrBthd" type="STRING" size="256" description="카드소유자생년월일"/>
+          <Column id="cardOwnrNm" type="STRING" size="256" description="카드소유자명"/>
+          <Column id="ccn" type="STRING" size="256" description="카드번호"/>
+          <Column id="vldtPrdYm" type="STRING" size="256" description="유효기간년월"/>
+          <Column id="card2FgrsPwd" type="STRING" size="256" description="카드2자리비밀번호"/>
+          <Column id="chnlReqYn" type="STRING" size="256" description="채널요청여부"/>
+          <Column id="airSaleChnlCd" type="STRING" size="256" description="항공판매채널코드"/>
+          <Column id="resPathCd" type="STRING" size="256" description="예약경로코드"/>
+          <Column id="airSiteCd" type="STRING" size="256" description="항공사이트코드"/>
+          <Column id="memcSiteCd" type="STRING" size="256" description="회원사사이트코드"/>
+          <Column id="saleAgtPtnCd" type="STRING" size="256" description="판매대리점거래처코드"/>
+        </ColumnInfo>
+      </Dataset>
+      <Dataset id="ds_airResult">
+        <ColumnInfo>
+          <Column id="resCd" type="STRING" size="256" description="예약코드"/>
+          <Column id="crttFnshDttm" type="STRING" size="256" description="인증완료일시"/>
+          <Column id="hanaEmpYn" type="STRING" size="256" description="하나투어사원여부"/>
+          <Column id="agtStafYn" type="STRING" size="256" description="대리점직원여부"/>
+          <Column id="resultCode" type="STRING" size="256" description="결과코드"/>
+          <Column id="resultMsg" type="STRING" size="256" description="결과메세지"/>
+          <Column id="recmLmttDttm" type="STRING" size="256" description="입금시한"/>
+          <Column id="guid" type="STRING" size="256" description="GUID"/>
+        </ColumnInfo>
+      </Dataset>
+      <Dataset id="ds_gndrDvCd">
+        <ColumnInfo>
+          <Column id="comBscCd" type="STRING" size="256"/>
+          <Column id="comDtlCd" type="STRING" size="256"/>
+          <Column id="comDtlCdNm" type="STRING" size="256"/>
+        </ColumnInfo>
+      </Dataset>
+      <Dataset id="ds_insmPrdDvCd">
+        <ColumnInfo>
+          <Column id="comBscCd" type="STRING" size="256"/>
+          <Column id="comDtlCd" type="STRING" size="256"/>
+          <Column id="comDtlCdNm" type="STRING" size="256"/>
+        </ColumnInfo>
+      </Dataset>
+      <Dataset id="ds_psngr">
+        <ColumnInfo>
+          <Column id="resId" type="STRING" size="256" description="예약ID"/>
+          <Column id="tustNum" type="STRING" size="256" description="탭승객번호"/>
+          <Column id="psngrSeq" type="STRING" size="256" description="탑승객순번"/>
+          <Column id="tustEnName" type="STRING" size="256" description="여행자영문이름"/>
+        </ColumnInfo>
+      </Dataset>
+      <Dataset id="ds_payRet">
+        <ColumnInfo>
+          <Column id="confirmYN" type="STRING" size="256"/>
+          <Column id="tasfList" type="STRING" size="256"/>
+          <Column id="authType" type="STRING" size="256"/>
+          <Column id="cardCoCd" type="STRING" size="256"/>
+          <Column id="cardNo" type="STRING" size="256"/>
+          <Column id="instMm" type="STRING" size="256"/>
+          <Column id="birthDay" type="STRING" size="256"/>
+          <Column id="cardPw" type="STRING" size="256"/>
+          <Column id="expMm" type="STRING" size="256"/>
+          <Column id="expYy" type="STRING" size="256"/>
+          <Column id="ownerNm" type="STRING" size="256"/>
+          <Column id="gender" type="STRING" size="256"/>
+        </ColumnInfo>
+      </Dataset>
+    </Objects>
+    <Bind>
+      <BindItem id="item17" compid="div_card.form.divCd.form.div_total.form.stc_total" propid="text" datasetid="ds_airMlgBkr" columnid="month3ExpPntDisp"/>
+      <BindItem id="item19" compid="div_card.form.divCd.form.div_total.form.stc10" propid="text" datasetid="ds_airMlgBkr" columnid="remainText"/>
+    </Bind>
+  </Form>
+</FDL>
