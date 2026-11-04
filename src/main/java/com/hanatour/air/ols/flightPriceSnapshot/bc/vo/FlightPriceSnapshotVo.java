@@ -79,7 +79,7 @@ public class FlightPriceSnapshotVo extends AbstractVo {
     private String tax;
 
     @Property(typeName = "유류할증료", length = 256)
-    private String qCharge;
+    private String fuelSurcharge;
 
     @Property(typeName = "당사현재순위", length = 256)
     private String currentRank;
@@ -231,12 +231,12 @@ public class FlightPriceSnapshotVo extends AbstractVo {
         this.tax = tax;
     }
 
-    public String getQCharge() {
-        return qCharge;
+    public String getFuelSurcharge() {
+        return fuelSurcharge;
     }
 
-    public void setQCharge(String qCharge) {
-        this.qCharge = qCharge;
+    public void setFuelSurcharge(String fuelSurcharge) {
+        this.fuelSurcharge = fuelSurcharge;
     }
 
     public String getCurrentRank() {
