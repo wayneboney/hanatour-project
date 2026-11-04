@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>항공권 가격 스냅샷 조회</title>
+<style>
+  body { font-family: sans-serif; margin: 24px; color: #222; }
+  h1 { font-size: 20px; }
+  form { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; margin-bottom: 16px; }
+  label { display: flex; flex-direction: column; font-size: 12px; gap: 2px; }
+  input, button { padding: 6px 8px; font-size: 14px; }
+  #msg { margin: 8px 0; min-height: 20px; }
+  #msg.error { color: #c00; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { border: 1px solid #ccc; padding: 4px 8px; text-align: right; white-space: nowrap; }
+  th { background: #f3f3f3; }
+  td.l { text-align: left; }
+  .wrap { overflow-x: auto; }
+  details { margin: 2px 0; }
+</style>
+</head>
+<body>
+<h1>항공권 가격 스냅샷 조회</h1>
+
+<form id="searchForm">
+  <label>예약코드 (필수)<input type="text" id="reservationCode" maxlength="50" required></label>
+  <label>수집일 시작<input type="date" id="fromDate"></label>
+  <label>수집일 종료<input type="date" id="toDate"></label>
+  <label>최대 건수<input type="number" id="limit" min="1" max="200" value="50"></label>
+  <button type="submit" id="btnSearch">조회</button>
+</form>
+
+<div id="msg"></div>
+<div class="wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>수집시각</th><th>여정</th><th>출발</th><th>귀국</th>
+        <th>기본운임</th><th>세금</th><th>유류할증</th><th>당사순위</th><th>경쟁운임</th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+</div>
+
+<script>
+// 핵심 동작: 폼 입력 → /api/price-snapshots 호출(GET) → 응답 code 확인 → 표 렌더링
+// 보안: 서버 데이터는 innerHTML 이 아닌 textContent 로만 출력해 XSS 를 방지한다.
+(function () {
+  var API_URL = '/api/price-snapshots';
+  var form = document.getElementById('searchForm');
+  var btn = document.getElementById('btnSearch');
+  var msg = document.getElementById('msg');
+  var tbody = document.getElementById('tbody');
+
+  function setMsg(text, isError) {
+    msg.textContent = text || '';
+    msg.className = isError ? 'error' : '';
+  }
+
+  function td(text, left) {
+    var cell = document.createElement('td');
+    cell.textContent = (text === null || text === undefined) ? '' : String(text);
+    if (left) { cell.className = 'l'; }
+    return cell;
+  }
+
+  function fmtNum(n) {
+    return (n === null || n === undefined) ? '' : Number(n).toLocaleString();
+  }
+
+  function competitorCell(list) {
+    var cell = document.createElement('td');
+    cell.className = 'l';
+    if (!list || list.length === 0) { return cell; }
+    var d = document.createElement('details');
+    var s = document.createElement('summary');
+    s.textContent = list.length + '건 (최저 ' + fmtNum(list[0].fare) + ')';
+    d.appendChild(s);
+    for (var i = 0; i < list.length; i++) {
+      var line = document.createElement('div');
+      line.textContent = list[i].rank + '. ' + (list[i].agencyName || list[i].agencyCode || '-') + ' : ' + fmtNum(list[i].fare);
+      d.appendChild(line);
+    }
+    cell.appendChild(d);
+    return cell;
+  }
+
+  function render(rows) {
+    tbody.innerHTML = '';
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      var tr = document.createElement('tr');
+      tr.appendChild(td(r.capturedAt, true));
+      tr.appendChild(td(r.tripType + (r.directOnly ? ' / 직항' : ''), true));
+      tr.appendChild(td(r.depDate + ' ' + r.depAirport + ' ' + r.depAirlineCode + r.depFlightNo, true));
+      tr.appendChild(td(r.returnDate ? (r.returnDate + ' ' + r.returnAirport + ' ' + r.returnAirlineCode + r.returnFlightNo) : '', true));
+      tr.appendChild(td(fmtNum(r.baseFare)));
+      tr.appendChild(td(fmtNum(r.tax)));
+      tr.appendChild(td(fmtNum(r.qCharge)));
+      tr.appendChild(td(r.currentRank));
+      tr.appendChild(competitorCell(r.competitors));
+      tbody.appendChild(tr);
+    }
+  }
+
+  function buildUrl() {
+    var params = new URLSearchParams();
+    params.set('reservationCode', document.getElementById('reservationCode').value.trim());
+    var from = document.getElementById('fromDate').value;
+    var to = document.getElementById('toDate').value;
+    var limit = document.getElementById('limit').value;
+    if (from) { params.set('fromDate', from); }
+    if (to) { params.set('toDate', to); }
+    if (limit) { params.set('limit', limit); }
+    return API_URL + '?' + params.toString();
+  }
+
+  form.addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    setMsg('조회 중...', false);
+    btn.disabled = true;      // 중복 클릭 방지
+    tbody.innerHTML = '';
+
+    fetch(buildUrl(), { method: 'GET', headers: { 'Accept': 'application/json' }, credentials: 'same-origin' })
+      .then(function (res) {
+        // 4xx/5xx 도 본문(JSON)에 code/message 가 있으므로 파싱 시도
+        return res.json().catch(function () { return { code: 'PARSE', message: '응답을 해석할 수 없습니다. (HTTP ' + res.status + ')' }; });
+      })
+      .then(function (body) {
+        if (body.code !== '0000') {
+          setMsg(body.message || '조회에 실패했습니다.', true);
+          return;
+        }
+        var rows = body.data || [];
+        render(rows);
+        setMsg(rows.length === 0 ? '조회 결과가 없습니다.' : rows.length + '건 조회되었습니다.', false);
+      })
+      .catch(function () {
+        setMsg('서버와 통신할 수 없습니다.', true);
+      })
+      .then(function () {
+        btn.disabled = false;
+      });
+  });
+})();
+</script>
+</body>
+</html>
