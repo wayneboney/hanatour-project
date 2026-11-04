@@ -18,8 +18,7 @@ import javax.xml.bind.annotation.XmlRootElement;
  * 항공권 가격 스냅샷 조회 요청 VO (UI -> Controller 요청 본문)
  *
  * <pre>
- * /list        : reservationCode(필수), startDt/endDt(YYYYMMDD, 선택), maxRows(선택)
- * /competitors : reservationCode(필수), snapshotId(필수)
+ * reservationCode(필수), startDt/endDt(YYYYMMDD, 선택), maxRows(선택, 기본 50 / 최대 200)
  * </pre>
  */
 @CompositeType
@@ -35,9 +34,6 @@ public class FlightPriceSnapshotReqVo extends AbstractVo {
 
     @Property(typeName = "예약코드")
     private String reservationCode;
-
-    @Property(typeName = "스냅샷ID")
-    private String snapshotId;
 
     @Property(typeName = "수집시작일자")
     private String startDt;

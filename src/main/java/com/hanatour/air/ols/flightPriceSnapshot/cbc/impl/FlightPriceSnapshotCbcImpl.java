@@ -3,7 +3,6 @@ package com.hanatour.air.ols.flightPriceSnapshot.cbc.impl;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hanatour.air.ols.flightPriceSnapshot.cbc.FlightPriceSnapshotCbc;
-import com.hanatour.air.ols.flightPriceSnapshot.cbc.vo.FlightPriceSnapshotCompetitorVo;
 import com.hanatour.air.ols.flightPriceSnapshot.cbc.vo.FlightPriceSnapshotReqVo;
 import com.hanatour.air.ols.flightPriceSnapshot.cbc.vo.FlightPriceSnapshotVo;
 import com.hanatour.air.ols.flightPriceSnapshot.ec.qc.FlightPriceSnapshotMapper;
@@ -30,7 +29,7 @@ import java.util.regex.Pattern;
  * 차이점: 항공API 호출이 아니라 Mapper(MyBatis)로 내부 DB 를 직접 조회한다. (단순 조회라 Bc 생략)
  *
  * 핵심 동작
- * 1) 입력값 검증 + 정규화 (예약코드/스냅샷ID 형식, 날짜 형식·순서, 조회 건수 상한/기본값)
+ * 1) 입력값 검증 + 정규화 (예약코드 형식, 날짜 형식·순서, 조회 건수 상한/기본값)
  * 2) Mapper 호출 (DB 예외는 삼키지 않고 전파)
  * 3) 결과를 JSON 문자열로 직렬화
  * </pre>
@@ -42,7 +41,6 @@ import java.util.regex.Pattern;
 public class FlightPriceSnapshotCbcImpl implements FlightPriceSnapshotCbc {
 
     private static final Pattern RESERVATION_CODE_PATTERN = Pattern.compile("^[A-Za-z0-9_-]{1,50}$");
-    private static final Pattern SNAPSHOT_ID_PATTERN = Pattern.compile("^[0-9]{1,19}$");
     // STRICT: 20261301, 20260230 같은 존재하지 않는 날짜 거부 (uuuu 필수)
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("uuuuMMdd").withResolverStyle(ResolverStyle.STRICT);
 
@@ -54,7 +52,7 @@ public class FlightPriceSnapshotCbcImpl implements FlightPriceSnapshotCbc {
 
     @Override
     public String getSnapshotList(FlightPriceSnapshotReqVo vo) {
-        validateListCondition(vo);
+        validateCondition(vo);
 
         List<FlightPriceSnapshotVo> list = flightPriceSnapshotMapper.findFlightPriceSnapshotList(vo);
         if (list == null) {
@@ -72,59 +70,28 @@ public class FlightPriceSnapshotCbcImpl implements FlightPriceSnapshotCbc {
         return toJson(body);
     }
 
-    @Override
-    public String getSnapshotCompetitors(FlightPriceSnapshotReqVo vo) {
-        validateCompetitorCondition(vo);
-
-        List<FlightPriceSnapshotCompetitorVo> list = flightPriceSnapshotMapper.findFlightPriceSnapshotCompetitorList(vo);
-        if (list == null) {
-            list = new ArrayList<FlightPriceSnapshotCompetitorVo>();
-        }
-        log.info("[FLIGHT-PRICE-SNAPSHOT] 경쟁운임 조회 reservationCode={}, snapshotId={}, result={}",
-                vo.getReservationCode(), vo.getSnapshotId(), list.size());
-
-        Map<String, Object> body = new LinkedHashMap<String, Object>();
-        body.put("list", list);
-        return toJson(body);
-    }
-
     // ---------------------------------------------------------------- 검증 (정규화한 값을 vo 에 다시 설정)
 
-    private void validateListCondition(FlightPriceSnapshotReqVo vo) {
+    private void validateCondition(FlightPriceSnapshotReqVo vo) {
         if (vo == null) {
             throw new IllegalArgumentException("조회 조건을 입력하세요.");
         }
-        vo.setReservationCode(validateReservationCode(vo.getReservationCode()));
+
+        String reservationCode = StringUtils.trimToNull(vo.getReservationCode());
+        if (reservationCode == null || !RESERVATION_CODE_PATTERN.matcher(reservationCode).matches()) {
+            throw new IllegalArgumentException("예약코드 형식이 올바르지 않습니다. (영문/숫자/-/_ 최대 50자)");
+        }
 
         String startDt = validateDate(vo.getStartDt(), "수집시작일자");
         String endDt = validateDate(vo.getEndDt(), "수집종료일자");
         if (startDt != null && endDt != null && startDt.compareTo(endDt) > 0) {
             throw new IllegalArgumentException("수집시작일자가 수집종료일자보다 클 수 없습니다.");
         }
+
+        vo.setReservationCode(reservationCode);
         vo.setStartDt(startDt);
         vo.setEndDt(endDt);
         vo.setMaxRows(resolveMaxRows(vo.getMaxRows()));
-    }
-
-    private void validateCompetitorCondition(FlightPriceSnapshotReqVo vo) {
-        if (vo == null) {
-            throw new IllegalArgumentException("조회 조건을 입력하세요.");
-        }
-        vo.setReservationCode(validateReservationCode(vo.getReservationCode()));
-
-        String snapshotId = StringUtils.trimToNull(vo.getSnapshotId());
-        if (snapshotId == null || !SNAPSHOT_ID_PATTERN.matcher(snapshotId).matches()) {
-            throw new IllegalArgumentException("스냅샷ID 형식이 올바르지 않습니다.");
-        }
-        vo.setSnapshotId(snapshotId);
-    }
-
-    private String validateReservationCode(String reservationCode) {
-        String value = StringUtils.trimToNull(reservationCode);
-        if (value == null || !RESERVATION_CODE_PATTERN.matcher(value).matches()) {
-            throw new IllegalArgumentException("예약코드 형식이 올바르지 않습니다. (영문/숫자/-/_ 최대 50자)");
-        }
-        return value;
     }
 
     /** 빈 값이면 null(조건 없음), 값이 있으면 YYYYMMDD 실제 존재하는 날짜인지 검증 */

@@ -4,7 +4,6 @@
   항공권 가격 스냅샷 (Oracle)
   - 모든 파라미터는 #{} 바인딩만 사용 (${} 금지)
   - 목록: ROWNUM 으로 건수 제한. TOTAL_COUNT 는 제한 전 전체 건수
-  - 경쟁운임: UNPIVOT 으로 FARE1~20 반복 컬럼을 행으로 변환
 -->
 <mapper namespace="com.hanatour.air.ols.flightPriceSnapshot.ec.qc.FlightPriceSnapshotMapper">
 
@@ -47,69 +46,5 @@
             ORDER BY A.CAPTURED_AT DESC, A.SNAPSHOT_ID DESC
         )
         WHERE ROWNUM &lt;= #{maxRows}
-    </select>
-
-    <!-- 스냅샷 1건의 경쟁 운임 조회 (RESERVATION_CODE 도 함께 검증 → SNAPSHOT_ID 순차 추측 조회 방지) -->
-    <select id="findFlightPriceSnapshotCompetitorList" parameterType="com.hanatour.air.ols.flightPriceSnapshot.cbc.vo.FlightPriceSnapshotReqVo" resultType="com.hanatour.air.ols.flightPriceSnapshot.cbc.vo.FlightPriceSnapshotCompetitorVo">
-        /* SQL_ID: com.hanatour.air.ols.flightPriceSnapshot.ec.qc.FlightPriceSnapshotMapper.findFlightPriceSnapshotCompetitorList */
-        SELECT
-            T.SNAPSHOT_ID
-            , T.RANK_NO
-            , TO_CHAR(T.FARE, 'FM999999999990.00') AS FARE
-            , T.AGENCY_CODE
-            , T.AGENCY_NAME
-        FROM (
-            SELECT
-                A.FARE1, A.FARE1_AGENCY_CODE, A.FARE1_AGENCY_NAME,
-                A.FARE2, A.FARE2_AGENCY_CODE, A.FARE2_AGENCY_NAME,
-                A.FARE3, A.FARE3_AGENCY_CODE, A.FARE3_AGENCY_NAME,
-                A.FARE4, A.FARE4_AGENCY_CODE, A.FARE4_AGENCY_NAME,
-                A.FARE5, A.FARE5_AGENCY_CODE, A.FARE5_AGENCY_NAME,
-                A.FARE6, A.FARE6_AGENCY_CODE, A.FARE6_AGENCY_NAME,
-                A.FARE7, A.FARE7_AGENCY_CODE, A.FARE7_AGENCY_NAME,
-                A.FARE8, A.FARE8_AGENCY_CODE, A.FARE8_AGENCY_NAME,
-                A.FARE9, A.FARE9_AGENCY_CODE, A.FARE9_AGENCY_NAME,
-                A.FARE10, A.FARE10_AGENCY_CODE, A.FARE10_AGENCY_NAME,
-                A.FARE11, A.FARE11_AGENCY_CODE, A.FARE11_AGENCY_NAME,
-                A.FARE12, A.FARE12_AGENCY_CODE, A.FARE12_AGENCY_NAME,
-                A.FARE13, A.FARE13_AGENCY_CODE, A.FARE13_AGENCY_NAME,
-                A.FARE14, A.FARE14_AGENCY_CODE, A.FARE14_AGENCY_NAME,
-                A.FARE15, A.FARE15_AGENCY_CODE, A.FARE15_AGENCY_NAME,
-                A.FARE16, A.FARE16_AGENCY_CODE, A.FARE16_AGENCY_NAME,
-                A.FARE17, A.FARE17_AGENCY_CODE, A.FARE17_AGENCY_NAME,
-                A.FARE18, A.FARE18_AGENCY_CODE, A.FARE18_AGENCY_NAME,
-                A.FARE19, A.FARE19_AGENCY_CODE, A.FARE19_AGENCY_NAME,
-                A.FARE20, A.FARE20_AGENCY_CODE, A.FARE20_AGENCY_NAME
-                , A.SNAPSHOT_ID
-            FROM AIR01.FLIGHT_PRICE_SNAPSHOT A
-            WHERE A.SNAPSHOT_ID = #{snapshotId}
-              AND A.RESERVATION_CODE = #{reservationCode}
-        )
-        UNPIVOT (
-            (FARE, AGENCY_CODE, AGENCY_NAME) FOR RANK_NO IN (
-                (FARE1, FARE1_AGENCY_CODE, FARE1_AGENCY_NAME) AS 1,
-                (FARE2, FARE2_AGENCY_CODE, FARE2_AGENCY_NAME) AS 2,
-                (FARE3, FARE3_AGENCY_CODE, FARE3_AGENCY_NAME) AS 3,
-                (FARE4, FARE4_AGENCY_CODE, FARE4_AGENCY_NAME) AS 4,
-                (FARE5, FARE5_AGENCY_CODE, FARE5_AGENCY_NAME) AS 5,
-                (FARE6, FARE6_AGENCY_CODE, FARE6_AGENCY_NAME) AS 6,
-                (FARE7, FARE7_AGENCY_CODE, FARE7_AGENCY_NAME) AS 7,
-                (FARE8, FARE8_AGENCY_CODE, FARE8_AGENCY_NAME) AS 8,
-                (FARE9, FARE9_AGENCY_CODE, FARE9_AGENCY_NAME) AS 9,
-                (FARE10, FARE10_AGENCY_CODE, FARE10_AGENCY_NAME) AS 10,
-                (FARE11, FARE11_AGENCY_CODE, FARE11_AGENCY_NAME) AS 11,
-                (FARE12, FARE12_AGENCY_CODE, FARE12_AGENCY_NAME) AS 12,
-                (FARE13, FARE13_AGENCY_CODE, FARE13_AGENCY_NAME) AS 13,
-                (FARE14, FARE14_AGENCY_CODE, FARE14_AGENCY_NAME) AS 14,
-                (FARE15, FARE15_AGENCY_CODE, FARE15_AGENCY_NAME) AS 15,
-                (FARE16, FARE16_AGENCY_CODE, FARE16_AGENCY_NAME) AS 16,
-                (FARE17, FARE17_AGENCY_CODE, FARE17_AGENCY_NAME) AS 17,
-                (FARE18, FARE18_AGENCY_CODE, FARE18_AGENCY_NAME) AS 18,
-                (FARE19, FARE19_AGENCY_CODE, FARE19_AGENCY_NAME) AS 19,
-                (FARE20, FARE20_AGENCY_CODE, FARE20_AGENCY_NAME) AS 20
-            )
-        ) T
-        WHERE T.FARE IS NOT NULL
-        ORDER BY T.FARE ASC, T.RANK_NO ASC
     </select>
 </mapper>

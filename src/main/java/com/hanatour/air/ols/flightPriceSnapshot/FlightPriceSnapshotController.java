@@ -32,12 +32,4 @@ public class FlightPriceSnapshotController {
     public String getSnapshotList(@RequestBody FlightPriceSnapshotReqVo vo) {
         return flightPriceSnapshotCbc.getSnapshotList(vo);
     }
-
-    /**
-     * 스냅샷 1건의 경쟁 운임 조회
-     */
-    @PostMapping(value = "/competitors", produces = JSON_UTF8)
-    public String getSnapshotCompetitors(@RequestBody FlightPriceSnapshotReqVo vo) {
-        return flightPriceSnapshotCbc.getSnapshotCompetitors(vo);
-    }
 }
