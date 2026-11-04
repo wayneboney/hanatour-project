@@ -1,4 +1,4 @@
-package com.hanatour.air.ols.flightPriceSnapshot.bc.vo;
+package com.hanatour.air.ols.flightPriceSnapshot.cbc.vo;
 
 import com.thoughtworks.xstream.annotations.XStreamAlias;
 import hntframe.run.common.io.type.annotation.CompositeType;

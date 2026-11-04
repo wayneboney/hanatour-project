@@ -9,7 +9,7 @@
 <mapper namespace="com.hanatour.air.ols.flightPriceSnapshot.ec.qc.FlightPriceSnapshotMapper">
 
     <!-- 스냅샷 목록 조회 -->
-    <select id="findFlightPriceSnapshotList" parameterType="com.hanatour.air.ols.flightPriceSnapshot.bc.vo.FlightPriceSnapshotSearchVo" resultType="com.hanatour.air.ols.flightPriceSnapshot.bc.vo.FlightPriceSnapshotVo">
+    <select id="findFlightPriceSnapshotList" parameterType="com.hanatour.air.ols.flightPriceSnapshot.cbc.vo.FlightPriceSnapshotReqVo" resultType="com.hanatour.air.ols.flightPriceSnapshot.cbc.vo.FlightPriceSnapshotVo">
         /* SQL_ID: com.hanatour.air.ols.flightPriceSnapshot.ec.qc.FlightPriceSnapshotMapper.findFlightPriceSnapshotList */
         SELECT *
         FROM (
@@ -50,7 +50,7 @@
     </select>
 
     <!-- 스냅샷 1건의 경쟁 운임 조회 (RESERVATION_CODE 도 함께 검증 → SNAPSHOT_ID 순차 추측 조회 방지) -->
-    <select id="findFlightPriceSnapshotCompetitorList" parameterType="com.hanatour.air.ols.flightPriceSnapshot.bc.vo.FlightPriceSnapshotSearchVo" resultType="com.hanatour.air.ols.flightPriceSnapshot.bc.vo.FlightPriceSnapshotCompetitorVo">
+    <select id="findFlightPriceSnapshotCompetitorList" parameterType="com.hanatour.air.ols.flightPriceSnapshot.cbc.vo.FlightPriceSnapshotReqVo" resultType="com.hanatour.air.ols.flightPriceSnapshot.cbc.vo.FlightPriceSnapshotCompetitorVo">
         /* SQL_ID: com.hanatour.air.ols.flightPriceSnapshot.ec.qc.FlightPriceSnapshotMapper.findFlightPriceSnapshotCompetitorList */
         SELECT
             T.SNAPSHOT_ID

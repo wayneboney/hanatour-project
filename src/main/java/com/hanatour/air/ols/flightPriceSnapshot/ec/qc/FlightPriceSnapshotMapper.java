@@ -1,9 +1,9 @@
 package com.hanatour.air.ols.flightPriceSnapshot.ec.qc;
 
 import com.hanatour.air.cmn.common.config.datasource.AirMapper;
-import com.hanatour.air.ols.flightPriceSnapshot.bc.vo.FlightPriceSnapshotCompetitorVo;
-import com.hanatour.air.ols.flightPriceSnapshot.bc.vo.FlightPriceSnapshotSearchVo;
-import com.hanatour.air.ols.flightPriceSnapshot.bc.vo.FlightPriceSnapshotVo;
+import com.hanatour.air.ols.flightPriceSnapshot.cbc.vo.FlightPriceSnapshotCompetitorVo;
+import com.hanatour.air.ols.flightPriceSnapshot.cbc.vo.FlightPriceSnapshotReqVo;
+import com.hanatour.air.ols.flightPriceSnapshot.cbc.vo.FlightPriceSnapshotVo;
 
 import java.util.List;
 
@@ -23,10 +23,10 @@ public interface FlightPriceSnapshotMapper {
     /**
      * 스냅샷 목록 조회 (예약코드 필수, 수집일자 기간 선택, 최신순, maxRows 로 건수 제한)
      */
-    List<FlightPriceSnapshotVo> findFlightPriceSnapshotList(FlightPriceSnapshotSearchVo vo);
+    List<FlightPriceSnapshotVo> findFlightPriceSnapshotList(FlightPriceSnapshotReqVo vo);
 
     /**
      * 스냅샷 1건의 경쟁 운임 목록 조회 (최저가순, 값이 있는 슬롯만)
      */
-    List<FlightPriceSnapshotCompetitorVo> findFlightPriceSnapshotCompetitorList(FlightPriceSnapshotSearchVo vo);
+    List<FlightPriceSnapshotCompetitorVo> findFlightPriceSnapshotCompetitorList(FlightPriceSnapshotReqVo vo);
 }
