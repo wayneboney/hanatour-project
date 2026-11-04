@@ -5,6 +5,8 @@ import hntframe.run.common.io.type.annotation.CompositeType;
 import hntframe.run.common.io.type.annotation.Property;
 import hntframe.run.oltp.ext.annotation.LocalName;
 import hntframe.run.oltp.ext.vo.AbstractVo;
+import lombok.Getter;
+import lombok.Setter;
 import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 
@@ -20,6 +22,8 @@ import javax.xml.bind.annotation.XmlRootElement;
 @XmlAccessorType(XmlAccessType.FIELD)
 @XStreamAlias("FlightPriceSnapshotVo")
 @XmlRootElement(name = "FlightPriceSnapshotVo")
+@Getter
+@Setter
 public class FlightPriceSnapshotVo extends AbstractVo {
 
     private static final long serialVersionUID = 1L;
@@ -86,174 +90,6 @@ public class FlightPriceSnapshotVo extends AbstractVo {
 
     @Property(typeName = "가격수집시각", length = 256)
     private String capturedAt;
-
-    public int getTotalCount() {
-        return totalCount;
-    }
-
-    public void setTotalCount(int totalCount) {
-        this.totalCount = totalCount;
-    }
-
-    public String getSnapshotId() {
-        return snapshotId;
-    }
-
-    public void setSnapshotId(String snapshotId) {
-        this.snapshotId = snapshotId;
-    }
-
-    public String getReservationCode() {
-        return reservationCode;
-    }
-
-    public void setReservationCode(String reservationCode) {
-        this.reservationCode = reservationCode;
-    }
-
-    public String getTripType() {
-        return tripType;
-    }
-
-    public void setTripType(String tripType) {
-        this.tripType = tripType;
-    }
-
-    public String getDirectOnlyYn() {
-        return directOnlyYn;
-    }
-
-    public void setDirectOnlyYn(String directOnlyYn) {
-        this.directOnlyYn = directOnlyYn;
-    }
-
-    public String getDepDate() {
-        return depDate;
-    }
-
-    public void setDepDate(String depDate) {
-        this.depDate = depDate;
-    }
-
-    public String getDepAirport() {
-        return depAirport;
-    }
-
-    public void setDepAirport(String depAirport) {
-        this.depAirport = depAirport;
-    }
-
-    public String getDepAirlineCode() {
-        return depAirlineCode;
-    }
-
-    public void setDepAirlineCode(String depAirlineCode) {
-        this.depAirlineCode = depAirlineCode;
-    }
-
-    public String getDepFlightNo() {
-        return depFlightNo;
-    }
-
-    public void setDepFlightNo(String depFlightNo) {
-        this.depFlightNo = depFlightNo;
-    }
-
-    public String getReturnDate() {
-        return returnDate;
-    }
-
-    public void setReturnDate(String returnDate) {
-        this.returnDate = returnDate;
-    }
-
-    public String getReturnAirport() {
-        return returnAirport;
-    }
-
-    public void setReturnAirport(String returnAirport) {
-        this.returnAirport = returnAirport;
-    }
-
-    public String getReturnAirlineCode() {
-        return returnAirlineCode;
-    }
-
-    public void setReturnAirlineCode(String returnAirlineCode) {
-        this.returnAirlineCode = returnAirlineCode;
-    }
-
-    public String getReturnFlightNo() {
-        return returnFlightNo;
-    }
-
-    public void setReturnFlightNo(String returnFlightNo) {
-        this.returnFlightNo = returnFlightNo;
-    }
-
-    public String getPromoCardCode() {
-        return promoCardCode;
-    }
-
-    public void setPromoCardCode(String promoCardCode) {
-        this.promoCardCode = promoCardCode;
-    }
-
-    public String getSeatClass() {
-        return seatClass;
-    }
-
-    public void setSeatClass(String seatClass) {
-        this.seatClass = seatClass;
-    }
-
-    public String getPassengerType() {
-        return passengerType;
-    }
-
-    public void setPassengerType(String passengerType) {
-        this.passengerType = passengerType;
-    }
-
-    public String getBaseFare() {
-        return baseFare;
-    }
-
-    public void setBaseFare(String baseFare) {
-        this.baseFare = baseFare;
-    }
-
-    public String getTax() {
-        return tax;
-    }
-
-    public void setTax(String tax) {
-        this.tax = tax;
-    }
-
-    public String getFuelSurcharge() {
-        return fuelSurcharge;
-    }
-
-    public void setFuelSurcharge(String fuelSurcharge) {
-        this.fuelSurcharge = fuelSurcharge;
-    }
-
-    public String getCurrentRank() {
-        return currentRank;
-    }
-
-    public void setCurrentRank(String currentRank) {
-        this.currentRank = currentRank;
-    }
-
-    public String getCapturedAt() {
-        return capturedAt;
-    }
-
-    public void setCapturedAt(String capturedAt) {
-        this.capturedAt = capturedAt;
-    }
 
     @Override
     public String toString() {

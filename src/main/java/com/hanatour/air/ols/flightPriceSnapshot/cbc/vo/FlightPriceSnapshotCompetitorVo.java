@@ -5,6 +5,8 @@ import hntframe.run.common.io.type.annotation.CompositeType;
 import hntframe.run.common.io.type.annotation.Property;
 import hntframe.run.oltp.ext.annotation.LocalName;
 import hntframe.run.oltp.ext.vo.AbstractVo;
+import lombok.Getter;
+import lombok.Setter;
 import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 
@@ -24,6 +26,8 @@ import javax.xml.bind.annotation.XmlRootElement;
 @XmlAccessorType(XmlAccessType.FIELD)
 @XStreamAlias("FlightPriceSnapshotCompetitorVo")
 @XmlRootElement(name = "FlightPriceSnapshotCompetitorVo")
+@Getter
+@Setter
 public class FlightPriceSnapshotCompetitorVo extends AbstractVo {
 
     private static final long serialVersionUID = 1L;
@@ -42,46 +46,6 @@ public class FlightPriceSnapshotCompetitorVo extends AbstractVo {
 
     @Property(typeName = "경쟁사명", length = 256)
     private String agencyName;
-
-    public String getSnapshotId() {
-        return snapshotId;
-    }
-
-    public void setSnapshotId(String snapshotId) {
-        this.snapshotId = snapshotId;
-    }
-
-    public int getRankNo() {
-        return rankNo;
-    }
-
-    public void setRankNo(int rankNo) {
-        this.rankNo = rankNo;
-    }
-
-    public String getFare() {
-        return fare;
-    }
-
-    public void setFare(String fare) {
-        this.fare = fare;
-    }
-
-    public String getAgencyCode() {
-        return agencyCode;
-    }
-
-    public void setAgencyCode(String agencyCode) {
-        this.agencyCode = agencyCode;
-    }
-
-    public String getAgencyName() {
-        return agencyName;
-    }
-
-    public void setAgencyName(String agencyName) {
-        this.agencyName = agencyName;
-    }
 
     @Override
     public String toString() {
