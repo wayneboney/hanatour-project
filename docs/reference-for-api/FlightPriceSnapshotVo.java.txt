@@ -282,6 +282,50 @@ public class FlightPriceSnapshotVo extends AbstractVo {
     @Property(typeName = "저장시각", length = 256)
     private String createdAt;
 
+    // ---- 예약·탑승객 분석 탭용 (선택 필드. FLIGHT_PRICE_SNAPSHOT 에 없으므로 예약 테이블 등과 조인 필요)
+
+    @Property(typeName = "예약ID", length = 256)
+    private String resId;
+
+    @Property(typeName = "예약공통코드", length = 256)
+    private String resComCd;
+
+    @Property(typeName = "항공예약코드", length = 256)
+    private String resCd;
+
+    @Property(typeName = "항공통합예약코드", length = 256)
+    private String unfyResCd;
+
+    @Property(typeName = "제휴사멤버십등급", length = 256)
+    private String afcnMemGradNm;
+
+    @Property(typeName = "GDS구분", length = 256)
+    private String gdsDvCd;
+
+    @Property(typeName = "GDS1PNR", length = 256)
+    private String gds1PnrNum;
+
+    @Property(typeName = "GDSPNR", length = 256)
+    private String gdsPnrNum;
+
+    @Property(typeName = "카드프로모션코드", length = 256)
+    private String cardEventCd;
+
+    @Property(typeName = "제휴사카드코드", length = 256)
+    private String afcnCardCd;
+
+    @Property(typeName = "성인예약인원", length = 256)
+    private Integer resAdtCnt;
+
+    @Property(typeName = "소아예약인원", length = 256)
+    private Integer resChdCnt;
+
+    @Property(typeName = "탑승객성별요약 (예: M1,F2)", length = 256)
+    private String passengerGenderSummary;
+
+    @Property(typeName = "탑승객성별연령요약 (예: M20,1,F40,1)", length = 256)
+    private String passengerAgeSummary;
+
     @Override
     public String toString() {
         return ReflectionToStringBuilder.toString(this, ToStringStyle.MULTI_LINE_STYLE, false, false, true, null);

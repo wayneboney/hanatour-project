@@ -81,24 +81,30 @@ Body: { "dateStart": "2026-11-04", "dateEnd": "2026-11-04", "timeZone": "Asia/Se
 
 ## 4-1. 예약·탑승객 분석 탭 필드 (최신 HTML 에서 추가됨)
 
-최신 `flightPricingDashboard.html` 의 "예약·탑승객 분석" 탭은 **같은 API 응답의 각 행**에서 아래 필드를 추가로 읽는다 (별도 호출 없음).
-값이 없으면 "미기록"으로 표시하므로 **필수는 아님**. 단 이 필드들은 `FLIGHT_PRICE_SNAPSHOT` 테이블에 없어서 항공API 에서 예약 테이블 등과 조인해야 함.
+최신 `flightPricingDashboard.html` 의 "예약·탑승객 분석" 탭은 **같은 API 응답의 각 행**에서 아래 필드를 추가로 읽는다 (별도 호출·별도 요청 파라미터 없음).
+**모두 선택(optional)**: 없으면(`null`/생략) 화면에 "미기록"으로 표시. 단 이 필드들은 `FLIGHT_PRICE_SNAPSHOT` 테이블에 없어서 항공API 에서 예약 테이블 등과 조인해야 함.
 
-| 키 | 의미 |
-|---|---|
-| `res_id` | 예약 ID |
-| `res_com_cd` | 예약 공통 코드 |
-| `res_cd` | 항공 예약 코드 |
-| `unfy_res_cd` | 항공 통합 예약 코드 |
-| `afcn_mem_grad_nm` | 제휴사 멤버십 등급 |
-| `gds_dv_cd` | GDS 구분 |
-| `gds1_pnr_num`, `gds_pnr_num` | GDS PNR |
-| `card_event_cd` | 카드 프로모션 코드 |
-| `afcn_card_cd` | 제휴사 카드 코드 |
-| `res_adt_cnt`, `res_chd_cnt` | 성인/소아 예약 인원 (0 이상 정수) |
-| `passenger_gender_summary` | 탑승객 성별 요약 |
-| `passenger_age_summary` | 탑승객 성별·연령 요약 |
+| 키 | 의미 | 형식 규칙 (프론트가 검사) |
+|---|---|---|
+| `res_id` | 예약 ID | 문자열 |
+| `res_com_cd` | 예약 공통 코드 | 문자열 |
+| `res_cd` | 항공 예약 코드 | 문자열 |
+| `unfy_res_cd` | 항공 통합 예약 코드 | 문자열 |
+| `afcn_mem_grad_nm` | 제휴사 멤버십 등급 | 문자열 (멤버십 필터에 사용) |
+| `gds_dv_cd` | GDS 구분 | 문자열 (GDS 필터에 사용) |
+| `gds1_pnr_num`, `gds_pnr_num` | GDS PNR | 문자열 |
+| `card_event_cd` | 카드 프로모션 코드 | 문자열 |
+| `afcn_card_cd` | 제휴사 카드 코드 | 문자열 |
+| `res_adt_cnt` | 성인 예약 인원 | **0 이상 정수** (숫자 또는 `"2"`, `"2.0"` 허용). 아니면 "형식 오류" |
+| `res_chd_cnt` | 소아 예약 인원 | 위와 동일 |
+| `passenger_gender_summary` | 탑승객 성별 요약 | **문자열** `"M1,F2"` (`M` 또는 `F` + 인원, 쉼표 구분). 숫자/객체면 형식 오류 |
+| `passenger_age_summary` | 탑승객 성별·연령 요약 | **문자열** `"M20,1,F40,1"` = (성별+연령대, 인원) 쌍의 쉼표 나열. 연령대는 0~120 의 10 단위(`M20`=남 20대, `M0`=10세 미만), 토큰 수는 짝수 |
 
+검증 규칙(프론트): 성별 요약 총인원 = 연령 요약 총인원 = `res_adt_cnt + res_chd_cnt` 이어야 정상 (다르면 "집계 범위 확인" 경고 표시, 화면은 계속 동작).
+예약 단위 묶음 키: `reservation_code` → 없으면 `res_id` → `unfy_res_cd` → `res_cd` 순.
+
+- 키는 camelCase 로 내려도 프론트가 변환해서 읽음 (`resAdtCnt`→`res_adt_cnt`, `gds1PnrNum`→`gds1_pnr_num`).
+- 요청(`date_start`, `date_end`, `timezone`) 과 응답 봉투(`business_date`, `as_of`, `is_complete`, `total`, `rows`)는 **이전 버전과 동일**.
 - ols 는 응답을 가공 없이 전달하므로 **ols 코드 수정은 필요 없음**.
 - ⚠ **민감 정보**: PNR, 예약코드, 탑승객 성별/연령, 멤버십 등급이 포함됨. 이 API 를 통해 대량 노출되므로 **인증/권한 검증을 더 엄격히** 해야 하고, 분석에 불필요한 식별자(PNR 등)는 내려주지 않는 것을 검토할 것.
 
