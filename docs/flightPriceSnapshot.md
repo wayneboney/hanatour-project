@@ -1,11 +1,11 @@
 # 항공권 가격 스냅샷 조회 (flightPriceSnapshot)
 
-프론트 대시보드(`flightPricingDashboard.html`)가 호출하면 ols가 내부 MariaDB(price 데이터소스, MyBatis)를 조회해 JSON으로 돌려주는 **조회 전용** API.
-프론트팀 `API_CONTRACT.md` 기준으로 구현.
+프론트 대시보드(`flightPricingDashboard.html`)가 ols 를 호출하면, ols 가 **항공API 를 호출**해서 응답을 그대로 돌려주는 **중계(조회 전용)** API.
+DB(MariaDB, price 데이터소스) 조회는 **항공API 쪽**에서 수행한다. (ols 에는 price 데이터소스 설정이 없음, `PriceMapper` 는 공통 모듈)
 
 - 갱신일: 2026-11-05
 - 브랜치: `claude/busy-knuth-v7bcfs`
-- 기준: Java 8, MariaDB (`jdbc:mariadb://.../AIR01`, price 데이터소스), 기존 `dynamicPricing` 구조 (Controller → Cbc), 단순 조회라 Bc 생략
+- 기준: Java 8, 기존 `dynamicPricing` 구조 (Controller → Cbc → 항공API GET 호출)
 
 ## 1. 구조
 
@@ -13,12 +13,12 @@
 HTML (portal /air/**)
  └─ GET /air/flightPriceSnapshot/snapshots?date_start=&date_end=&timezone=
       FlightPriceSnapshotController        파라미터 수신, Cbc 위임
-        └─ FlightPriceSnapshotCbc(+Impl)   Mapper 호출 → 응답 JSON 조립
-             └─ FlightPriceSnapshotMapper  @PriceMapper (ec.qc)
-                  └─ FlightPriceSnapshotMapper.xml  MariaDB SQL
+        └─ FlightPriceSnapshotCbc(+Impl)   항공API GET 호출 → 응답 JSON 그대로 반환
+             └─ 항공API  /flightPriceSnapshot/air/api/service/snapshots/v1.00  (경로 확인 필요)
+                  └─ MariaDB (price 데이터소스, AIR01.FLIGHT_PRICE_SNAPSHOT)
 ```
 
-## 2. 파일 목록
+## 2. 파일 목록 (ols)
 
 경로 기준: `src/main/java/com/hanatour/air/ols/flightPriceSnapshot/`
 
@@ -26,29 +26,33 @@ HTML (portal /air/**)
 |---|---|
 | `FlightPriceSnapshotController.java` | `@RestController`, `GET /air/flightPriceSnapshot/snapshots` |
 | `cbc/FlightPriceSnapshotCbc.java` | 인터페이스 |
-| `cbc/impl/FlightPriceSnapshotCbcImpl.java` | Mapper 호출, 응답 JSON 조립 |
+| `cbc/impl/FlightPriceSnapshotCbcImpl.java` | 항공API GET 호출 (`WebClient`, `ServiceEndpoint`) |
 | `cbc/vo/FlightPriceSnapshotReqVo.java` | 조회 조건 (`dateStart`, `dateEnd`) |
-| `cbc/vo/FlightPriceSnapshotVo.java` | 스냅샷 1행 (81개 필드) |
-| `ec/qc/FlightPriceSnapshotMapper.java` | MyBatis Mapper 인터페이스 |
-| `src/main/resources/mapper/com/hanatour/air/ols/flightPriceSnapshot/FlightPriceSnapshotMapper.xml` | SQL |
-| `sql/FLIGHT_PRICE_SNAPSHOT.index.mariadb.sql` | 기간 조회용 인덱스 (`captured_at`) |
 
-## 3. API
+참고 자료(항공API 개발자용): `docs/reference-for-api/`
+
+## 3. 프론트 ↔ ols API
 
 ### GET `/air/flightPriceSnapshot/snapshots`
-
-> 프론트 기본 `endpoint` 는 `/air/dynamicPricing/snapshots` (제안 경로) 이므로
-> **프론트 `PRICING_DASHBOARD_CONFIG.endpoint` 를 `/air/flightPriceSnapshot/snapshots` 로 변경 요청 필요.**
 
 | 파라미터 | 필수 | 설명 |
 |---|---|---|
 | `date_start` | O | 수집일자 시작 `YYYY-MM-DD` (KST, 포함) |
 | `date_end` | O | 수집일자 종료 `YYYY-MM-DD` (KST, 포함) |
-| `timezone` | | 프론트가 `Asia/Seoul` 고정으로 전송. 서버는 사용하지 않음 (KST 기준) |
+| `timezone` | | 프론트가 `Asia/Seoul` 고정 전송. ols 는 사용하지 않고 항공API 에는 `Asia/Seoul` 로 고정 전달 |
 
-조회 범위: `[date_start 00:00 KST, date_end 다음날 00:00 KST)` — `captured_at` 기준. 예약 출발일(`dep_date`)로 조회하지 않음.
+프론트 `endpoint` 는 `/air/flightPriceSnapshot/snapshots` 로 이미 변경되어 있음 (확인 완료).
 
-응답:
+## 4. ols → 항공API (항공API 개발자 구현 사항)
+
+ols 가 호출하는 항공API (**경로/파라미터는 항공API 개발자와 확정 필요**, 현재 가정):
+
+```
+GET {ENDPOINT_API}/flightPriceSnapshot/air/api/service/snapshots/v1.00
+    ?date_start=2026-11-04&date_end=2026-11-04&timezone=Asia%2FSeoul
+```
+
+항공API 가 반환해야 하는 응답 (프론트 `API_CONTRACT.md` 계약, ols 는 **가공 없이 그대로 전달**):
 
 ```json
 {
@@ -56,70 +60,45 @@ HTML (portal /air/**)
   "as_of": "2026-11-04T16:20:00+09:00",
   "is_complete": true,
   "total": 1,
-  "rows": [
-    {
-      "snapshotId": "12345", "reservationCode": "...", "tripType": "ROUND_TRIP", "isDirectOnly": 1,
-      "depDate": "2026-12-15", "depAirport": "ICN", "...": "...",
-      "baseFare": "235000.00", "tax": "45000.00", "qCharge": "15000.00",
-      "fare1": "230000.00", "fare1AgencyCode": "...", "fare1AgencyName": "...",
-      "fare2": null, "fare2AgencyCode": null, "fare2AgencyName": null,
-      "currentRank": 2,
-      "capturedAt": "2026-11-04T16:19:30+09:00", "createdAt": "2026-11-04T16:19:31+09:00"
-    }
-  ]
+  "rows": [ { "snapshot_id": "123", "reservation_code": "...", "base_fare": "235000.00",
+              "fare1": "230000.00", "fare1_agency_code": "...", "fare1_agency_name": "...",
+              "current_rank": 2, "captured_at": "2026-11-04T16:19:30+09:00", "...": "..." } ]
 }
 ```
 
-- `business_date`: **하루 조회일 때만** 반환 (프론트 실시간 탭이 오늘(KST)과 일치하는지 검사). 기간 조회면 `null`
-- `total` = `rows` 건수 (프론트는 불일치 시 `PARTIAL_RESPONSE` 오류 처리). **건수 제한 없이 기간 전체 반환**
-- 행 키는 camelCase (`snapshotId`, `baseFare`, `fare1AgencyCode` ...). 프론트가 snake_case/camelCase/대문자를 같은 키로 변환해서 읽음
-- `qCharge`: 필드 기준 직렬화로 `q_charge` 와 동일하게 인식 (getter 기준이면 `qcharge` 로 깨짐)
-- 금액: 문자열(`CAST ... AS CHAR`), `NULL` 은 `null` 유지, `base_fare` 는 세금/유류 포함 최종금액 (DB 값을 그대로 전달, 합산 안 함)
-- 시각: `+09:00` 오프셋 포함 ISO 형식 (DB 가 KST 저장이라는 전제)
-- `snapshotId`: 문자열 (BIGINT 정밀도 보존)
-- `isDirectOnly`: DB `tinyint(1)` 값 그대로 (`1/0`)
+| 규칙 | 설명 |
+|---|---|
+| 조회 기준 | `captured_at` 기준 KST 영업일, 양끝 포함: `[date_start 00:00, date_end+1일 00:00)`. `dep_date` 로 조회 금지 |
+| 건수 | **기간 전체를 한 번에 반환**. `total` 은 `rows` 건수와 같아야 함 (다르면 프론트가 오류 처리) |
+| `business_date` | 하루 조회일 때 반드시 반환 (프론트 실시간 탭이 오늘(KST)과 일치하는지 검사) |
+| 키 | snake_case/camelCase/대문자 모두 프론트가 처리. 단 `q_charge` 가 `qcharge` 로 깨지지 않게 주의 |
+| 값 | 금액은 문자열, `NULL` 은 `null` 유지, `snapshot_id` 는 문자열, 시각은 `+09:00` 포함 ISO |
+| `base_fare` | 세금/유류 포함 성인 1인 최종금액. `tax`/`q_charge` 를 합산하지 않음 |
+| 오류 | HTTP 상태코드로 명확히 반환 (200 + 빈 rows 로 오류를 숨기지 않기) |
+| 인덱스 | `captured_at` 단독 인덱스 필요 (`reference-for-api/` 스크립트) |
 
-## 4. 검증
+## 5. dynamicPricing Cbc 와 차이
 
-입력 유효성 검사는 하지 않는다. (단순 조회 요구사항)
-
-- `date_start`, `date_end` 누락 시 Spring 이 400 처리
-- 날짜 형식이 `YYYY-MM-DD` 가 아니면 `STR_TO_DATE` 가 NULL 을 반환해 조회 결과 0건 (오류 없이 빈 결과)
-- 기간 상한 없음, 건수 제한 없음 → 기간이 길면 응답이 매우 커질 수 있음 (7번 참고)
-
-## 5. SQL 요약
-
-- 대상 테이블: `FLIGHT_PRICE_SNAPSHOT` (DB명 `AIR01` 은 JDBC URL 에 지정. 테이블명은 대문자 그대로 — Linux MariaDB 는 대소문자 구분)
-- 조건: `captured_at >= date_start` AND `captured_at < date_end + 1일`
-- 정렬: `captured_at DESC, snapshot_id DESC`
-- `${}` 미사용, 전부 `#{}` 바인딩
-- **인덱스**: 기존 `(reservation_code, captured_at)` 는 예약코드 없는 기간 조회에 사용할 수 없음 → `idx_snapshot_captured_at (captured_at)` 추가 필요 (`sql/` 스크립트)
-
-## 6. 샘플 대비 차이
-
-| 항목 | 샘플 | 이번 구현 |
+| 항목 | dynamicPricing | 이번 구현 |
 |---|---|---|
-| 호출 방식 | `@ServiceMapping` / `@RestController` POST | `@RestController` + `@GetMapping` (프론트 계약) |
-| 계층 | Cbc → Bc → Mapper | Cbc → Mapper (Bc 생략) |
-| 주입 | `@Autowired` 필드 | `@RequiredArgsConstructor` 생성자 주입 |
-| 예외 | Cbc에서 catch 후 debug 로그만 (삼킴) | 삼키지 않고 전파 |
-| 조회기간 | `BETWEEN ... + 0.99999` | `>= 시작일` AND `< 종료일 + 1` |
-| VO | getter/setter 직접 작성 | Lombok `@Getter @Setter` + Jackson 필드 기준 직렬화 |
+| 호출 | GET(`callGetApi`) + POST(MCI) | GET 만 |
+| URL 조립 | 경로만 이어 붙임 | 조회 조건을 **URI 변수**로 바인딩 (자동 인코딩) |
+| 타임아웃 | 10초 | 25초 (프론트 30초 제한보다 짧게, 기간 전체 조회라 길게) |
+| 응답 로그 | 응답 전문 로그 | 크기만 로그 (대용량 응답) |
+| 예외 | Controller `@ExceptionHandler` | 핸들러 없음 (요구사항). WebClient 오류는 그대로 전파 |
+| 주입 | 생성자 `@Autowired` | `@RequiredArgsConstructor` |
 
-## 7. 확인 필요 / 남은 작업
+## 6. 확인 필요 / 남은 작업
 
-1. **데이터량 (중요)**: 기간 전체를 한 응답으로 반환하는 계약. 하루 스냅샷이 수만 건 이상이면 응답이 수십 MB가 되어 사용 불가 → 서버 집계 API로 확장 필요
-2. **Mapper 어노테이션**: price(MariaDB) 데이터소스용 `@PriceMapper` 적용 완료. XML 위치(`mapperLocations`)는 기존 `@PriceMapper` Mapper 와 비교 확인 필요
-3. **DB 시각 저장 기준**: KST 저장 전제. UTC 저장이면 기간 경계와 `+09:00` 표기 변환 필요
-4. **환경별 DB명**: DEV/QA/LIVE 의 DB명이 `AIR01` 과 다를 수 있어 SQL 에서 DB명을 생략함 (URL 의 기본 DB 사용)
-5. **인덱스**: `captured_at` 인덱스 추가 필요. 대용량이면 DBA 검토
-6. **SQL 직접 실행 검증**: 개발 환경에 MariaDB 접속이 없어 미검증
-7. **JSON 직렬화**: 응답에 부모 `AbstractVo` 의 필드가 섞이는지 첫 호출 때 확인
-8. **인증/인가 (운영 반영 전 필수)**: 사용자 권한별 조회 범위 검증 필요. 포털 SSO 적용 범위 확인
-9. **프론트 요청**: `endpoint` 를 `/air/flightPriceSnapshot/snapshots` 로 변경
-10. **편도/다구간 목적지**: 테이블에 `dest_airport` 컬럼이 없음. 왕복만 `return_airport` 로 목적지 판단 가능
+1. **항공API 경로/파라미터 확정** (항공API 개발자): `Cbc` 의 `SNAPSHOT_PATH` 상수 수정
+2. **항공API 응답 규격**: 4번 규칙대로 내려오는지 (특히 `total == rows`, `business_date`, `q_charge` 키)
+3. **데이터량**: 기간 전체를 한 응답으로 중계하는 구조. 하루 수만 건 이상이면 응답이 커져 ols/프론트 모두 부담 → 항공API 에서 서버 집계 API 로 확장 필요
+4. **타임아웃**: 25초. 항공API 응답이 느리면 조정 (프론트 30초, 포털 프록시 타임아웃 확인)
+5. **인증/인가 (운영 반영 전 필수)**: 포털 SSO 적용 범위, 사용자 권한별 조회 범위 검증. Controller 주석에 TODO
+6. **컴파일/실행 미검증**: 사내 라이브러리(`hntframe`, `RestServiceClient` 등)가 없는 환경에서 작성. DEV 환경에서 호출 확인 필요
+7. **편도/다구간 목적지**: 테이블에 `dest_airport` 컬럼 없음 → 프론트는 `return_airport` 로만 판단 (왕복만 정확)
 
-## 8. 구조 개선 제안
+## 7. 구조 개선 제안
 
 - `FARE1~20`, `FAREn_AGENCY_CODE/NAME` 반복 컬럼(60개)은 정규화 대상.
   `FLIGHT_PRICE_COMPETITOR(SNAPSHOT_ID, RANK_NO, FARE, AGENCY_CODE, AGENCY_NAME)` 로 분리하면 확장/집계/조회가 쉬움

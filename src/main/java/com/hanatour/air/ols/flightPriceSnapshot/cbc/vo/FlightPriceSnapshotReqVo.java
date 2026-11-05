@@ -15,7 +15,7 @@ import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlRootElement;
 
 /**
- * 항공권 가격 스냅샷 조회 조건 (Mapper 파라미터)
+ * 항공권 가격 스냅샷 조회 조건 (Controller -> Cbc 전달용)
  *
  * <pre>
  * dateStart / dateEnd : 수집일자(captured_at) 기준 한국시간(KST) 영업일, 양끝 포함 (YYYY-MM-DD)
