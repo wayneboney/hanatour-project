@@ -18,24 +18,28 @@
 |---|---|
 | `FlightPriceSnapshotController.java` | `GET /air/flightPriceSnapshot/snapshots` |
 | `cbc/FlightPriceSnapshotCbc.java` | `String getSnapshots(ReqVo)` |
-| `cbc/impl/FlightPriceSnapshotCbcImpl.java` | 항공API GET 호출 (**전면 교체**) |
+| `cbc/impl/FlightPriceSnapshotCbcImpl.java` | 항공API **MCI POST** 호출 (**전면 교체**) |
 | `cbc/vo/FlightPriceSnapshotReqVo.java` | `dateStart`, `dateEnd` |
 
 **이전에 복사해 둔 아래 파일은 삭제**: `ec/qc/FlightPriceSnapshotMapper.java`, `FlightPriceSnapshotMapper.xml`, `cbc/vo/FlightPriceSnapshotVo.java`, `bc/` 폴더 (ols 에서 DB 를 조회하지 않으므로 불필요. `@PriceMapper` 도 사용하지 않음)
 
-### A-2. 항공API 경로 확정 후 수정
+### A-2. 항공API 경로/요청 키 확정 후 수정
 
-`FlightPriceSnapshotCbcImpl.java` 의 상수 한 줄:
+`FlightPriceSnapshotCbcImpl.java` 두 곳:
 
 ```java
 private static final String SNAPSHOT_PATH = "/flightPriceSnapshot/air/api/service/snapshots/v1.00"; // 가정
 ```
 
-항공API 개발자가 정한 실제 경로로 변경. 파라미터명(`date_start`, `date_end`, `timezone`)과 GET 방식도 같이 확인.
+```java
+body.put("dateStart", ...); body.put("dateEnd", ...); body.put("timeZone", ...); // 요청 키 이름 가정
+```
+
+항공API 개발자가 정한 실제 경로와 요청 키로 변경. HTTP 방식은 **POST(MCI)** 로 가정했으므로 다르면 알려줄 것.
 
 ### A-3. 의존 클래스 확인
 
-`dynamicPricing` 의 `DynamicPricingCbcImpl` 과 같은 빈을 주입받음: `ServiceEndpoint`, `WebClient`.
+`dynamicPricing` 의 `DynamicPricingCbcImpl` 과 같은 빈을 주입받음: `RestServiceClient`, `ObjectMapper`.
 같은 모듈에서 `DynamicPricingCbcImpl` 이 정상 동작하면 추가 설정 불필요.
 
 ---
@@ -44,7 +48,7 @@ private static final String SNAPSHOT_PATH = "/flightPriceSnapshot/air/api/servic
 
 이미 전달했다고 하셨으므로 **아래가 반영됐는지 확인용**. 상세는 `docs/flightPriceSnapshot.md` 4번.
 
-- [ ] 경로/파라미터/HTTP 메서드(GET) 확정 → ols `SNAPSHOT_PATH` 반영
+- [ ] 경로/요청 본문 키/HTTP 메서드(POST, MCI) 확정 → ols `SNAPSHOT_PATH`, `toRequestJson()` 반영
 - [ ] 응답 `{business_date, as_of, is_complete, total, rows}`, `total == rows.length`
 - [ ] 하루 조회일 때 `business_date` 반환 (프론트 실시간 탭 검사)
 - [ ] `q_charge` 키가 `qcharge` 로 깨지지 않을 것 (Jackson getter 규칙)
@@ -64,10 +68,10 @@ curl -G "http://127.0.0.1:8081/air/flightPriceSnapshot/snapshots" \
   --data-urlencode "timezone=Asia/Seoul"
 ```
 
-- [ ] 항공API 가 호출되는지 (ols 로그 `[FLIGHT-PRICE-SNAPSHOT] GET ...`)
+- [ ] 항공API 가 호출되는지 (ols 로그 `[FLIGHT-PRICE-SNAPSHOT] MCI ...`)
 - [ ] 응답이 항공API 응답 그대로인지 (ols 는 가공하지 않음)
 - [ ] 프론트 화면이 정상 표시되는지 (`PARTIAL_RESPONSE` 등 오류 없음)
-- [ ] 응답 시간이 25초 이내인지
+- [ ] 응답 시간이 프론트 제한(30초) 이내인지
 
 ### 데이터량 (중요)
 
@@ -80,7 +84,7 @@ curl -G "http://127.0.0.1:8081/air/flightPriceSnapshot/snapshots" \
 | 항목 | 내용 |
 |---|---|
 | 인증/인가 | 포털 SSO 적용 범위, 사용자 권한별 조회 범위 검증 (프론트 계약에도 명시). Controller 주석에 TODO |
-| 타임아웃 | ols 25초, 프론트 30초. 포털 프록시 타임아웃과 항공API 응답 시간 확인 |
+| 타임아웃 | MCI 타임아웃은 `RestServiceClient` 설정을 따름. 프론트 30초, 포털 프록시 타임아웃과 항공API 응답 시간 확인 |
 | 예외 처리 | 요구사항에 따라 `@ExceptionHandler` 없음. 항공API 오류/타임아웃은 프레임워크 기본 오류로 나감 (프론트는 HTTP 오류로 표시) |
 
 ---
@@ -88,5 +92,5 @@ curl -G "http://127.0.0.1:8081/air/flightPriceSnapshot/snapshots" \
 ## 요약: 지금 할 일
 
 1. 파일 4개 복사, 옛 DB 조회 파일 삭제 (A-1)
-2. 항공API 개발자에게 **경로 확정** → `SNAPSHOT_PATH` 수정 (A-2)
+2. 항공API 개발자에게 **경로/요청 키 확정** → `SNAPSHOT_PATH`, `toRequestJson()` 수정 (A-2)
 3. DEV 에서 curl 로 호출 확인 (C)

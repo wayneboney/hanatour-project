@@ -1,11 +1,11 @@
 # 항공권 가격 스냅샷 조회 (flightPriceSnapshot)
 
-프론트 대시보드(`flightPricingDashboard.html`)가 ols 를 호출하면, ols 가 **항공API 를 호출**해서 응답을 그대로 돌려주는 **중계(조회 전용)** API.
+프론트 대시보드(`flightPricingDashboard.html`)가 ols 를 호출하면, ols 가 **항공API 를 MCI(POST)로 호출**해서 응답을 그대로 돌려주는 **중계(조회 전용)** API.
 DB(MariaDB, price 데이터소스) 조회는 **항공API 쪽**에서 수행한다. (ols 에는 price 데이터소스 설정이 없음, `PriceMapper` 는 공통 모듈)
 
 - 갱신일: 2026-11-05
 - 브랜치: `claude/busy-knuth-v7bcfs`
-- 기준: Java 8, 기존 `dynamicPricing` 구조 (Controller → Cbc → 항공API GET 호출)
+- 기준: Java 8, 기존 `dynamicPricing` 구조 (Controller → Cbc → 항공API MCI POST 호출)
 
 ## 1. 구조
 
@@ -13,8 +13,8 @@ DB(MariaDB, price 데이터소스) 조회는 **항공API 쪽**에서 수행한�
 HTML (portal /air/**)
  └─ GET /air/flightPriceSnapshot/snapshots?date_start=&date_end=&timezone=
       FlightPriceSnapshotController        파라미터 수신, Cbc 위임
-        └─ FlightPriceSnapshotCbc(+Impl)   항공API GET 호출 → 응답 JSON 그대로 반환
-             └─ 항공API  /flightPriceSnapshot/air/api/service/snapshots/v1.00  (경로 확인 필요)
+        └─ FlightPriceSnapshotCbc(+Impl)   항공API MCI POST 호출 → 응답 JSON 그대로 반환
+             └─ 항공API  POST /flightPriceSnapshot/air/api/service/snapshots/v1.00  (경로/요청키 확인 필요)
                   └─ MariaDB (price 데이터소스, AIR01.FLIGHT_PRICE_SNAPSHOT)
 ```
 
@@ -26,7 +26,7 @@ HTML (portal /air/**)
 |---|---|
 | `FlightPriceSnapshotController.java` | `@RestController`, `GET /air/flightPriceSnapshot/snapshots` |
 | `cbc/FlightPriceSnapshotCbc.java` | 인터페이스 |
-| `cbc/impl/FlightPriceSnapshotCbcImpl.java` | 항공API GET 호출 (`WebClient`, `ServiceEndpoint`) |
+| `cbc/impl/FlightPriceSnapshotCbcImpl.java` | 항공API MCI POST 호출 (`RestServiceClient`) |
 | `cbc/vo/FlightPriceSnapshotReqVo.java` | 조회 조건 (`dateStart`, `dateEnd`) |
 
 참고 자료(항공API 개발자용): `docs/reference-for-api/`
@@ -41,15 +41,17 @@ HTML (portal /air/**)
 | `date_end` | O | 수집일자 종료 `YYYY-MM-DD` (KST, 포함) |
 | `timezone` | | 프론트가 `Asia/Seoul` 고정 전송. ols 는 사용하지 않고 항공API 에는 `Asia/Seoul` 로 고정 전달 |
 
+> HTML → ols 는 **GET** (프론트 `fetch` 가 GET, 요청 body 없음). ols → 항공API 는 **POST**.
+
 프론트 `endpoint` 는 `/air/flightPriceSnapshot/snapshots` 로 이미 변경되어 있음 (확인 완료).
 
 ## 4. ols → 항공API (항공API 개발자 구현 사항)
 
-ols 가 호출하는 항공API (**경로/파라미터는 항공API 개발자와 확정 필요**, 현재 가정):
+ols 가 호출하는 항공API (**경로/요청 키는 항공API 개발자와 확정 필요**, 현재 가정). 호출 방식은 `dynamicPricing` 과 같은 **MCI POST**:
 
 ```
-GET {ENDPOINT_API}/flightPriceSnapshot/air/api/service/snapshots/v1.00
-    ?date_start=2026-11-04&date_end=2026-11-04&timezone=Asia%2FSeoul
+POST {ENDPOINT_API}/flightPriceSnapshot/air/api/service/snapshots/v1.00   (MCI Header 포함)
+Body: { "dateStart": "2026-11-04", "dateEnd": "2026-11-04", "timeZone": "Asia/Seoul" }
 ```
 
 항공API 가 반환해야 하는 응답 (프론트 `API_CONTRACT.md` 계약, ols 는 **가공 없이 그대로 전달**):
@@ -81,19 +83,18 @@ GET {ENDPOINT_API}/flightPriceSnapshot/air/api/service/snapshots/v1.00
 
 | 항목 | dynamicPricing | 이번 구현 |
 |---|---|---|
-| 호출 | GET(`callGetApi`) + POST(MCI) | GET 만 |
-| URL 조립 | 경로만 이어 붙임 | 조회 조건을 **URI 변수**로 바인딩 (자동 인코딩) |
-| 타임아웃 | 10초 | 25초 (프론트 30초 제한보다 짧게, 기간 전체 조회라 길게) |
+| 호출 | GET(`callGetApi`) + POST(MCI) | **MCI POST 만** (`callApiService` 동일) |
+| 요청 본문 | `{ "targetValue": ... }` | `{ "dateStart", "dateEnd", "timeZone" }` (키 이름은 항공API 와 확정) |
 | 응답 로그 | 응답 전문 로그 | 크기만 로그 (대용량 응답) |
-| 예외 | Controller `@ExceptionHandler` | 핸들러 없음 (요구사항). WebClient 오류는 그대로 전파 |
+| 예외 | Controller `@ExceptionHandler` | 핸들러 없음 (요구사항). `ApiException` 은 `IllegalStateException` 으로 변환해 전파 |
 | 주입 | 생성자 `@Autowired` | `@RequiredArgsConstructor` |
 
 ## 6. 확인 필요 / 남은 작업
 
-1. **항공API 경로/파라미터 확정** (항공API 개발자): `Cbc` 의 `SNAPSHOT_PATH` 상수 수정
+1. **항공API 경로/요청 키 확정** (항공API 개발자): `Cbc` 의 `SNAPSHOT_PATH` 상수와 `toRequestJson()` 의 키 이름 수정. MCI Header 값(`JobSysCd` 등)이 dynamicPricing 과 같은지도 확인
 2. **항공API 응답 규격**: 4번 규칙대로 내려오는지 (특히 `total == rows`, `business_date`, `q_charge` 키)
 3. **데이터량**: 기간 전체를 한 응답으로 중계하는 구조. 하루 수만 건 이상이면 응답이 커져 ols/프론트 모두 부담 → 항공API 에서 서버 집계 API 로 확장 필요
-4. **타임아웃**: 25초. 항공API 응답이 느리면 조정 (프론트 30초, 포털 프록시 타임아웃 확인)
+4. **타임아웃**: `RestServiceClient` 의 MCI 타임아웃 설정을 따름 (코드에서 별도 지정하지 않음). 프론트 30초, 포털 프록시 타임아웃보다 짧은지 확인
 5. **인증/인가 (운영 반영 전 필수)**: 포털 SSO 적용 범위, 사용자 권한별 조회 범위 검증. Controller 주석에 TODO
 6. **컴파일/실행 미검증**: 사내 라이브러리(`hntframe`, `RestServiceClient` 등)가 없는 환경에서 작성. DEV 환경에서 호출 확인 필요
 7. **편도/다구간 목적지**: 테이블에 `dest_airport` 컬럼 없음 → 프론트는 `return_airport` 로만 판단 (왕복만 정확)
