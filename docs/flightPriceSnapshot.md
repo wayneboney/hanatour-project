@@ -11,7 +11,7 @@ DB(MariaDB, price 데이터소스) 조회는 **항공API 쪽**에서 수행한�
 
 ```
 HTML (portal /air/**)
- └─ GET /air/dynamicPricing/snapshots?date_start=&date_end=&timezone=
+ └─ GET /air/flightPriceSnapshot/snapshots?date_start=&date_end=&timezone=
       FlightPriceSnapshotController        파라미터 수신, Cbc 위임
         └─ FlightPriceSnapshotCbc(+Impl)   항공API MCI POST 호출 → 응답 JSON 그대로 반환
              └─ 항공API  POST /flightPriceSnapshot/air/api/service/snapshots/v1.00  (경로/요청키 확인 필요)
@@ -24,7 +24,7 @@ HTML (portal /air/**)
 
 | 파일 | 역할 |
 |---|---|
-| `FlightPriceSnapshotController.java` | `@RestController`, `GET /air/dynamicPricing/snapshots` |
+| `FlightPriceSnapshotController.java` | `@RestController`, `GET /air/flightPriceSnapshot/snapshots` |
 | `cbc/FlightPriceSnapshotCbc.java` | 인터페이스 |
 | `cbc/impl/FlightPriceSnapshotCbcImpl.java` | 항공API MCI POST 호출 (`RestServiceClient`) |
 | `cbc/vo/FlightPriceSnapshotReqVo.java` | 조회 조건 (`dateStart`, `dateEnd`) |
@@ -33,7 +33,7 @@ HTML (portal /air/**)
 
 ## 3. 프론트 ↔ ols API
 
-### GET `/air/dynamicPricing/snapshots`
+### GET `/air/flightPriceSnapshot/snapshots`
 
 | 파라미터 | 필수 | 설명 |
 |---|---|---|
@@ -43,8 +43,7 @@ HTML (portal /air/**)
 
 > HTML → ols 는 **GET** (프론트 `fetch` 가 GET, 요청 body 없음). ols → 항공API 는 **POST**.
 
-프론트 `endpoint` 는 `/air/dynamicPricing/snapshots` (최신 HTML 확인 완료). Controller 를 이 경로에 맞춤.
-기존 `DynamicPricingController`(`/air/dynamicPricing/targetValues`, `/rules`, `/rules/history`)와 베이스 경로가 같지만 하위 경로가 달라 충돌하지 않음.
+프론트 HTML 의 `endpoint` 는 원본이 `/air/dynamicPricing/snapshots` 이므로 **`/air/flightPriceSnapshot/snapshots` 로 수정한 파일**(`html/flightPricingDashboard.html`)을 사용한다. (수정 위치: `PRICING_DASHBOARD_CONFIG.endpoint` 2곳)
 
 ## 4. ols → 항공API (항공API 개발자 구현 사항)
 
