@@ -10,3 +10,5 @@ ols 는 price(MariaDB) 데이터소스 설정이 없어서, **DB 조회는 항�
 | `FLIGHT_PRICE_SNAPSHOT.index.mariadb.sql` | 기간 조회용 인덱스 `captured_at` (없으면 풀스캔) |
 
 응답 규격은 프론트팀 `API_CONTRACT.md` 기준 (`docs/flightPriceSnapshot.md` 3번 참고).
+
+**참고**: 최신 프론트 HTML 은 위 81개 필드 외에 예약·탑승객 필드(`res_id`, `res_cd`, `res_adt_cnt`, `passenger_gender_summary` 등)를 추가로 읽는다. 목록과 주의사항은 `docs/flightPriceSnapshot.md` 4-1 참고.

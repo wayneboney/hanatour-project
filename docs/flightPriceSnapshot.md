@@ -11,7 +11,7 @@ DB(MariaDB, price 데이터소스) 조회는 **항공API 쪽**에서 수행한�
 
 ```
 HTML (portal /air/**)
- └─ GET /air/flightPriceSnapshot/snapshots?date_start=&date_end=&timezone=
+ └─ GET /air/dynamicPricing/snapshots?date_start=&date_end=&timezone=
       FlightPriceSnapshotController        파라미터 수신, Cbc 위임
         └─ FlightPriceSnapshotCbc(+Impl)   항공API MCI POST 호출 → 응답 JSON 그대로 반환
              └─ 항공API  POST /flightPriceSnapshot/air/api/service/snapshots/v1.00  (경로/요청키 확인 필요)
@@ -24,7 +24,7 @@ HTML (portal /air/**)
 
 | 파일 | 역할 |
 |---|---|
-| `FlightPriceSnapshotController.java` | `@RestController`, `GET /air/flightPriceSnapshot/snapshots` |
+| `FlightPriceSnapshotController.java` | `@RestController`, `GET /air/dynamicPricing/snapshots` |
 | `cbc/FlightPriceSnapshotCbc.java` | 인터페이스 |
 | `cbc/impl/FlightPriceSnapshotCbcImpl.java` | 항공API MCI POST 호출 (`RestServiceClient`) |
 | `cbc/vo/FlightPriceSnapshotReqVo.java` | 조회 조건 (`dateStart`, `dateEnd`) |
@@ -33,7 +33,7 @@ HTML (portal /air/**)
 
 ## 3. 프론트 ↔ ols API
 
-### GET `/air/flightPriceSnapshot/snapshots`
+### GET `/air/dynamicPricing/snapshots`
 
 | 파라미터 | 필수 | 설명 |
 |---|---|---|
@@ -43,7 +43,8 @@ HTML (portal /air/**)
 
 > HTML → ols 는 **GET** (프론트 `fetch` 가 GET, 요청 body 없음). ols → 항공API 는 **POST**.
 
-프론트 `endpoint` 는 `/air/flightPriceSnapshot/snapshots` 로 이미 변경되어 있음 (확인 완료).
+프론트 `endpoint` 는 `/air/dynamicPricing/snapshots` (최신 HTML 확인 완료). Controller 를 이 경로에 맞춤.
+기존 `DynamicPricingController`(`/air/dynamicPricing/targetValues`, `/rules`, `/rules/history`)와 베이스 경로가 같지만 하위 경로가 달라 충돌하지 않음.
 
 ## 4. ols → 항공API (항공API 개발자 구현 사항)
 
@@ -78,6 +79,29 @@ Body: { "dateStart": "2026-11-04", "dateEnd": "2026-11-04", "timeZone": "Asia/Se
 | `base_fare` | 세금/유류 포함 성인 1인 최종금액. `tax`/`q_charge` 를 합산하지 않음 |
 | 오류 | HTTP 상태코드로 명확히 반환 (200 + 빈 rows 로 오류를 숨기지 않기) |
 | 인덱스 | `captured_at` 단독 인덱스 필요 (`reference-for-api/` 스크립트) |
+
+## 4-1. 예약·탑승객 분석 탭 필드 (최신 HTML 에서 추가됨)
+
+최신 `flightPricingDashboard.html` 의 "예약·탑승객 분석" 탭은 **같은 API 응답의 각 행**에서 아래 필드를 추가로 읽는다 (별도 호출 없음).
+값이 없으면 "미기록"으로 표시하므로 **필수는 아님**. 단 이 필드들은 `FLIGHT_PRICE_SNAPSHOT` 테이블에 없어서 항공API 에서 예약 테이블 등과 조인해야 함.
+
+| 키 | 의미 |
+|---|---|
+| `res_id` | 예약 ID |
+| `res_com_cd` | 예약 공통 코드 |
+| `res_cd` | 항공 예약 코드 |
+| `unfy_res_cd` | 항공 통합 예약 코드 |
+| `afcn_mem_grad_nm` | 제휴사 멤버십 등급 |
+| `gds_dv_cd` | GDS 구분 |
+| `gds1_pnr_num`, `gds_pnr_num` | GDS PNR |
+| `card_event_cd` | 카드 프로모션 코드 |
+| `afcn_card_cd` | 제휴사 카드 코드 |
+| `res_adt_cnt`, `res_chd_cnt` | 성인/소아 예약 인원 (0 이상 정수) |
+| `passenger_gender_summary` | 탑승객 성별 요약 |
+| `passenger_age_summary` | 탑승객 성별·연령 요약 |
+
+- ols 는 응답을 가공 없이 전달하므로 **ols 코드 수정은 필요 없음**.
+- ⚠ **민감 정보**: PNR, 예약코드, 탑승객 성별/연령, 멤버십 등급이 포함됨. 이 API 를 통해 대량 노출되므로 **인증/권한 검증을 더 엄격히** 해야 하고, 분석에 불필요한 식별자(PNR 등)는 내려주지 않는 것을 검토할 것.
 
 ## 5. dynamicPricing Cbc 와 차이
 
