@@ -23,7 +23,7 @@ import javax.xml.bind.annotation.XmlRootElement;
  * - 필드명은 DB 컬럼명의 camelCase (프론트가 snake_case/camelCase/대문자를 같은 키로 처리)
  * - JSON 은 getter 가 아닌 필드 기준으로 직렬화한다. (qCharge 가 getter 규칙상 'qcharge' 로 바뀌는 문제 방지,
  *   부모 AbstractVo 의 getter 가 응답에 섞이는 것도 방지)
- * - 금액은 문자열(TO_CHAR), NULL 은 NULL 유지, 시각은 KST 오프셋(+09:00) 포함 ISO 형식
+ * - 금액은 문자열(CAST AS CHAR), NULL 은 NULL 유지, 시각은 KST 오프셋(+09:00) 포함 ISO 형식
  * </pre>
  */
 @CompositeType

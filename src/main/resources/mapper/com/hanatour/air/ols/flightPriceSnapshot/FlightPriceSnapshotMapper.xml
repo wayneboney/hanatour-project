@@ -1,12 +1,13 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <!--
-  항공권 가격 스냅샷 (Oracle)
+  항공권 가격 스냅샷 (MariaDB - price 데이터소스, jdbc:mariadb://.../AIR01)
   - 모든 파라미터는 #{} 바인딩만 사용 (${} 금지)
-  - 조회 기준: 수집일자(CAPTURED_AT) 한국시간(KST) 영업일, 양끝 포함. DB 시각은 KST 저장 기준
-  - 예약 출발일(DEP_DATE) 로 기간을 조회하지 않는다.
+  - 조회 기준: 수집일자(captured_at) 한국시간(KST) 영업일, 양끝 포함. DB 시각은 KST 저장 기준
+  - 예약 출발일(dep_date) 로 기간을 조회하지 않는다.
   - 건수 제한 없음 (프론트 계약: 조회 기간 전체를 한 번에 반환. 부분 응답은 프론트에서 오류 처리)
-  - 시각은 KST 오프셋(+09:00) 포함 ISO 형식, 금액은 문자열, NULL 은 NULL 유지
+  - 시각은 KST 오프셋(+09:00) 포함 ISO 형식, 금액은 문자열(CAST AS CHAR), NULL 은 NULL 유지
+  - 테이블명은 대문자 그대로 사용 (Linux MariaDB 는 테이블명 대소문자 구분). DB명(AIR01)은 URL 에 있으므로 생략
 -->
 <mapper namespace="com.hanatour.air.ols.flightPriceSnapshot.ec.qc.FlightPriceSnapshotMapper">
 
@@ -14,90 +15,90 @@
     <select id="findFlightPriceSnapshotList" parameterType="com.hanatour.air.ols.flightPriceSnapshot.cbc.vo.FlightPriceSnapshotReqVo" resultType="com.hanatour.air.ols.flightPriceSnapshot.cbc.vo.FlightPriceSnapshotVo">
         /* SQL_ID: com.hanatour.air.ols.flightPriceSnapshot.ec.qc.FlightPriceSnapshotMapper.findFlightPriceSnapshotList */
         SELECT
-                TO_CHAR(A.SNAPSHOT_ID) AS SNAPSHOT_ID
-                , A.RESERVATION_CODE
-                , A.TRIP_TYPE
-                , DECODE(A.IS_DIRECT_ONLY, 'Y', 1, 0) AS IS_DIRECT_ONLY
-                , TO_CHAR(A.DEP_DATE, 'YYYY-MM-DD') AS DEP_DATE
-                , A.DEP_AIRPORT
-                , A.DEP_AIRLINE_CODE
-                , A.DEP_FLIGHT_NO
-                , TO_CHAR(A.RETURN_DATE, 'YYYY-MM-DD') AS RETURN_DATE
-                , A.RETURN_AIRPORT
-                , A.RETURN_AIRLINE_CODE
-                , A.RETURN_FLIGHT_NO
-                , A.PROMO_CARD_CODE
-                , A.SEAT_CLASS
-                , A.PASSENGER_TYPE
-                , TO_CHAR(A.BASE_FARE, 'FM999999999990.00') AS BASE_FARE
-                , TO_CHAR(A.TAX, 'FM999999999990.00') AS TAX
-                , TO_CHAR(A.Q_CHARGE, 'FM999999999990.00') AS Q_CHARGE
-                , TO_CHAR(A.FARE1, 'FM999999999990.00') AS FARE1
-                , A.FARE1_AGENCY_CODE
-                , A.FARE1_AGENCY_NAME
-                , TO_CHAR(A.FARE2, 'FM999999999990.00') AS FARE2
-                , A.FARE2_AGENCY_CODE
-                , A.FARE2_AGENCY_NAME
-                , TO_CHAR(A.FARE3, 'FM999999999990.00') AS FARE3
-                , A.FARE3_AGENCY_CODE
-                , A.FARE3_AGENCY_NAME
-                , TO_CHAR(A.FARE4, 'FM999999999990.00') AS FARE4
-                , A.FARE4_AGENCY_CODE
-                , A.FARE4_AGENCY_NAME
-                , TO_CHAR(A.FARE5, 'FM999999999990.00') AS FARE5
-                , A.FARE5_AGENCY_CODE
-                , A.FARE5_AGENCY_NAME
-                , TO_CHAR(A.FARE6, 'FM999999999990.00') AS FARE6
-                , A.FARE6_AGENCY_CODE
-                , A.FARE6_AGENCY_NAME
-                , TO_CHAR(A.FARE7, 'FM999999999990.00') AS FARE7
-                , A.FARE7_AGENCY_CODE
-                , A.FARE7_AGENCY_NAME
-                , TO_CHAR(A.FARE8, 'FM999999999990.00') AS FARE8
-                , A.FARE8_AGENCY_CODE
-                , A.FARE8_AGENCY_NAME
-                , TO_CHAR(A.FARE9, 'FM999999999990.00') AS FARE9
-                , A.FARE9_AGENCY_CODE
-                , A.FARE9_AGENCY_NAME
-                , TO_CHAR(A.FARE10, 'FM999999999990.00') AS FARE10
-                , A.FARE10_AGENCY_CODE
-                , A.FARE10_AGENCY_NAME
-                , TO_CHAR(A.FARE11, 'FM999999999990.00') AS FARE11
-                , A.FARE11_AGENCY_CODE
-                , A.FARE11_AGENCY_NAME
-                , TO_CHAR(A.FARE12, 'FM999999999990.00') AS FARE12
-                , A.FARE12_AGENCY_CODE
-                , A.FARE12_AGENCY_NAME
-                , TO_CHAR(A.FARE13, 'FM999999999990.00') AS FARE13
-                , A.FARE13_AGENCY_CODE
-                , A.FARE13_AGENCY_NAME
-                , TO_CHAR(A.FARE14, 'FM999999999990.00') AS FARE14
-                , A.FARE14_AGENCY_CODE
-                , A.FARE14_AGENCY_NAME
-                , TO_CHAR(A.FARE15, 'FM999999999990.00') AS FARE15
-                , A.FARE15_AGENCY_CODE
-                , A.FARE15_AGENCY_NAME
-                , TO_CHAR(A.FARE16, 'FM999999999990.00') AS FARE16
-                , A.FARE16_AGENCY_CODE
-                , A.FARE16_AGENCY_NAME
-                , TO_CHAR(A.FARE17, 'FM999999999990.00') AS FARE17
-                , A.FARE17_AGENCY_CODE
-                , A.FARE17_AGENCY_NAME
-                , TO_CHAR(A.FARE18, 'FM999999999990.00') AS FARE18
-                , A.FARE18_AGENCY_CODE
-                , A.FARE18_AGENCY_NAME
-                , TO_CHAR(A.FARE19, 'FM999999999990.00') AS FARE19
-                , A.FARE19_AGENCY_CODE
-                , A.FARE19_AGENCY_NAME
-                , TO_CHAR(A.FARE20, 'FM999999999990.00') AS FARE20
-                , A.FARE20_AGENCY_CODE
-                , A.FARE20_AGENCY_NAME
-                , A.CURRENT_RANK
-                , TO_CHAR(A.CAPTURED_AT, 'YYYY-MM-DD"T"HH24:MI:SS') || '+09:00' AS CAPTURED_AT
-                , TO_CHAR(A.CREATED_AT, 'YYYY-MM-DD"T"HH24:MI:SS') || '+09:00' AS CREATED_AT
-        FROM AIR01.FLIGHT_PRICE_SNAPSHOT A
-        WHERE <![CDATA[ A.CAPTURED_AT >= TO_DATE(#{dateStart}, 'YYYY-MM-DD') ]]>
-          AND <![CDATA[ A.CAPTURED_AT < TO_DATE(#{dateEnd}, 'YYYY-MM-DD') + 1 ]]>
-        ORDER BY A.CAPTURED_AT DESC, A.SNAPSHOT_ID DESC
+                CAST(A.snapshot_id AS CHAR) AS snapshot_id
+                , A.reservation_code
+                , A.trip_type
+                , A.is_direct_only
+                , DATE_FORMAT(A.dep_date, '%Y-%m-%d') AS dep_date
+                , A.dep_airport
+                , A.dep_airline_code
+                , A.dep_flight_no
+                , DATE_FORMAT(A.return_date, '%Y-%m-%d') AS return_date
+                , A.return_airport
+                , A.return_airline_code
+                , A.return_flight_no
+                , A.promo_card_code
+                , A.seat_class
+                , A.passenger_type
+                , CAST(A.base_fare AS CHAR) AS base_fare
+                , CAST(A.tax AS CHAR) AS tax
+                , CAST(A.q_charge AS CHAR) AS q_charge
+                , CAST(A.fare1 AS CHAR) AS fare1
+                , A.fare1_agency_code
+                , A.fare1_agency_name
+                , CAST(A.fare2 AS CHAR) AS fare2
+                , A.fare2_agency_code
+                , A.fare2_agency_name
+                , CAST(A.fare3 AS CHAR) AS fare3
+                , A.fare3_agency_code
+                , A.fare3_agency_name
+                , CAST(A.fare4 AS CHAR) AS fare4
+                , A.fare4_agency_code
+                , A.fare4_agency_name
+                , CAST(A.fare5 AS CHAR) AS fare5
+                , A.fare5_agency_code
+                , A.fare5_agency_name
+                , CAST(A.fare6 AS CHAR) AS fare6
+                , A.fare6_agency_code
+                , A.fare6_agency_name
+                , CAST(A.fare7 AS CHAR) AS fare7
+                , A.fare7_agency_code
+                , A.fare7_agency_name
+                , CAST(A.fare8 AS CHAR) AS fare8
+                , A.fare8_agency_code
+                , A.fare8_agency_name
+                , CAST(A.fare9 AS CHAR) AS fare9
+                , A.fare9_agency_code
+                , A.fare9_agency_name
+                , CAST(A.fare10 AS CHAR) AS fare10
+                , A.fare10_agency_code
+                , A.fare10_agency_name
+                , CAST(A.fare11 AS CHAR) AS fare11
+                , A.fare11_agency_code
+                , A.fare11_agency_name
+                , CAST(A.fare12 AS CHAR) AS fare12
+                , A.fare12_agency_code
+                , A.fare12_agency_name
+                , CAST(A.fare13 AS CHAR) AS fare13
+                , A.fare13_agency_code
+                , A.fare13_agency_name
+                , CAST(A.fare14 AS CHAR) AS fare14
+                , A.fare14_agency_code
+                , A.fare14_agency_name
+                , CAST(A.fare15 AS CHAR) AS fare15
+                , A.fare15_agency_code
+                , A.fare15_agency_name
+                , CAST(A.fare16 AS CHAR) AS fare16
+                , A.fare16_agency_code
+                , A.fare16_agency_name
+                , CAST(A.fare17 AS CHAR) AS fare17
+                , A.fare17_agency_code
+                , A.fare17_agency_name
+                , CAST(A.fare18 AS CHAR) AS fare18
+                , A.fare18_agency_code
+                , A.fare18_agency_name
+                , CAST(A.fare19 AS CHAR) AS fare19
+                , A.fare19_agency_code
+                , A.fare19_agency_name
+                , CAST(A.fare20 AS CHAR) AS fare20
+                , A.fare20_agency_code
+                , A.fare20_agency_name
+                , A.current_rank
+                , CONCAT(DATE_FORMAT(A.captured_at, '%Y-%m-%dT%H:%i:%s'), '+09:00') AS captured_at
+                , CONCAT(DATE_FORMAT(A.created_at, '%Y-%m-%dT%H:%i:%s'), '+09:00') AS created_at
+        FROM FLIGHT_PRICE_SNAPSHOT A
+        WHERE <![CDATA[ A.captured_at >= STR_TO_DATE(#{dateStart}, '%Y-%m-%d') ]]>
+          AND <![CDATA[ A.captured_at < DATE_ADD(STR_TO_DATE(#{dateEnd}, '%Y-%m-%d'), INTERVAL 1 DAY) ]]>
+        ORDER BY A.captured_at DESC, A.snapshot_id DESC
     </select>
 </mapper>
