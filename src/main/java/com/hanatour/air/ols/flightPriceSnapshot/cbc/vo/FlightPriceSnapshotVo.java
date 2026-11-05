@@ -1,5 +1,6 @@
 package com.hanatour.air.ols.flightPriceSnapshot.cbc.vo;
 
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.thoughtworks.xstream.annotations.XStreamAlias;
 import hntframe.run.common.io.type.annotation.CompositeType;
 import hntframe.run.common.io.type.annotation.Property;
@@ -15,21 +16,28 @@ import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlRootElement;
 
 /**
- * 항공권가격스냅샷
+ * 항공권가격스냅샷 (FLIGHT_PRICE_SNAPSHOT 1행)
+ *
+ * <pre>
+ * 프론트(flightPricingDashboard.html) 응답 계약 기준
+ * - 필드명은 DB 컬럼명의 camelCase (프론트가 snake_case/camelCase/대문자를 같은 키로 처리)
+ * - JSON 은 getter 가 아닌 필드 기준으로 직렬화한다. (qCharge 가 getter 규칙상 'qcharge' 로 바뀌는 문제 방지,
+ *   부모 AbstractVo 의 getter 가 응답에 섞이는 것도 방지)
+ * - 금액은 문자열(TO_CHAR), NULL 은 NULL 유지, 시각은 KST 오프셋(+09:00) 포함 ISO 형식
+ * </pre>
  */
 @CompositeType
 @LocalName("항공권가격스냅샷")
 @XmlAccessorType(XmlAccessType.FIELD)
 @XStreamAlias("FlightPriceSnapshotVo")
 @XmlRootElement(name = "FlightPriceSnapshotVo")
+@JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY, getterVisibility = JsonAutoDetect.Visibility.NONE,
+        isGetterVisibility = JsonAutoDetect.Visibility.NONE, setterVisibility = JsonAutoDetect.Visibility.NONE)
 @Getter
 @Setter
 public class FlightPriceSnapshotVo extends AbstractVo {
 
     private static final long serialVersionUID = 1L;
-
-    @Property(typeName = "전체건수", length = 256)
-    private int totalCount;
 
     @Property(typeName = "스냅샷ID", length = 256)
     private String snapshotId;
@@ -41,7 +49,7 @@ public class FlightPriceSnapshotVo extends AbstractVo {
     private String tripType;
 
     @Property(typeName = "직항여부", length = 256)
-    private String directOnlyYn;
+    private Integer isDirectOnly;
 
     @Property(typeName = "출발일", length = 256)
     private String depDate;
@@ -83,13 +91,196 @@ public class FlightPriceSnapshotVo extends AbstractVo {
     private String tax;
 
     @Property(typeName = "유류할증료", length = 256)
-    private String fuelSurcharge;
+    private String qCharge;
+
+    @Property(typeName = "경쟁운임1", length = 256)
+    private String fare1;
+
+    @Property(typeName = "경쟁운임1여행사코드", length = 256)
+    private String fare1AgencyCode;
+
+    @Property(typeName = "경쟁운임1경쟁사명", length = 256)
+    private String fare1AgencyName;
+
+    @Property(typeName = "경쟁운임2", length = 256)
+    private String fare2;
+
+    @Property(typeName = "경쟁운임2여행사코드", length = 256)
+    private String fare2AgencyCode;
+
+    @Property(typeName = "경쟁운임2경쟁사명", length = 256)
+    private String fare2AgencyName;
+
+    @Property(typeName = "경쟁운임3", length = 256)
+    private String fare3;
+
+    @Property(typeName = "경쟁운임3여행사코드", length = 256)
+    private String fare3AgencyCode;
+
+    @Property(typeName = "경쟁운임3경쟁사명", length = 256)
+    private String fare3AgencyName;
+
+    @Property(typeName = "경쟁운임4", length = 256)
+    private String fare4;
+
+    @Property(typeName = "경쟁운임4여행사코드", length = 256)
+    private String fare4AgencyCode;
+
+    @Property(typeName = "경쟁운임4경쟁사명", length = 256)
+    private String fare4AgencyName;
+
+    @Property(typeName = "경쟁운임5", length = 256)
+    private String fare5;
+
+    @Property(typeName = "경쟁운임5여행사코드", length = 256)
+    private String fare5AgencyCode;
+
+    @Property(typeName = "경쟁운임5경쟁사명", length = 256)
+    private String fare5AgencyName;
+
+    @Property(typeName = "경쟁운임6", length = 256)
+    private String fare6;
+
+    @Property(typeName = "경쟁운임6여행사코드", length = 256)
+    private String fare6AgencyCode;
+
+    @Property(typeName = "경쟁운임6경쟁사명", length = 256)
+    private String fare6AgencyName;
+
+    @Property(typeName = "경쟁운임7", length = 256)
+    private String fare7;
+
+    @Property(typeName = "경쟁운임7여행사코드", length = 256)
+    private String fare7AgencyCode;
+
+    @Property(typeName = "경쟁운임7경쟁사명", length = 256)
+    private String fare7AgencyName;
+
+    @Property(typeName = "경쟁운임8", length = 256)
+    private String fare8;
+
+    @Property(typeName = "경쟁운임8여행사코드", length = 256)
+    private String fare8AgencyCode;
+
+    @Property(typeName = "경쟁운임8경쟁사명", length = 256)
+    private String fare8AgencyName;
+
+    @Property(typeName = "경쟁운임9", length = 256)
+    private String fare9;
+
+    @Property(typeName = "경쟁운임9여행사코드", length = 256)
+    private String fare9AgencyCode;
+
+    @Property(typeName = "경쟁운임9경쟁사명", length = 256)
+    private String fare9AgencyName;
+
+    @Property(typeName = "경쟁운임10", length = 256)
+    private String fare10;
+
+    @Property(typeName = "경쟁운임10여행사코드", length = 256)
+    private String fare10AgencyCode;
+
+    @Property(typeName = "경쟁운임10경쟁사명", length = 256)
+    private String fare10AgencyName;
+
+    @Property(typeName = "경쟁운임11", length = 256)
+    private String fare11;
+
+    @Property(typeName = "경쟁운임11여행사코드", length = 256)
+    private String fare11AgencyCode;
+
+    @Property(typeName = "경쟁운임11경쟁사명", length = 256)
+    private String fare11AgencyName;
+
+    @Property(typeName = "경쟁운임12", length = 256)
+    private String fare12;
+
+    @Property(typeName = "경쟁운임12여행사코드", length = 256)
+    private String fare12AgencyCode;
+
+    @Property(typeName = "경쟁운임12경쟁사명", length = 256)
+    private String fare12AgencyName;
+
+    @Property(typeName = "경쟁운임13", length = 256)
+    private String fare13;
+
+    @Property(typeName = "경쟁운임13여행사코드", length = 256)
+    private String fare13AgencyCode;
+
+    @Property(typeName = "경쟁운임13경쟁사명", length = 256)
+    private String fare13AgencyName;
+
+    @Property(typeName = "경쟁운임14", length = 256)
+    private String fare14;
+
+    @Property(typeName = "경쟁운임14여행사코드", length = 256)
+    private String fare14AgencyCode;
+
+    @Property(typeName = "경쟁운임14경쟁사명", length = 256)
+    private String fare14AgencyName;
+
+    @Property(typeName = "경쟁운임15", length = 256)
+    private String fare15;
+
+    @Property(typeName = "경쟁운임15여행사코드", length = 256)
+    private String fare15AgencyCode;
+
+    @Property(typeName = "경쟁운임15경쟁사명", length = 256)
+    private String fare15AgencyName;
+
+    @Property(typeName = "경쟁운임16", length = 256)
+    private String fare16;
+
+    @Property(typeName = "경쟁운임16여행사코드", length = 256)
+    private String fare16AgencyCode;
+
+    @Property(typeName = "경쟁운임16경쟁사명", length = 256)
+    private String fare16AgencyName;
+
+    @Property(typeName = "경쟁운임17", length = 256)
+    private String fare17;
+
+    @Property(typeName = "경쟁운임17여행사코드", length = 256)
+    private String fare17AgencyCode;
+
+    @Property(typeName = "경쟁운임17경쟁사명", length = 256)
+    private String fare17AgencyName;
+
+    @Property(typeName = "경쟁운임18", length = 256)
+    private String fare18;
+
+    @Property(typeName = "경쟁운임18여행사코드", length = 256)
+    private String fare18AgencyCode;
+
+    @Property(typeName = "경쟁운임18경쟁사명", length = 256)
+    private String fare18AgencyName;
+
+    @Property(typeName = "경쟁운임19", length = 256)
+    private String fare19;
+
+    @Property(typeName = "경쟁운임19여행사코드", length = 256)
+    private String fare19AgencyCode;
+
+    @Property(typeName = "경쟁운임19경쟁사명", length = 256)
+    private String fare19AgencyName;
+
+    @Property(typeName = "경쟁운임20", length = 256)
+    private String fare20;
+
+    @Property(typeName = "경쟁운임20여행사코드", length = 256)
+    private String fare20AgencyCode;
+
+    @Property(typeName = "경쟁운임20경쟁사명", length = 256)
+    private String fare20AgencyName;
 
     @Property(typeName = "당사현재순위", length = 256)
-    private String currentRank;
+    private Integer currentRank;
 
     @Property(typeName = "가격수집시각", length = 256)
     private String capturedAt;
+
+    @Property(typeName = "저장시각", length = 256)
+    private String createdAt;
 
     @Override
     public String toString() {

@@ -15,10 +15,10 @@ import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlRootElement;
 
 /**
- * 항공권 가격 스냅샷 조회 요청 VO (UI -> Controller 요청 본문)
+ * 항공권 가격 스냅샷 조회 조건 (Mapper 파라미터)
  *
  * <pre>
- * reservationCode(필수), startDt/endDt(YYYYMMDD, 선택), maxRows(선택, 기본 50 / 최대 200)
+ * dateStart / dateEnd : 수집일자(captured_at) 기준 한국시간(KST) 영업일, 양끝 포함 (YYYY-MM-DD)
  * </pre>
  */
 @CompositeType
@@ -32,17 +32,11 @@ public class FlightPriceSnapshotReqVo extends AbstractVo {
 
     private static final long serialVersionUID = 1L;
 
-    @Property(typeName = "예약코드")
-    private String reservationCode;
+    @Property(typeName = "조회시작일자")
+    private String dateStart;
 
-    @Property(typeName = "수집시작일자")
-    private String startDt;
-
-    @Property(typeName = "수집종료일자")
-    private String endDt;
-
-    @Property(typeName = "최대조회건수")
-    private Integer maxRows;
+    @Property(typeName = "조회종료일자")
+    private String dateEnd;
 
     @Override
     public String toString() {

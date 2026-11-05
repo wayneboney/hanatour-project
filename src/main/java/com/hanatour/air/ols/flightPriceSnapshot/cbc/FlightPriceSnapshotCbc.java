@@ -4,7 +4,7 @@ import com.hanatour.air.ols.flightPriceSnapshot.cbc.vo.FlightPriceSnapshotReqVo;
 
 public interface FlightPriceSnapshotCbc {
 
-    /** 스냅샷 목록 조회 → {"totalCount":n,"list":[...]} */
-    public String getSnapshotList(FlightPriceSnapshotReqVo vo);
+    /** 스냅샷 조회 → {"business_date":..,"as_of":..,"is_complete":true,"total":n,"rows":[...]} */
+    public String getSnapshots(FlightPriceSnapshotReqVo vo);
 
 }
