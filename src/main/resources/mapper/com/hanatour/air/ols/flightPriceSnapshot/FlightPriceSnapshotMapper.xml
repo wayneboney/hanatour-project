@@ -37,14 +37,14 @@
             FROM AIR01.FLIGHT_PRICE_SNAPSHOT A
             WHERE A.RESERVATION_CODE = #{reservationCode}
             <if test='startDt != null and startDt != ""'>
-                AND A.CAPTURED_AT &gt;= TO_DATE(#{startDt}, 'YYYYMMDD')
+                <![CDATA[ AND A.CAPTURED_AT >= TO_DATE(#{startDt}, 'YYYYMMDD') ]]>
             </if>
             <if test='endDt != null and endDt != ""'>
                 /* 종료일자 당일 23:59:59 까지 포함 */
-                AND A.CAPTURED_AT &lt; TO_DATE(#{endDt}, 'YYYYMMDD') + 1
+                <![CDATA[ AND A.CAPTURED_AT < TO_DATE(#{endDt}, 'YYYYMMDD') + 1 ]]>
             </if>
             ORDER BY A.CAPTURED_AT DESC, A.SNAPSHOT_ID DESC
         )
-        WHERE ROWNUM &lt;= #{maxRows}
+        <![CDATA[ WHERE ROWNUM <= #{maxRows} ]]>
     </select>
 </mapper>
