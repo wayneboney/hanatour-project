@@ -10,17 +10,14 @@
 
 ## A. 반드시 해야 함 (안 하면 동작하지 않음)
 
-### A-1. Mapper 어노테이션을 price(MariaDB) 데이터소스용으로 변경 ⚠ 가장 중요
+### A-1. Mapper 어노테이션을 price(MariaDB) 데이터소스용으로 변경 ✅ 반영 완료
 
 | 항목 | 내용 |
 |---|---|
-| 문제 | 이 테이블은 **MariaDB** (`jdbc:mariadb://172.31.250.31:6001/AIR01`, `price:` 데이터소스). 그런데 Mapper 에 붙인 `@AirMapper` 는 기존 샘플 기준 **기본(Oracle) 데이터소스용**으로 추정 |
-| 증상 | `@AirMapper` 그대로면 Oracle 로 연결 → `FLIGHT_PRICE_SNAPSHOT` 테이블 없음 오류 |
-| 할 일 | price 데이터소스를 쓰는 **기존 Mapper 하나**를 확인해서 같은 어노테이션/설정으로 변경 |
-| 수정 파일 | `ec/qc/FlightPriceSnapshotMapper.java` 의 `@AirMapper` 한 줄 |
-| 같이 확인 | price 데이터소스의 `SqlSessionFactory` 가 **우리 XML 위치**(`mapper/com/hanatour/air/ols/flightPriceSnapshot/*.xml`)를 읽는지 (`mapperLocations`) |
-
-> price 데이터소스용 Mapper 샘플 1개를 주면 Claude 가 바로 반영 가능
+| 원인 | 테이블은 **MariaDB** (`jdbc:mariadb://172.31.250.31:6001/AIR01`, `price:` 데이터소스). `@AirMapper` 는 기본(Oracle) 데이터소스용 마커 어노테이션 |
+| 조치 | `@AirMapper` → **`@PriceMapper`** (`com.hanatour.air.cmn.common.config.datasource.PriceMapper`) |
+| 수정 파일 | `ec/qc/FlightPriceSnapshotMapper.java` (import 와 어노테이션 한 줄) |
+| 남은 확인 | `@PriceMapper` 가 붙은 Mapper 의 **XML 위치 설정**(`mapperLocations`)이 우리 XML 경로(`mapper/com/hanatour/air/ols/flightPriceSnapshot/*.xml`)를 포함하는지. 기존 `@PriceMapper` Mapper 의 XML 위치와 비교 |
 
 ### A-2. 프로젝트에 파일 복사 (최신본으로)
 
@@ -121,6 +118,6 @@ curl -G "http://127.0.0.1:8081/air/flightPriceSnapshot/snapshots" \
 
 ## 요약: 지금 당장 할 일 3가지
 
-1. **price 데이터소스용 Mapper 어노테이션 확인** → Claude 에게 샘플 전달 (A-1)
+1. ~~price 데이터소스용 Mapper 어노테이션~~ → `@PriceMapper` 로 반영 완료 (A-1). **XML 위치(`mapperLocations`)만 확인**
 2. **파일 7개 최신본으로 교체** (A-2) + **`captured_at` 인덱스 생성** (A-3)
 3. **프론트팀에 `endpoint` 변경 요청** (A-4)

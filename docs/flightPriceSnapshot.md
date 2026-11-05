@@ -14,7 +14,7 @@ HTML (portal /air/**)
  └─ GET /air/flightPriceSnapshot/snapshots?date_start=&date_end=&timezone=
       FlightPriceSnapshotController        파라미터 수신, Cbc 위임
         └─ FlightPriceSnapshotCbc(+Impl)   Mapper 호출 → 응답 JSON 조립
-             └─ FlightPriceSnapshotMapper  @AirMapper (ec.qc)
+             └─ FlightPriceSnapshotMapper  @PriceMapper (ec.qc)
                   └─ FlightPriceSnapshotMapper.xml  MariaDB SQL
 ```
 
@@ -109,7 +109,7 @@ HTML (portal /air/**)
 ## 7. 확인 필요 / 남은 작업
 
 1. **데이터량 (중요)**: 기간 전체를 한 응답으로 반환하는 계약. 하루 스냅샷이 수만 건 이상이면 응답이 수십 MB가 되어 사용 불가 → 서버 집계 API로 확장 필요
-2. **Mapper 어노테이션 (필수)**: 현재 `@AirMapper` 는 기본(Oracle) 데이터소스용으로 추정. price(MariaDB) 데이터소스용 Mapper 어노테이션/설정 확인 필요
+2. **Mapper 어노테이션**: price(MariaDB) 데이터소스용 `@PriceMapper` 적용 완료. XML 위치(`mapperLocations`)는 기존 `@PriceMapper` Mapper 와 비교 확인 필요
 3. **DB 시각 저장 기준**: KST 저장 전제. UTC 저장이면 기간 경계와 `+09:00` 표기 변환 필요
 4. **환경별 DB명**: DEV/QA/LIVE 의 DB명이 `AIR01` 과 다를 수 있어 SQL 에서 DB명을 생략함 (URL 의 기본 DB 사용)
 5. **인덱스**: `captured_at` 인덱스 추가 필요. 대용량이면 DBA 검토
