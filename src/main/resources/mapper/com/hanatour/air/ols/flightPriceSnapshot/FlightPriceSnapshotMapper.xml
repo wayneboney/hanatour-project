@@ -3,7 +3,7 @@
 <!--
   항공권 가격 스냅샷 (Oracle)
   - 모든 파라미터는 #{} 바인딩만 사용 (${} 금지)
-  - 목록: ROWNUM 으로 건수 제한. TOTAL_COUNT 는 제한 전 전체 건수
+  - 목록: maxRows 가 있을 때만 ROWNUM 으로 건수 제한 (없으면 전체). TOTAL_COUNT 는 제한 전 전체 건수
 -->
 <mapper namespace="com.hanatour.air.ols.flightPriceSnapshot.ec.qc.FlightPriceSnapshotMapper">
 
@@ -45,6 +45,8 @@
             </if>
             ORDER BY A.CAPTURED_AT DESC, A.SNAPSHOT_ID DESC
         )
-        <![CDATA[ WHERE ROWNUM <= #{maxRows} ]]>
+        <if test='maxRows != null'>
+            <![CDATA[ WHERE ROWNUM <= #{maxRows} ]]>
+        </if>
     </select>
 </mapper>

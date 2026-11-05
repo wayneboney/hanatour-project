@@ -12,7 +12,7 @@ HTML 화면이 URL을 호출하면 ols가 내부 Oracle DB(MyBatis)를 조회해
 HTML
  └─ POST /air/flightPriceSnapshot/list
       FlightPriceSnapshotController        요청/응답 입출력만 담당
-        └─ FlightPriceSnapshotCbc(+Impl)   입력 검증 → Mapper 호출 → JSON 변환
+        └─ FlightPriceSnapshotCbc(+Impl)   Mapper 호출 → JSON 변환
              └─ FlightPriceSnapshotMapper  @AirMapper (ec.qc)
                   └─ FlightPriceSnapshotMapper.xml  Oracle SQL
 ```
@@ -25,7 +25,7 @@ HTML
 |---|---|
 | `FlightPriceSnapshotController.java` | `@RestController`, `/air/flightPriceSnapshot/list` |
 | `cbc/FlightPriceSnapshotCbc.java` | 인터페이스 (`String getSnapshotList(ReqVo)`) |
-| `cbc/impl/FlightPriceSnapshotCbcImpl.java` | 검증, Mapper 호출, JSON 직렬화 |
+| `cbc/impl/FlightPriceSnapshotCbcImpl.java` | Mapper 호출, JSON 직렬화 |
 | `cbc/vo/FlightPriceSnapshotReqVo.java` | 요청 VO (Mapper 파라미터 겸용) |
 | `cbc/vo/FlightPriceSnapshotVo.java` | 목록 결과 1행 |
 | `ec/qc/FlightPriceSnapshotMapper.java` | MyBatis Mapper 인터페이스 |
@@ -52,7 +52,7 @@ HTML
 | `reservationCode` | O | 영문/숫자/`-`/`_` 1~50자 |
 | `startDt` | | 수집일자 시작 (YYYYMMDD, 실제 존재하는 날짜) |
 | `endDt` | | 수집일자 종료 (YYYYMMDD, 당일 23:59:59 까지 포함) |
-| `maxRows` | | 조회 건수. 생략 시 50, 허용 범위 1~200 |
+| `maxRows` | | 조회 건수 제한. 생략하면 제한 없음 |
 
 응답 (수집시각 최신순):
 
@@ -90,21 +90,20 @@ HTML
 - `totalCount`: `maxRows`로 자르기 전 전체 건수
 - 날짜/금액은 SQL에서 `TO_CHAR`로 문자열 변환 (금액 형식 `FM999999999990.00`)
 
-## 4. 검증 규칙 (CbcImpl)
+## 4. 검증
 
-| 항목 | 규칙 |
-|---|---|
-| 예약코드 | `^[A-Za-z0-9_-]{1,50}$` |
-| 날짜 | `uuuuMMdd` STRICT (존재하지 않는 날짜 거부), 시작일 > 종료일이면 오류 |
-| `maxRows` | 미입력 → 50, 1~200 외에는 오류 |
-| 오류 | `IllegalArgumentException` (DB 예외는 삼키지 않고 전파) |
+입력 유효성 검사는 하지 않는다. (단순 조회 요구사항)
+
+- 필수 조건은 `reservationCode` 이며 값이 없으면 결과가 0건으로 나온다.
+- 날짜 형식(YYYYMMDD)이 틀리면 Oracle 오류(`TO_DATE`)가 발생하고 DB 예외가 그대로 전파된다.
+- `maxRows` 를 생략하면 건수 제한 없이 조회한다.
 
 ## 5. SQL 요약
 
 - 대상 테이블: `AIR01.FLIGHT_PRICE_SNAPSHOT` (스키마/테이블명은 **가정**)
 - 조건: `RESERVATION_CODE = #{reservationCode}` + 수집일자 기간(`CAPTURED_AT`, 선택)
 - 정렬: `CAPTURED_AT DESC, SNAPSHOT_ID DESC`
-- 건수 제한: 바깥 쿼리 `ROWNUM <= #{maxRows}` (Oracle 11g 호환)
+- 건수 제한: `maxRows` 가 있을 때만 바깥 쿼리 `ROWNUM <= #{maxRows}` (Oracle 11g 호환)
 - `${}` 미사용, 전부 `#{}` 바인딩
 - 인덱스: `(RESERVATION_CODE, CAPTURED_AT)` 활용
 
@@ -115,9 +114,9 @@ HTML
 | 호출 방식 | `@ServiceMapping` (넥사크로) / `@RestController` (dynamicPricing) | `@RestController` + `@PostMapping` |
 | 계층 | Cbc → Bc → Mapper | Cbc → Mapper (Bc 생략) |
 | 주입 | `@Autowired` 필드 | `@RequiredArgsConstructor` 생성자 주입 |
-| 예외 | Cbc에서 catch 후 debug 로그만 (삼킴) | 삼키지 않고 전파 |
+| 예외 | Cbc에서 catch 후 debug 로그만 (삼킴) | 삼키지 않고 전파 (유효성 검사 없음) |
 | 조회기간 | `BETWEEN ... + 0.99999` | `>= 시작일` AND `< 종료일 + 1` |
-| 건수 제한 | 없음 | `ROWNUM` + 상한 200 |
+| 건수 제한 | 없음 | `maxRows` 지정 시 `ROWNUM` |
 | VO | getter/setter 직접 작성 | Lombok `@Getter @Setter` (DynamicPricingVo 방식) |
 
 ## 7. 확인 필요 / 남은 작업
