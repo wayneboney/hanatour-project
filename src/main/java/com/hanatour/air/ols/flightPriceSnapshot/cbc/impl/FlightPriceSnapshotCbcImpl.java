@@ -40,7 +40,7 @@ import java.util.regex.Pattern;
  *   3) 항공API 응답(JSON 문자열)을 가공 없이 그대로 돌려준다. (응답 형식은 프론트 계약을 항공API 가 책임)
  *
  * [Prometheus] ols -> Prometheus (읽기 전용 중계)
- *   1) 주소는 서버 설정(monitoring.prometheus.base-url)으로만 지정한다. 경로는 query/query_range 로 고정, GET 만 사용
+ *   1) 주소는 서버 설정(monitoring.prometheus.base-url)으로만 지정한다. 경로는 query/query_range/rules 로 고정, GET 만 사용
  *   2) 파라미터 검증 (PromQL 길이, 시간 형식, 조회 범위/해상도 상한 → Prometheus 과부하 방지)
  *   3) 값은 URI 변수로 바인딩해 인코딩한다. (PromQL 의 { } " & # 등이 파라미터를 주입하지 못함)
  *   4) 응답(JSON 문자열)을 가공 없이 그대로 돌려준다. 입력 오류 400, Prometheus 실패/설정 누락 502
@@ -63,12 +63,15 @@ public class FlightPriceSnapshotCbcImpl implements FlightPriceSnapshotCbc {
 
     private static final String PROMETHEUS_QUERY = "/api/v1/query";
     private static final String PROMETHEUS_QUERY_RANGE = "/api/v1/query_range";
+    private static final String PROMETHEUS_RULES = "/api/v1/rules";
 
     // UI 요청 제한(12초)보다 짧게
     private static final Duration PROMETHEUS_TIMEOUT = Duration.ofSeconds(10);
 
     // 입력 제한값 (운영하면서 조정. TODO: 실제 UI 의 조회 범위/해상도에 맞춰 확정)
-    private static final int MAX_QUERY_LENGTH = 2000;
+    // HTML 이 만드는 freshness 쿼리가 최대 약 3200자(규칙 16개 × 필터). 여유를 두고 6000자.
+    // 주의: GET 쿼리스트링이라 URL 인코딩 후 길이가 약 1.4배(약 4.4KB). 웹서버/게이트웨이 요청줄 제한(보통 8KB)에 주의
+    private static final int MAX_QUERY_LENGTH = 6000;
     private static final long MAX_RANGE_SECONDS = 7L * 24 * 3600;   // 최대 조회 범위 7일
     private static final double MIN_STEP_SECONDS = 1.0;             // 최소 해상도 1초
     private static final long MAX_POINTS = 5000;                    // 시계열당 최대 포인트 수
@@ -190,6 +193,19 @@ public class FlightPriceSnapshotCbcImpl implements FlightPriceSnapshotCbc {
         return prometheusGet(PROMETHEUS_QUERY_RANGE, params);
     }
 
+    @Override
+    public String prometheusRules(String type) {
+        Map<String, String> params = new LinkedHashMap<String, String>();
+        if (StringUtils.isNotBlank(type)) {
+            // 규칙 종류만 허용. (rule_name[], file[] 등 다른 필터는 전달하지 않는다)
+            if (!"alert".equals(type.trim()) && !"record".equals(type.trim())) {
+                throw badRequest("type 은 alert 또는 record 만 가능합니다.");
+            }
+            params.put("type", type.trim());
+        }
+        return prometheusGet(PROMETHEUS_RULES, params);
+    }
+
     private String prometheusGet(String path, Map<String, String> params) {
         if (StringUtils.isBlank(prometheusBaseUrl)) {
             log.error("[PROMETHEUS-PROXY] monitoring.prometheus.base-url 설정이 없습니다.");
@@ -205,7 +221,7 @@ public class FlightPriceSnapshotCbcImpl implements FlightPriceSnapshotCbc {
         }
         final URI uri = builder.encode().buildAndExpand(vars).toUri();
 
-        log.info("[PROMETHEUS-PROXY] GET {} query={}", path, StringUtils.abbreviate(params.get("query"), 200));
+        log.info("[PROMETHEUS-PROXY] GET {} params={}", path, StringUtils.abbreviate(String.valueOf(params), 300));
 
         final String response;
         try {

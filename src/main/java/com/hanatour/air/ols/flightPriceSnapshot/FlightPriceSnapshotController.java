@@ -20,7 +20,8 @@ import org.springframework.web.bind.annotation.RestController;
  *    HTML 설정 prometheus.proxyPath = '/air/monitoring/prometheus' 를 그대로 사용하기 위해 경로를 메서드마다 전체로 지정
  *    GET /air/monitoring/prometheus/api/v1/query        ?query=&time=
  *    GET /air/monitoring/prometheus/api/v1/query_range  ?query=&start=&end=&step=
- *    (Prometheus 표준 API 경로 가정 — TODO: 실제 HTML/TRAFFIC_MONITORING.md 호출 형태와 대조 필요)
+ *    GET /air/monitoring/prometheus/api/v1/rules        ?type=alert   (알림 규칙 조회)
+ *    (HTML 의 호출부 `proxyPath + '/api/v1/' + path` 확인 완료: path = query, query_range, rules 3종)
  *    그 외 경로(/api/v1/admin, /-/reload 등)는 매핑하지 않으므로 전달되지 않는다.
  * </pre>
  *
@@ -65,5 +66,11 @@ public class FlightPriceSnapshotController {
                                        @RequestParam("end") String end,
                                        @RequestParam("step") String step) {
         return flightPriceSnapshotCbc.prometheusQueryRange(query, start, end, step);
+    }
+
+    /** Prometheus 알림 규칙 조회 (type: alert | record, 생략 가능) */
+    @GetMapping(value = PROMETHEUS_PATH + "/api/v1/rules", produces = JSON_UTF8)
+    public String prometheusRules(@RequestParam(value = "type", required = false) String type) {
+        return flightPriceSnapshotCbc.prometheusRules(type);
     }
 }
