@@ -1874,6 +1874,17 @@
             if (location.protocol === 'https:' && parsed.protocol === 'http:') throw new Error('보안 페이지에서 HTTP Prometheus를 직접 조회할 수 없습니다. OLS 프록시를 연결해 주세요.');
             return {mode: 'direct', url: parsed.href.replace(/\/$/, '')};
         }
+        // 로그인 상태 알림: 스냅샷 API 와 같은 이벤트를 사용하므로 화면의 로그인 경고창이 동일하게 동작한다.
+        function loginRequired(status, text) {
+            if (status === 401) return true;
+            const api = global.AdminSnapshotAPI;
+            return text !== null && !!api && typeof api.isSsoLoginRequired === 'function' && api.isSsoLoginRequired(text);
+        }
+        function dispatchLogin(name) {
+            if (typeof global.dispatchEvent !== 'function' || typeof global.CustomEvent !== 'function') return;
+            const api = global.AdminSnapshotAPI;
+            global.dispatchEvent(new global.CustomEvent(name, {detail: {env: api && typeof api.getEnv === 'function' ? api.getEnv() : null}}));
+        }
         function readableError(error, conn) {
             if (error && error.name === 'AbortError') return 'Prometheus 조회 제한시간을 초과했습니다.';
             if (error && error.message) {
@@ -1923,14 +1934,23 @@
                 const url = new URL(conn.url + '/api/v1/' + path);
                 Object.keys(params || {}).forEach(key => url.searchParams.set(key, params[key]));
                 const response = await fetcher(url.href, {method: 'GET', mode: conn.mode === 'direct' ? 'cors' : 'same-origin', credentials: conn.mode === 'proxy' ? 'same-origin' : 'omit', cache: 'no-store', headers: {Accept: 'application/json'}, signal});
+                // 401 또는 SSO 로그인 응답이면 전체 화면 로그인 경고창으로 알린다. (403 은 권한 오류라 기존 문구 유지)
+                const text = typeof response.text === 'function' ? await response.text() : null;
+                if (loginRequired(response.status, text)) {
+                    dispatchLogin('admin-snapshot:login-required');
+                    const loginError = new Error('포털 로그인이 필요합니다. 로그인한 뒤 다시 조회해 주세요.');
+                    loginError.code = 'LOGIN_REQUIRED';
+                    throw loginError;
+                }
                 if (!response.ok) throw new Error('Prometheus ' + path + ' 조회 실패 (HTTP ' + response.status + ').' + ([401, 403].includes(response.status) ? ' 접근권한 또는 포털 로그인을 확인해 주세요.' : ''));
                 let body;
-                try { body = await response.json(); } catch (_) { throw new Error('Prometheus가 JSON 대신 다른 응답을 반환했습니다. OLS 경로 또는 로그인 상태를 확인해 주세요.'); }
+                try { body = text !== null ? JSON.parse(text) : await response.json(); } catch (_) { throw new Error('Prometheus가 JSON 대신 다른 응답을 반환했습니다. OLS 경로 또는 로그인 상태를 확인해 주세요.'); }
                 if (!body || body.status !== 'success' || !body.data) throw new Error('Prometheus ' + (body && body.errorType || '응답') + ': ' + (body && body.error || '잘못된 응답 형식'));
                 if (Array.isArray(body.warnings) && body.warnings.length) throw new Error('Prometheus가 불완전할 수 있는 조회 결과를 경고했습니다: ' + body.warnings.join(' · '));
                 if (path === 'rules') {
                     if (!Array.isArray(body.data.groups)) throw new Error('Prometheus 알림 규칙 응답 형식이 올바르지 않습니다.');
                 } else if (!Array.isArray(body.data.result) || !['vector', 'matrix'].includes(body.data.resultType)) throw new Error('Prometheus 시계열 응답 형식이 올바르지 않습니다.');
+                dispatchLogin('admin-snapshot:login-ok');
                 return body;
             }
             async function refresh() {
@@ -2605,6 +2625,7 @@
         $('loginOverlay').addEventListener('cancel',event=>event.preventDefault());
         $('btnLogin').onclick=goPortalLogin;$('btnLoginRetry').onclick=retrySession;
         window.addEventListener('admin-snapshot:login-required',showLoginRequired);
+        window.addEventListener('admin-snapshot:login-ok',()=>{if(authBlocked)closeLogin();});
         document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&authBlocked)retrySession();});
         window.addEventListener('pagehide',()=>{querySequence++;queryAbort?.abort();window.RealtimeMonitor.unmount();window.InsightMonitor.unmount();window.TrafficMonitor.unmount();});
         window.addEventListener('hashchange',()=>{const view=location.hash.slice(1);if(titles[view]&&state.view!==view)navigate(view);});
