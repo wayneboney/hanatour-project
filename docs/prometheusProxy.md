@@ -45,7 +45,7 @@ HTML: `proxyPath + '/api/v1/' + path`, `GET`, `credentials: same-origin`. 탭 �
 
 ## 3. 설정 (선택 사항 — yml 추가 불필요)
 
-Prometheus 주소 기본값은 코드에 있다 (`DEFAULT_PROMETHEUS_BASE_URL = http://10.100.23.95:9090`).
+Prometheus 주소 기본값은 코드에 있다 (`DEFAULT_PROMETHEUS_BASE_URL = http://203.245.33.80:9090`).
 다른 주소가 필요하면 ols 설정에 추가하면 **설정 값이 우선**한다.
 
 ```yaml
@@ -72,7 +72,7 @@ Java 8(`--release 8`) 로 컴파일하고, **실제 HTTP 서버(가짜 Prometheu
 3. **브라우저 시계 오차**: 요청 시각이 서버보다 60초 넘게 앞서면 400. PC 시계가 크게 어긋나면 화면 전체가 실패
 4. **동시 호출/캐시 없음**: 탭 하나가 20초마다 5건. 사용자가 많으면 ols → Prometheus 요청이 `사용자 수 × 5건/20초`. 필요하면 동시 한도나 5~10초 캐시 추가
 5. **HTML 이 바뀌면 같이 수정**: 허용 템플릿이 HTML 의 `selector()/freshnessQuery()` 와 메트릭 이름 16종·prefix 2종에 고정되어 있음. 레코딩 규칙이나 쿼리 형태가 바뀌면 `METRIC_SUFFIXES`/템플릿 수정 필요 (바뀌면 400 으로 즉시 드러남)
-6. **Prometheus 주소가 둘로 보임**: 코드 기본값 `10.100.23.95:9090`, HTML 기본값/연결 정보 화면 문구는 `203.245.33.80:9090`. 운영 Prometheus 가 맞는지 확인
+6. **Prometheus 주소**: 기본값을 `203.245.33.80:9090` 으로 사용 (HTML 기본값과 동일). 이전 설정에 있던 `10.100.23.95:9090` 은 예약(`FINAL_BOOKING`)·동시간대 유입(`wow_min`) 지표가 보이지 않아 변경함. 공인 대역 IP 로 보이므로 사내 Prometheus 가 맞는지, 평문 HTTP 로 나가도 되는지 확인 필요. 필요하면 설정 `monitoring.prometheus.base-url` 로 덮어쓸 수 있음
 7. **긴 URL**: freshness 쿼리가 GET 쿼리스트링으로 약 4.4~4.7KB. 포털/게이트웨이 요청줄 제한(보통 8KB, 일부 4KB)에 걸리면 ols 도달 전에 400/414
 
 ## 6. 별도로 받은 참고 구현(Java 17, Spring Security)과의 관계

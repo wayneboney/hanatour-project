@@ -58,7 +58,7 @@ public class FlightPriceSnapshotCbcImpl implements FlightPriceSnapshotCbc {
     // ---------------------------------------------------------------- Prometheus
 
     // Prometheus 기본 주소 (내부망). 설정 monitoring.prometheus.base-url 이 있으면 설정이 우선
-    private static final String DEFAULT_PROMETHEUS_BASE_URL = "http://10.100.23.95:9090";
+    private static final String DEFAULT_PROMETHEUS_BASE_URL = "http://203.245.33.80:9090";
 
     // HTML 이 조회하는 레코딩 규칙: (air:stage_ | air:naver:stage_) + 아래 16종 (HTML 의 TRAFFIC_RULES 와 같은 순서)
     private static final String[] METRIC_SUFFIXES = {
