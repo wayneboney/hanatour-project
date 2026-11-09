@@ -13,15 +13,15 @@ import org.springframework.web.bind.annotation.RestController;
  * 항공권 가격 스냅샷 조회 Controller
  * UI(flightPricingDashboard.html) -> portal /air/** -> ols -> 항공API (DB 조회는 항공API 에서 수행)
  *
- * GET /air/flightPriceSnapshot/snapshots?date_start=2026-11-04&date_end=2026-11-04&timezone=Asia%2FSeoul
+ * GET /air/flightPrice/snapshots?date_start=2026-11-04&date_end=2026-11-04&timezone=Asia%2FSeoul
  *
- * 프론트(flightPricingDashboard.html)의 endpoint 설정을 이 경로로 변경해서 사용한다.
+ * 프론트(flightPricingDashboard.html)의 endpoint 설정(/air/flightPrice/snapshots)에 맞춘 경로.
  *
  * [TODO - 운영 반영 전 필수] 인증/인가 및 사용자 권한별 조회 범위 제한
  *   내부 데이터(예약/탑승객 정보 포함)를 내려주는 API 이므로, 포털 인증(SSO) 적용 여부와 권한 검증이 반드시 필요하다.
  */
 @RestController
-@RequestMapping("/air/flightPriceSnapshot")
+@RequestMapping("/air/flightPrice")
 @RequiredArgsConstructor
 public class FlightPriceSnapshotController {
 

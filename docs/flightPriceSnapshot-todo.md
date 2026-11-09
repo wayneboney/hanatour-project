@@ -16,7 +16,7 @@
 
 | 파일 | 비고 |
 |---|---|
-| `FlightPriceSnapshotController.java` | `GET /air/flightPriceSnapshot/snapshots` |
+| `FlightPriceSnapshotController.java` | `GET /air/flightPrice/snapshots` |
 | `cbc/FlightPriceSnapshotCbc.java` | `String getSnapshots(ReqVo)` |
 | `cbc/impl/FlightPriceSnapshotCbcImpl.java` | 항공API **MCI POST** 호출 (**전면 교체**) |
 | `cbc/vo/FlightPriceSnapshotReqVo.java` | `dateStart`, `dateEnd` |
@@ -62,7 +62,7 @@ body.put("dateStart", ...); body.put("dateEnd", ...); body.put("timeZone", ...);
 ## C. 첫 호출 때 확인 (DEV)
 
 ```bash
-curl -G "http://127.0.0.1:8081/air/flightPriceSnapshot/snapshots" \
+curl -G "http://127.0.0.1:8081/air/flightPrice/snapshots" \
   --data-urlencode "date_start=2026-11-04" \
   --data-urlencode "date_end=2026-11-04" \
   --data-urlencode "timezone=Asia/Seoul"
