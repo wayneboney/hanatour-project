@@ -206,12 +206,8 @@
             dateStartParam: 'date_start',
             dateEndParam: 'date_end',
             timeZoneParam: 'timezone',
-            insights: {
-                minSample: 20,
-                maxFindings: 12
-            }
+            insights: { minSample: 20, maxFindings: 12 }
         }, window.PRICING_DASHBOARD_CONFIG || {}, {
-            // 기존 설정에 direct/auto가 있어도 중계 모드로 고정
             prometheus: {
                 mode: 'proxy',
                 proxyPath: '/air/monitoring/prometheus',

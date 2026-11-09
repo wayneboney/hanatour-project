@@ -41,7 +41,7 @@ HTML: `proxyPath + '/api/v1/' + path`, `GET`, `credentials: same-origin`. 탭 �
 | 리다이렉트 | 따르지 않음 | |
 | 인바운드 쿠키/인증 헤더 | 전달하지 않음 | |
 
-오류는 입력 400(상세 사유 미노출), Prometheus 실패/설정 누락 502, 시간 초과 504 로 응답하고 Prometheus 원문 오류는 로그에만 남긴다.
+오류는 입력 400, Prometheus 가 반환한 JSON 오류(status=error)는 원래 HTTP 상태와 본문 그대로 전달(`X-Monitoring-Error-Source: prometheus`), 그 외 실패/비JSON/리다이렉트 502, 시간 초과 504 로 응답한다. 컨트롤러 오류 본문은 `{status:"error", errorType: bad_data|timeout|proxy_error, error}` 형식이며 모든 응답은 `Cache-Control: no-store`.
 
 ## 3. 설정 (선택 사항 — yml 추가 불필요)
 
@@ -62,7 +62,7 @@ Java 8(`--release 8`) 로 컴파일하고, **실제 HTTP 서버(가짜 Prometheu
 - freshness 를 range 로 보내면 거부, 1h/2h/6h/24h 범위 통과, 25시간/1441포인트/step 0/단위 있는 step 거부
 - 임의 쿼리(`up`, `{__name__=~".+"}`, `sum(rate(...))`, 허용 쿼리 뒤 이어붙이기, 이름 일부만, 라벨 값 변조/주입) 거부
 - `rules`: `alert` 만 허용, 주입 시도 거부
-- 업스트림 400/503 → 502, 리다이렉트 안 따라감, 17MB 응답 → 502, 응답 지연 → 504(8.0초), 접속 불가/설정 없음 → 502
+- 업스트림 JSON 오류 400/503 → 같은 상태로 전달, 비JSON·리다이렉트(따라가지 않음) → 502, step 은 60의 배수만 허용, timezone 은 Asia/Seoul 만 허용, 17MB 응답 → 502, 응답 지연 → 504(8.0초), 접속 불가/설정 없음 → 502
 - ❗ **실제 Prometheus 연결, 포털/게이트웨이 경유, HTML 화면 연동은 미검증**
 
 ## 5. 확인 필요 / 한계

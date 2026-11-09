@@ -2,10 +2,12 @@ package com.hanatour.air.ols.flightPriceSnapshot.cbc.impl;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.hanatour.air.cmn.common.ApiException;
 import com.hanatour.air.cmn.webclient.RestServiceClient;
 import com.hanatour.air.cmn.webclient.ServiceEndpoint;
 import com.hanatour.air.ols.flightPriceSnapshot.cbc.FlightPriceSnapshotCbc;
+import com.hanatour.air.ols.flightPriceSnapshot.cbc.PrometheusUpstreamException;
 import com.hanatour.air.ols.flightPriceSnapshot.cbc.vo.FlightPriceSnapshotReqVo;
 import com.hanatour.common.cmn.restclient.vo.Header;
 import lombok.extern.slf4j.Slf4j;
@@ -22,8 +24,11 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.SocketTimeoutException;
 import java.net.URL;
+import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -100,20 +105,47 @@ public class FlightPriceSnapshotCbcImpl implements FlightPriceSnapshotCbc {
         this.restServiceClient = restServiceClient;
         this.objectMapper = objectMapper;
         this.prometheusBaseUrl = StringUtils.removeEnd(StringUtils.trimToEmpty(prometheusBaseUrl), "/");
+        try {
+            URI uri = URI.create(this.prometheusBaseUrl);
+            if (!("http".equals(uri.getScheme()) || "https".equals(uri.getScheme()))
+                    || uri.getHost() == null || uri.getUserInfo() != null
+                    || uri.getQuery() != null || uri.getFragment() != null) {
+                throw new IllegalArgumentException("Invalid Prometheus base URL");
+            }
+        } catch (IllegalArgumentException e) {
+            // 설정에 포함되었을 수 있는 인증정보를 예외/로그에 노출하지 않는다.
+            throw new IllegalArgumentException("monitoring.prometheus.base-url must be an HTTP(S) URL without credentials, query or fragment");
+        }
     }
 
     // ================================================================ 스냅샷
 
     @Override
     public String getSnapshots(FlightPriceSnapshotReqVo vo) {
+        validateSnapshotDates(vo);
         final String response = callApiService(SNAPSHOT_PATH, toRequestJson(vo));
 
         // 응답 본문(대용량 가능)은 로그에 남기지 않고 크기만 기록
         log.info("[FLIGHT-PRICE-SNAPSHOT] MCI response length={}", response == null ? 0 : response.length());
-        if (response == null) {
-            throw new IllegalStateException("항공API 응답이 비어 있습니다: " + SNAPSHOT_PATH);
+        if (StringUtils.isBlank(response)) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "항공API 응답이 비어 있습니다.");
         }
         return response;
+    }
+
+    private void validateSnapshotDates(FlightPriceSnapshotReqVo vo) {
+        if (vo == null || vo.getDateStart() == null || vo.getDateEnd() == null
+                || !vo.getDateStart().matches("[0-9]{4}-[0-9]{2}-[0-9]{2}")
+                || !vo.getDateEnd().matches("[0-9]{4}-[0-9]{2}-[0-9]{2}")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "date_start/date_end는 YYYY-MM-DD 날짜여야 합니다.");
+        }
+        try {
+            if (LocalDate.parse(vo.getDateStart()).isAfter(LocalDate.parse(vo.getDateEnd()))) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "시작일은 종료일보다 늦을 수 없습니다.");
+            }
+        } catch (DateTimeParseException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "실제 존재하는 조회 날짜를 입력하세요.");
+        }
     }
 
     /**
@@ -179,7 +211,8 @@ public class FlightPriceSnapshotCbcImpl implements FlightPriceSnapshotCbc {
 
         final long startSec = epochSeconds(start, "start");
         final long endSec = epochSeconds(end, "end");
-        if (StringUtils.isBlank(step) || !STEP_SECONDS.matcher(step).matches() || Long.parseLong(step) < 1) {
+        if (StringUtils.isBlank(step) || !STEP_SECONDS.matcher(step).matches()
+                || Long.parseLong(step) < 60 || Long.parseLong(step) % 60 != 0) {
             throw badRequest();
         }
         final long stepSec = Long.parseLong(step);
@@ -207,7 +240,7 @@ public class FlightPriceSnapshotCbcImpl implements FlightPriceSnapshotCbc {
         return prometheusGet("rules", params);
     }
 
-    /** Prometheus GET 호출. 리다이렉트는 따르지 않고, 응답 크기/시간을 제한한다. */
+    /** Prometheus GET 호출. 응답을 필터링/집계하지 않는다. read timeout은 읽기 대기 기준이다. */
     private String prometheusGet(String operation, Map<String, String> params) {
         if (StringUtils.isBlank(prometheusBaseUrl)) {
             log.error("[PROMETHEUS-PROXY] monitoring.prometheus.base-url 설정이 없습니다.");
@@ -230,18 +263,38 @@ public class FlightPriceSnapshotCbcImpl implements FlightPriceSnapshotCbc {
             conn = (HttpURLConnection) new URL(url.toString()).openConnection();
             conn.setRequestMethod("GET");
             conn.setInstanceFollowRedirects(false);
+            conn.setUseCaches(false);
             conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
             conn.setReadTimeout(READ_TIMEOUT_MS);
             conn.setRequestProperty("Accept", "application/json");   // 인바운드 쿠키/인증 헤더는 전달하지 않는다
+            conn.setRequestProperty("Cache-Control", "no-store");
 
             final int status = conn.getResponseCode();
             final InputStream in = status >= 400 ? conn.getErrorStream() : conn.getInputStream();
             final String body = in == null ? "" : readLimited(in);
+            JsonNode document;
+            try {
+                document = objectMapper.readTree(body);
+            } catch (JsonProcessingException e) {
+                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Prometheus가 JSON이 아닌 응답을 반환했습니다.");
+            }
             if (status != HttpURLConnection.HTTP_OK) {
-                // 잘못된 PromQL(400), 쿼리 시간 초과(503), 리다이렉트(3xx) 등. 내부 오류 본문은 로그에만 남긴다.
-                log.error("[PROMETHEUS-PROXY] 호출 실패 operation={}, status={}, body={}", operation, status, StringUtils.abbreviate(body, 500));
+                // JSON Prometheus 오류는 원래 HTTP 상태/errorType/error/warnings를 보존한다.
+                // HTML 로그인/리다이렉트/임의 오류 본문은 브라우저에 전달하지 않는다.
+                log.warn("[PROMETHEUS-PROXY] upstream error operation={}, status={}", operation, status);
+                HttpStatus upstreamStatus = HttpStatus.resolve(status);
+                if (status >= 400 && status <= 599 && upstreamStatus != null && document != null
+                        && document.isObject() && "error".equals(document.path("status").asText())) {
+                    throw new PrometheusUpstreamException(upstreamStatus, body);
+                }
                 throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Prometheus 조회에 실패했습니다.");
             }
+            if (document == null || !document.isObject()
+                    || !"success".equals(document.path("status").asText())
+                    || !document.path("data").isObject()) {
+                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Prometheus 응답 형식이 올바르지 않습니다.");
+            }
+            // 재직렬화하지 않음: 라벨, NaN 문자열, 빈 배열, warnings, 숫자 정밀도를 그대로 유지.
             return body;
         } catch (SocketTimeoutException e) {
             log.error("[PROMETHEUS-PROXY] 시간 초과 operation={}", operation, e);
@@ -289,7 +342,7 @@ public class FlightPriceSnapshotCbcImpl implements FlightPriceSnapshotCbc {
      * HTML 과 같은 규칙으로 쿼리를 다시 만들어 요청 쿼리와 완전히 같을 때만 허용한다.
      */
     private void requireHtmlQuery(String query, boolean rangeOnly) {
-        if (StringUtils.isBlank(query) || !isHtmlQuery(query, rangeOnly)) {
+        if (StringUtils.isBlank(query) || query.length() > 16384 || !isHtmlQuery(query, rangeOnly)) {
             throw badRequest();
         }
     }
