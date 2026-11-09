@@ -24,7 +24,7 @@ HTML (portal /air/**)
 
 | 파일 | 역할 |
 |---|---|
-| `FlightPriceSnapshotController.java` | `@RestController`, `GET /air/flightPrice/snapshots` |
+| `FlightPriceSnapshotController.java` | `@RestController`, `GET /air/flightPrice/snapshots` + Prometheus 중계 2개 (`docs/prometheusProxy.md`) |
 | `cbc/FlightPriceSnapshotCbc.java` | 인터페이스 |
 | `cbc/impl/FlightPriceSnapshotCbcImpl.java` | 항공API MCI POST 호출 (`RestServiceClient`) |
 | `cbc/vo/FlightPriceSnapshotReqVo.java` | 조회 조건 (`dateStart`, `dateEnd`) |

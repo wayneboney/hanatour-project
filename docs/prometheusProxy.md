@@ -3,8 +3,8 @@
 대시보드 HTML 은 내부망 Prometheus(`http://10.100.23.95:9090`)에 **직접 접근할 수 없어서**, ols 가 대신 조회해서 응답을 그대로 돌려준다.
 
 - 작성일: 2026-11-09
-- 코드: `src/main/java/com/hanatour/air/ols/monitoring/` (Controller → Cbc → Prometheus, 별도 DB/항공API 호출 없음)
-- 컴파일 검증: Java 8(`--release 8`) + Spring 5.1 + Lombok 으로 컴파일 확인, 검증 로직 16건 단위 확인. **실제 Prometheus 연결/HTML 연동은 미검증**
+- 코드: **별도 파일 없이 스냅샷 조회와 같은 3개 파일에 포함** (`flightPriceSnapshot/FlightPriceSnapshotController`, `cbc/FlightPriceSnapshotCbc`, `cbc/impl/FlightPriceSnapshotCbcImpl`)
+- 컴파일 검증: Java 8(`--release 8`) + Spring 5.1 + Jackson + Lombok 으로 패키지 전체 컴파일 확인(사내 클래스는 스텁), 경로/검증/인코딩 17건 확인. **실제 Prometheus 연결/HTML 연동은 미검증**
 
 ## 1. 구조
 
@@ -12,18 +12,22 @@
 HTML (prometheus.proxyPath = '/air/monitoring/prometheus')
  └─ GET /air/monitoring/prometheus/api/v1/query        ?query=&time=
  └─ GET /air/monitoring/prometheus/api/v1/query_range  ?query=&start=&end=&step=
-      PrometheusProxyController
-        └─ PrometheusProxyCbc(+Impl)   검증 → WebClient GET → 응답 JSON 그대로 반환
+      FlightPriceSnapshotController   (메서드마다 전체 경로 지정 → HTML proxyPath 변경 불필요)
+        └─ FlightPriceSnapshotCbc(+Impl)   검증 → WebClient GET → 응답 JSON 그대로 반환
              └─ Prometheus  {monitoring.prometheus.base-url}/api/v1/query | query_range
 ```
 
-## 2. 파일
+## 2. 파일 (스냅샷 조회와 공용)
 
-| 파일 | 역할 |
+| 파일 | Prometheus 관련 내용 |
 |---|---|
-| `monitoring/PrometheusProxyController.java` | `@RestController`, `/air/monitoring/prometheus` |
-| `monitoring/cbc/PrometheusProxyCbc.java` | 인터페이스 (`query`, `queryRange`) |
-| `monitoring/cbc/impl/PrometheusProxyCbcImpl.java` | 검증, Prometheus 호출 |
+| `FlightPriceSnapshotController.java` | `prometheusQuery`, `prometheusQueryRange` 두 메서드 (`/air/monitoring/prometheus/...`) |
+| `cbc/FlightPriceSnapshotCbc.java` | `prometheusQuery`, `prometheusQueryRange` |
+| `cbc/impl/FlightPriceSnapshotCbcImpl.java` | 검증, Prometheus 호출. 생성자에 `WebClient` 와 `@Value("${monitoring.prometheus.base-url:}")` 추가 |
+
+> 컨트롤러는 클래스 공통 `@RequestMapping` 이 없고 메서드마다 전체 경로를 지정한다.
+> - `/air/flightPrice/snapshots` (스냅샷)
+> - `/air/monitoring/prometheus/api/v1/query`, `/air/monitoring/prometheus/api/v1/query_range` (Prometheus)
 
 ## 3. 필수 설정 (ols application 설정, 환경별로 다름)
 

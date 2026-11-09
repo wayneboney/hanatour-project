@@ -4,7 +4,13 @@ import com.hanatour.air.ols.flightPriceSnapshot.cbc.vo.FlightPriceSnapshotReqVo;
 
 public interface FlightPriceSnapshotCbc {
 
-    /** 스냅샷 조회 → {"business_date":..,"as_of":..,"is_complete":true,"total":n,"rows":[...]} */
+    /** 스냅샷 조회 → 항공API 응답(JSON 문자열)을 그대로 반환 */
     public String getSnapshots(FlightPriceSnapshotReqVo vo);
+
+    /** Prometheus 즉시 조회 → Prometheus 응답(JSON 문자열)을 그대로 반환 */
+    public String prometheusQuery(String query, String time);
+
+    /** Prometheus 범위 조회 → Prometheus 응답(JSON 문자열)을 그대로 반환 */
+    public String prometheusQueryRange(String query, String start, String end, String step);
 
 }
