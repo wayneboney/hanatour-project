@@ -13,17 +13,17 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
-import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.server.ResponseStatusException;
-import org.springframework.web.util.UriComponentsBuilder;
 
-import java.net.URI;
-import java.time.Duration;
-import java.time.OffsetDateTime;
-import java.time.format.DateTimeParseException;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.SocketTimeoutException;
+import java.net.URL;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -34,16 +34,12 @@ import java.util.regex.Pattern;
  *
  * <pre>
  * [스냅샷] ols -> 항공API (DB 조회는 항공API 에서 수행. ols 에는 price(MariaDB) 데이터소스 설정이 없음)
- *   dynamicPricing 의 callApiService(MCI 방식, POST) 와 동일
- *   1) 항공API 경로는 서버에 고정한다. (UI 에서 URL 을 받아 호출하면 내부망 임의 호출 통로가 되므로 금지)
- *   2) 조회 조건을 요청 JSON 본문으로 만들어 MCI 로 POST 호출한다.
- *   3) 항공API 응답(JSON 문자열)을 가공 없이 그대로 돌려준다. (응답 형식은 프론트 계약을 항공API 가 책임)
+ *   dynamicPricing 의 callApiService(MCI 방식, POST) 와 동일. 항공API 경로는 서버에 고정하고, 응답은 가공 없이 그대로 반환
  *
- * [Prometheus] ols -> Prometheus (읽기 전용 중계)
- *   1) 주소는 서버에서만 정한다. (기본값 코드 지정, 설정 monitoring.prometheus.base-url 이 있으면 우선) 경로는 query/query_range/rules 로 고정, GET 만 사용
- *   2) 파라미터 검증 (PromQL 길이, 시간 형식, 조회 범위/해상도 상한 → Prometheus 과부하 방지)
- *   3) 값은 URI 변수로 바인딩해 인코딩한다. (PromQL 의 { } " & # 등이 파라미터를 주입하지 못함)
- *   4) 응답(JSON 문자열)을 가공 없이 그대로 돌려준다. 입력 오류 400, Prometheus 실패/설정 누락 502
+ * [Prometheus] ols -> Prometheus (읽기 전용 중계, flightPricingDashboard.html 전용)
+ *   HTML 이 보내는 쿼리 형태만 허용한다. HTML 의 selector/freshness 템플릿을 서버가 같은 규칙으로 다시 만들어 보고
+ *   요청 쿼리와 한 글자라도 다르면 거부한다. (임의 PromQL 실행 불가)
+ *   조회 범위/해상도는 HTML 선택지(최대 24시간, 약 240포인트)에 맞춘다.
  * </pre>
  */
 @Slf4j
@@ -61,45 +57,48 @@ public class FlightPriceSnapshotCbcImpl implements FlightPriceSnapshotCbc {
 
     // ---------------------------------------------------------------- Prometheus
 
-    // Prometheus 기본 주소 (내부망). HTML 의 environment 라벨(prod 등)로 환경을 구분하므로 한 주소를 공용으로 사용
+    // Prometheus 기본 주소 (내부망). 설정 monitoring.prometheus.base-url 이 있으면 설정이 우선
     private static final String DEFAULT_PROMETHEUS_BASE_URL = "http://10.100.23.95:9090";
 
-    private static final String PROMETHEUS_QUERY = "/api/v1/query";
-    private static final String PROMETHEUS_QUERY_RANGE = "/api/v1/query_range";
-    private static final String PROMETHEUS_RULES = "/api/v1/rules";
+    // HTML 이 조회하는 레코딩 규칙: (air:stage_ | air:naver:stage_) + 아래 16종 (HTML 의 TRAFFIC_RULES 와 같은 순서)
+    private static final String[] METRIC_SUFFIXES = {
+            "events:rate10m", "attempts:rate10m", "success:rate10m", "failure_ratio:rate10m",
+            "events:rate30m", "attempts:rate30m", "success:rate30m", "failure_ratio:rate30m",
+            "failure_ratio:zscore30m", "events:increase7d", "attempts:increase7d", "success:increase7d",
+            "failure_ratio:7d", "events:rate30m:wow_min", "attempts:rate30m:wow_min", "success:rate30m:wow_min"};
+    private static final String[] METRIC_PREFIXES = {"air:stage_", "air:naver:stage_"};   // [1] 이 naver (site_code 조건 없음)
+    private static final String UP = "up{job=\"air-api\"}";
 
-    // UI 요청 제한(12초)보다 짧게
-    private static final Duration PROMETHEUS_TIMEOUT = Duration.ofSeconds(10);
+    // 라벨 값(environment/application/site_code) 허용 문자
+    private static final Pattern LABEL_VALUE = Pattern.compile("[A-Za-z0-9_.:-]{1,64}");
+    private static final Pattern ENV_IN_QUERY = Pattern.compile("environment=\"([^\"]*)\"");
+    private static final Pattern APP_IN_QUERY = Pattern.compile("application=\"([^\"]*)\"");
+    private static final Pattern SITE_IN_QUERY = Pattern.compile("site_code=~\"([^\"]*)\\|\"");
 
-    // 입력 제한값 (운영하면서 조정. TODO: 실제 UI 의 조회 범위/해상도에 맞춰 확정)
-    // HTML 이 만드는 freshness 쿼리가 최대 약 3200자(규칙 16개 × 필터). 여유를 두고 6000자.
-    // 주의: GET 쿼리스트링이라 URL 인코딩 후 길이가 약 1.4배(약 4.4KB). 웹서버/게이트웨이 요청줄 제한(보통 8KB)에 주의
-    private static final int MAX_QUERY_LENGTH = 6000;
-    private static final long MAX_RANGE_SECONDS = 7L * 24 * 3600;   // 최대 조회 범위 7일
-    private static final double MIN_STEP_SECONDS = 1.0;             // 최소 해상도 1초
-    private static final long MAX_POINTS = 5000;                    // 시계열당 최대 포인트 수
+    // HTML 선택지 최대 24시간 / step 은 60초 배수(약 240포인트) → 250포인트 상한
+    private static final long MAX_RANGE_SECONDS = 24L * 3600;
+    private static final long MAX_POINTS = 250;
+    private static final long MAX_CLOCK_SKEW_SECONDS = 60;      // 브라우저 시계가 서버보다 앞선 허용치
+    private static final Pattern EPOCH_SECONDS = Pattern.compile("[0-9]{1,12}");
+    private static final Pattern STEP_SECONDS = Pattern.compile("[0-9]{1,6}");
 
-    // epoch 초 (소수 허용) / 기간 표기 (예: 15, 15s, 1m)
-    private static final Pattern EPOCH_PATTERN = Pattern.compile("^[0-9]{1,12}(\\.[0-9]{1,3})?$");
-    private static final Pattern STEP_PATTERN = Pattern.compile("^([0-9]+(?:\\.[0-9]+)?)(ms|s|m|h|d)?$");
-    // 줄바꿈/탭 외 제어문자 금지
-    private static final Pattern CONTROL_CHAR_PATTERN = Pattern.compile("[\\p{Cntrl}&&[^\\t\\r\\n]]");
+    private static final int CONNECT_TIMEOUT_MS = 2000;
+    private static final int READ_TIMEOUT_MS = 8000;             // HTML 요청 제한(12초)보다 짧게
+    private static final String PROMETHEUS_QUERY_TIMEOUT = "6000ms";   // Prometheus 쪽 쿼리 실행 제한 (브라우저가 늘릴 수 없음)
+    private static final int MAX_RESPONSE_BYTES = 16 * 1024 * 1024;
 
     private final RestServiceClient restServiceClient;
     private final ObjectMapper objectMapper;
-    private final WebClient webClient;
     private final String prometheusBaseUrl;
 
     @Autowired
     public FlightPriceSnapshotCbcImpl(RestServiceClient restServiceClient,
                                       ObjectMapper objectMapper,
-                                      WebClient webClient,
                                       // 설정 파일 없이 동작하도록 기본값을 지정. 다른 주소가 필요하면 설정에
                                       // monitoring.prometheus.base-url 을 추가해서 덮어쓸 수 있다. (설정 값이 우선)
                                       @Value("${monitoring.prometheus.base-url:" + DEFAULT_PROMETHEUS_BASE_URL + "}") String prometheusBaseUrl) {
         this.restServiceClient = restServiceClient;
         this.objectMapper = objectMapper;
-        this.webClient = webClient;
         this.prometheusBaseUrl = StringUtils.removeEnd(StringUtils.trimToEmpty(prometheusBaseUrl), "/");
     }
 
@@ -159,152 +158,248 @@ public class FlightPriceSnapshotCbcImpl implements FlightPriceSnapshotCbc {
 
     // ================================================================ Prometheus
 
+    /** 즉시 조회: HTML 쿼리 4종(selector / selector+up / freshness / up) 만 허용 */
     @Override
     public String prometheusQuery(String query, String time) {
-        validateQuery(query);
+        requireHtmlQuery(query, false);
 
         Map<String, String> params = new LinkedHashMap<String, String>();
         params.put("query", query);
         if (StringUtils.isNotBlank(time)) {
-            toEpochSeconds(time.trim(), "time");
-            params.put("time", time.trim());
+            params.put("time", String.valueOf(epochSeconds(time, "time")));
         }
-        return prometheusGet(PROMETHEUS_QUERY, params);
+        params.put("timeout", PROMETHEUS_QUERY_TIMEOUT);
+        return prometheusGet("query", params);
     }
 
+    /** 범위 조회: selector / selector+up 만 허용, 범위 24시간·250포인트 이하 */
     @Override
     public String prometheusQueryRange(String query, String start, String end, String step) {
-        validateQuery(query);
+        requireHtmlQuery(query, true);
 
-        final double startSec = toEpochSeconds(StringUtils.trimToEmpty(start), "start");
-        final double endSec = toEpochSeconds(StringUtils.trimToEmpty(end), "end");
-        final double stepSec = toStepSeconds(StringUtils.trimToEmpty(step));
-
-        if (endSec <= startSec) {
-            throw badRequest("end 는 start 보다 커야 합니다.");
+        final long startSec = epochSeconds(start, "start");
+        final long endSec = epochSeconds(end, "end");
+        if (StringUtils.isBlank(step) || !STEP_SECONDS.matcher(step).matches() || Long.parseLong(step) < 1) {
+            throw badRequest();
         }
-        if (endSec - startSec > MAX_RANGE_SECONDS) {
-            throw badRequest("조회 범위는 최대 " + (MAX_RANGE_SECONDS / 3600) + "시간까지 가능합니다.");
-        }
-        if ((endSec - startSec) / stepSec > MAX_POINTS) {
-            throw badRequest("조회 해상도가 너무 촘촘합니다. step 을 늘려주세요. (최대 " + MAX_POINTS + "포인트)");
+        final long stepSec = Long.parseLong(step);
+        if (startSec >= endSec || endSec - startSec > MAX_RANGE_SECONDS || (endSec - startSec) / stepSec + 1 > MAX_POINTS) {
+            throw badRequest();
         }
 
         Map<String, String> params = new LinkedHashMap<String, String>();
         params.put("query", query);
-        params.put("start", start.trim());
-        params.put("end", end.trim());
-        params.put("step", step.trim());
-        return prometheusGet(PROMETHEUS_QUERY_RANGE, params);
+        params.put("start", String.valueOf(startSec));
+        params.put("end", String.valueOf(endSec));
+        params.put("step", String.valueOf(stepSec));
+        params.put("timeout", PROMETHEUS_QUERY_TIMEOUT);
+        return prometheusGet("query_range", params);
     }
 
+    /** 알림 규칙 조회: HTML 은 type=alert 만 사용 */
     @Override
     public String prometheusRules(String type) {
-        Map<String, String> params = new LinkedHashMap<String, String>();
-        if (StringUtils.isNotBlank(type)) {
-            // 규칙 종류만 허용. (rule_name[], file[] 등 다른 필터는 전달하지 않는다)
-            if (!"alert".equals(type.trim()) && !"record".equals(type.trim())) {
-                throw badRequest("type 은 alert 또는 record 만 가능합니다.");
-            }
-            params.put("type", type.trim());
+        if (StringUtils.isNotBlank(type) && !"alert".equals(type)) {
+            throw badRequest();
         }
-        return prometheusGet(PROMETHEUS_RULES, params);
+        Map<String, String> params = new LinkedHashMap<String, String>();
+        params.put("type", "alert");
+        return prometheusGet("rules", params);
     }
 
-    private String prometheusGet(String path, Map<String, String> params) {
+    /** Prometheus GET 호출. 리다이렉트는 따르지 않고, 응답 크기/시간을 제한한다. */
+    private String prometheusGet(String operation, Map<String, String> params) {
         if (StringUtils.isBlank(prometheusBaseUrl)) {
             log.error("[PROMETHEUS-PROXY] monitoring.prometheus.base-url 설정이 없습니다.");
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Prometheus 연결 설정이 없습니다.");
         }
 
-        // 값은 URI 변수로 바인딩 → 인코딩 (PromQL 의 { } " = ~ 등이 쿼리스트링을 깨거나 파라미터를 주입하지 못함)
-        final UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(prometheusBaseUrl).path(path);
-        final Map<String, Object> vars = new LinkedHashMap<String, Object>();
+        final StringBuilder url = new StringBuilder(prometheusBaseUrl).append("/api/v1/").append(operation).append('?');
+        boolean first = true;
         for (Map.Entry<String, String> entry : params.entrySet()) {
-            builder.queryParam(entry.getKey(), "{" + entry.getKey() + "}");
-            vars.put(entry.getKey(), entry.getValue());
+            if (!first) {
+                url.append('&');
+            }
+            first = false;
+            url.append(encode(entry.getKey())).append('=').append(encode(entry.getValue()));
         }
-        final URI uri = builder.encode().buildAndExpand(vars).toUri();
+        log.info("[PROMETHEUS-PROXY] GET {} params={}", operation, StringUtils.abbreviate(String.valueOf(params), 300));
 
-        log.info("[PROMETHEUS-PROXY] GET {} params={}", path, StringUtils.abbreviate(String.valueOf(params), 300));
-
-        final String response;
+        HttpURLConnection conn = null;
         try {
-            response = webClient.get()
-                    .uri(uri)
-                    .accept(MediaType.APPLICATION_JSON)
-                    .retrieve()
-                    .bodyToMono(String.class)
-                    .block(PROMETHEUS_TIMEOUT);
-        } catch (WebClientResponseException e) {
-            // Prometheus 가 4xx/5xx 로 응답 (예: 잘못된 PromQL 400, 쿼리 시간 초과 503)
-            log.error("[PROMETHEUS-PROXY] 호출 실패 path={}, status={}, body={}",
-                    path, e.getRawStatusCode(), StringUtils.abbreviate(e.getResponseBodyAsString(), 500));
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Prometheus 조회에 실패했습니다.");
-        } catch (RuntimeException e) {
-            // 연결 실패, 타임아웃(block), 응답 크기 초과 등
-            log.error("[PROMETHEUS-PROXY] 호출 실패 path={}", path, e);
+            conn = (HttpURLConnection) new URL(url.toString()).openConnection();
+            conn.setRequestMethod("GET");
+            conn.setInstanceFollowRedirects(false);
+            conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
+            conn.setReadTimeout(READ_TIMEOUT_MS);
+            conn.setRequestProperty("Accept", "application/json");   // 인바운드 쿠키/인증 헤더는 전달하지 않는다
+
+            final int status = conn.getResponseCode();
+            final InputStream in = status >= 400 ? conn.getErrorStream() : conn.getInputStream();
+            final String body = in == null ? "" : readLimited(in);
+            if (status != HttpURLConnection.HTTP_OK) {
+                // 잘못된 PromQL(400), 쿼리 시간 초과(503), 리다이렉트(3xx) 등. 내부 오류 본문은 로그에만 남긴다.
+                log.error("[PROMETHEUS-PROXY] 호출 실패 operation={}, status={}, body={}", operation, status, StringUtils.abbreviate(body, 500));
+                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Prometheus 조회에 실패했습니다.");
+            }
+            return body;
+        } catch (SocketTimeoutException e) {
+            log.error("[PROMETHEUS-PROXY] 시간 초과 operation={}", operation, e);
+            throw new ResponseStatusException(HttpStatus.GATEWAY_TIMEOUT, "Prometheus 응답 제한 시간을 초과했습니다.");
+        } catch (IOException e) {
+            log.error("[PROMETHEUS-PROXY] 호출 실패 operation={}", operation, e);
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Prometheus 에 연결할 수 없습니다.");
-        }
-
-        if (response == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Prometheus 응답이 비어 있습니다.");
-        }
-        return response;
-    }
-
-    private void validateQuery(String query) {
-        if (StringUtils.isBlank(query)) {
-            throw badRequest("query 를 입력하세요.");
-        }
-        if (query.length() > MAX_QUERY_LENGTH) {
-            throw badRequest("query 가 너무 깁니다. (최대 " + MAX_QUERY_LENGTH + "자)");
-        }
-        if (CONTROL_CHAR_PATTERN.matcher(query).find()) {
-            throw badRequest("query 에 허용되지 않는 문자가 있습니다.");
+        } finally {
+            if (conn != null) {
+                conn.disconnect();
+            }
         }
     }
 
-    /** epoch 초(소수 허용) 또는 RFC3339(오프셋 필수) → epoch 초 */
-    private double toEpochSeconds(String value, String name) {
-        if (EPOCH_PATTERN.matcher(value).matches()) {
-            return Double.parseDouble(value);
-        }
+    /** 응답을 MAX_RESPONSE_BYTES 까지만 읽는다. 초과하면 중단. */
+    private String readLimited(InputStream in) throws IOException {
+        final ByteArrayOutputStream out = new ByteArrayOutputStream();
+        final byte[] buffer = new byte[8192];
+        int read;
         try {
-            return OffsetDateTime.parse(value).toInstant().toEpochMilli() / 1000.0;
-        } catch (DateTimeParseException e) {
-            throw badRequest(name + " 형식이 올바르지 않습니다. (epoch 초 또는 RFC3339)");
+            while ((read = in.read(buffer)) != -1) {
+                if (out.size() + read > MAX_RESPONSE_BYTES) {
+                    throw new IOException("Prometheus 응답이 허용 크기(" + MAX_RESPONSE_BYTES + " bytes)를 초과했습니다.");
+                }
+                out.write(buffer, 0, read);
+            }
+        } finally {
+            in.close();
+        }
+        return new String(out.toByteArray(), StandardCharsets.UTF_8);
+    }
+
+    private String encode(String value) {
+        try {
+            return URLEncoder.encode(value, "UTF-8");
+        } catch (java.io.UnsupportedEncodingException e) {
+            throw new IllegalStateException(e);
         }
     }
 
-    /** 15, 15s, 1m, 1h ... → 초 */
-    private double toStepSeconds(String value) {
-        final Matcher matcher = STEP_PATTERN.matcher(value);
-        if (!matcher.matches()) {
-            throw badRequest("step 형식이 올바르지 않습니다. (예: 15, 15s, 1m)");
-        }
-        final double number = Double.parseDouble(matcher.group(1));
-        final String unit = matcher.group(2);
+    // ---------------------------------------------------------------- HTML 쿼리 템플릿 검사
 
-        double seconds;
-        if ("ms".equals(unit)) {
-            seconds = number / 1000.0;
-        } else if ("m".equals(unit)) {
-            seconds = number * 60;
-        } else if ("h".equals(unit)) {
-            seconds = number * 3600;
-        } else if ("d".equals(unit)) {
-            seconds = number * 86400;
-        } else {
-            seconds = number;   // 단위 없음 또는 s
+    /**
+     * 쿼리에서 라벨 값(environment/application/site_code)만 뽑아 검증한 뒤,
+     * HTML 과 같은 규칙으로 쿼리를 다시 만들어 요청 쿼리와 완전히 같을 때만 허용한다.
+     */
+    private void requireHtmlQuery(String query, boolean rangeOnly) {
+        if (StringUtils.isBlank(query) || !isHtmlQuery(query, rangeOnly)) {
+            throw badRequest();
         }
-        if (seconds < MIN_STEP_SECONDS) {
-            throw badRequest("step 은 최소 " + (int) MIN_STEP_SECONDS + "초 이상이어야 합니다.");
+    }
+
+    private boolean isHtmlQuery(String query, boolean rangeOnly) {
+        if (UP.equals(query)) {
+            return true;
+        }
+        final String env = labelValue(ENV_IN_QUERY, query, false);
+        final String app = labelValue(APP_IN_QUERY, query, false);
+        final String site = labelValue(SITE_IN_QUERY, query, true);
+        if ("".equals(env) || "".equals(app) || "".equals(site)) {      // 값이 있는데 허용 문자가 아님
+            return false;
+        }
+
+        for (int scope = 0; scope < METRIC_PREFIXES.length; scope++) {
+            final boolean naver = scope == 1;
+            final String select = selector(METRIC_PREFIXES[scope], null, env, app, naver ? null : site);
+            if (query.equals(select) || query.equals(select + " or " + UP)) {
+                return true;
+            }
+            if (!rangeOnly && query.equals(freshness(METRIC_PREFIXES[scope], env, app, naver ? null : site))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** 쿼리에서 첫 라벨 값을 꺼낸다. 없으면 null, 있는데 허용 문자가 아니면 ""(거부 표시). */
+    private String labelValue(Pattern pattern, String query, boolean siteRegex) {
+        final Matcher matcher = pattern.matcher(query);
+        if (!matcher.find()) {
+            return null;
+        }
+        String value = matcher.group(1);
+        if (siteRegex) {
+            value = value.replace("\\\\.", ".");     // 쿼리 문자열의 \\. → 리터럴 '.'
+        }
+        return LABEL_VALUE.matcher(value).matches() ? value : "";
+    }
+
+    /** HTML selector(): {__name__=~"이름|이름...",environment="..",application="..",site_code=~"..|"} */
+    private String selector(String prefix, String exactName, String env, String app, String site) {
+        final StringBuilder sb = new StringBuilder("{");
+        if (exactName == null) {
+            final StringBuilder names = new StringBuilder();
+            for (String suffix : METRIC_SUFFIXES) {
+                if (names.length() > 0) {
+                    names.append('|');
+                }
+                names.append(escapeRegex(prefix + suffix));
+            }
+            sb.append("__name__=~").append(quote(names.toString()));
+        } else {
+            sb.append("__name__=").append(quote(exactName));
+        }
+        if (env != null) {
+            sb.append(",environment=").append(quote(env));
+        }
+        if (app != null) {
+            sb.append(",application=").append(quote(app));
+        }
+        if (site != null) {
+            sb.append(",site_code=~").append(quote(escapeRegex(site) + "|"));
+        }
+        return sb.append('}').toString();
+    }
+
+    /** HTML freshnessQuery(): 규칙별 label_replace(time()-timestamp(...)) 16개 + up 1개를 " or " 로 연결 */
+    private String freshness(String prefix, String env, String app, String site) {
+        final StringBuilder sb = new StringBuilder();
+        for (String suffix : METRIC_SUFFIXES) {
+            final String name = prefix + suffix;
+            sb.append("(label_replace(time()-timestamp(").append(selector(prefix, name, env, app, site))
+                    .append("),\"dashboard_metric\",").append(quote(name)).append(",\"\",\"\")) or ");
+        }
+        return sb.append("(label_replace(time()-timestamp(").append(UP)
+                .append("),\"dashboard_metric\",\"up\",\"\",\"\"))").toString();
+    }
+
+    /** JSON.stringify 와 동일 (값은 검증을 거친 안전 문자뿐이므로 역슬래시만 처리) */
+    private String quote(String value) {
+        return "\"" + value.replace("\\", "\\\\") + "\"";
+    }
+
+    private String escapeRegex(String value) {
+        final StringBuilder sb = new StringBuilder();
+        for (char c : value.toCharArray()) {
+            if (".*+?^${}()|[]\\".indexOf(c) >= 0) {
+                sb.append('\\');
+            }
+            sb.append(c);
+        }
+        return sb.toString();
+    }
+
+    /** epoch 초(정수). 음수/과도하게 먼 미래(서버 시각 + 60초 초과) 거부 */
+    private long epochSeconds(String value, String name) {
+        if (StringUtils.isBlank(value) || !EPOCH_SECONDS.matcher(value).matches()) {
+            throw badRequest();
+        }
+        final long seconds = Long.parseLong(value);
+        if (seconds > System.currentTimeMillis() / 1000 + MAX_CLOCK_SKEW_SECONDS) {
+            throw badRequest();
         }
         return seconds;
     }
 
-    private ResponseStatusException badRequest(String message) {
-        return new ResponseStatusException(HttpStatus.BAD_REQUEST, message);
+    /** 입력 오류 (HTML 의 정상 요청은 항상 통과하므로 상세 사유는 내려주지 않는다) */
+    private ResponseStatusException badRequest() {
+        return new ResponseStatusException(HttpStatus.BAD_REQUEST, "허용된 대시보드 조회 형식과 파라미터를 확인하세요.");
     }
 }
