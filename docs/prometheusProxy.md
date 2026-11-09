@@ -37,22 +37,28 @@ HTML (prometheus.proxyPath = '/air/monitoring/prometheus')
              └─ Prometheus  {monitoring.prometheus.base-url}/api/v1/...
 ```
 
-## 3. 필수 설정 (ols application 설정, 환경별로 다름)
+## 3. 설정 (선택 사항 — yml 추가 불필요)
+
+Prometheus 주소 기본값은 코드에 있다 (`FlightPriceSnapshotCbcImpl.DEFAULT_PROMETHEUS_BASE_URL = http://10.100.23.95:9090`).
+**yml 에 아무것도 추가하지 않아도 동작한다.**
+
+다른 주소가 필요해지면 ols 설정에 아래를 추가하면 **설정 값이 기본값보다 우선**한다. (코드 수정/재빌드 없이 환경별 변경 가능)
 
 ```yaml
 monitoring:
   prometheus:
-    base-url: http://10.100.23.95:9090
+    base-url: http://<다른 주소>:9090
 ```
 
-- 설정이 없으면 호출 시 502 (`Prometheus 연결 설정이 없습니다`). 스냅샷 조회와 앱 기동에는 영향 없음
-- ols 서버에서 해당 주소로 **네트워크가 열려 있어야 함** (방화벽)
+- HTML 의 `environment: 'prod'` 가 PromQL 라벨 필터이므로 Prometheus 한 곳에 여러 환경 지표가 있다고 보고 한 주소를 공용으로 둠. 환경마다 Prometheus 가 다르면 위 설정으로 환경별 지정
+- ols 서버에서 해당 주소로 **네트워크가 열려 있어야 함** (방화벽). DEV/QA/LIVE 각각 확인
+- 주소가 소스 코드에 들어가는 것이 단점 (내부 IP). 주소 변경 시 코드 수정이나 설정 추가가 필요
 
 ## 4. 보안 설계
 
 | 항목 | 내용 |
 |---|---|
-| 주소 고정 | Prometheus 주소는 서버 설정으로만 지정. UI 가 주소/경로를 정할 수 없음 (SSRF 방지) |
+| 주소 고정 | Prometheus 주소는 서버(코드 기본값/설정)에서만 정함. UI 가 주소/경로를 정할 수 없음 (SSRF 방지) |
 | 경로 allowlist | `query`, `query_range`, `rules` 3개만 매핑. `/api/v1/admin/*`, `/-/reload`, `/api/v1/targets` 등은 중계하지 않음 |
 | GET 만 | 읽기 전용 |
 | rules 필터 | `type` 은 `alert`/`record` 만 허용. `rule_name[]`, `file[]`, `match[]` 등은 전달하지 않음 (단위 확인: 주입 시도 거부) |
@@ -68,7 +74,7 @@ monitoring:
 
 ## 6. 확인 필요 / 한계
 
-1. **Prometheus 주소가 둘로 보임**: 사용자가 준 설정은 `10.100.23.95:9090`, HTML 기본값(`DEFAULTS.baseUrl`)과 "연결 정보" 화면 문구는 `203.245.33.80:9090`. **ols 설정(`monitoring.prometheus.base-url`)이 운영 Prometheus 가 맞는지 확인**. 프록시 모드에서는 브라우저가 이 주소를 호출하지 않지만 HTML 에 내부/외부 IP 가 노출되어 있으므로, 중계가 동작하면 HTML 설정에서 `baseUrl` 제거를 권장
+1. **Prometheus 주소가 둘로 보임**: 사용자가 준 설정은 `10.100.23.95:9090`(코드 기본값으로 사용), HTML 기본값(`DEFAULTS.baseUrl`)과 "연결 정보" 화면 문구는 `203.245.33.80:9090`. **코드 기본값이 운영 Prometheus 가 맞는지 확인**. 프록시 모드에서는 브라우저가 이 주소를 호출하지 않지만 HTML 에 내부/외부 IP 가 노출되어 있으므로, 중계가 동작하면 HTML 설정에서 `baseUrl` 제거를 권장
 2. **긴 URL**: freshness 쿼리가 GET 쿼리스트링으로 **약 4.4~4.7KB**. 웹서버/WAF/게이트웨이의 요청줄 제한(보통 8KB, 일부 4KB)에 걸리면 포털 구간에서 400/414 가 날 수 있음. ols 에 도달하기 전 구간이라 코드로 해결 불가 → DEV 에서 실제 호출 확인 필요. 필터(사이트코드 등) 값이 길어지면 더 늘어남
 3. **PromQL allowlist 없음 (중요)**: 지금은 어떤 PromQL 이든 길이/범위 제한 안에서 전달됨. 로그인한 사용자가 모든 애플리케이션/호스트 지표를 조회할 수 있음. HTML 이 쓰는 지표는 `air:stage_*`, `air:naver:stage_*`, `up{job="air-api"}` 로 한정되어 있으므로 **메트릭 이름 allowlist 로 좁히는 것이 가능**함 (필요하면 추가 구현)
 4. **인증/인가 (운영 반영 전 필수)**: 인프라 지표 노출. 포털 SSO 적용 범위와 권한 검증 필요. Controller 주석에 TODO

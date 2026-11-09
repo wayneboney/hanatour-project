@@ -40,7 +40,7 @@ import java.util.regex.Pattern;
  *   3) 항공API 응답(JSON 문자열)을 가공 없이 그대로 돌려준다. (응답 형식은 프론트 계약을 항공API 가 책임)
  *
  * [Prometheus] ols -> Prometheus (읽기 전용 중계)
- *   1) 주소는 서버 설정(monitoring.prometheus.base-url)으로만 지정한다. 경로는 query/query_range/rules 로 고정, GET 만 사용
+ *   1) 주소는 서버에서만 정한다. (기본값 코드 지정, 설정 monitoring.prometheus.base-url 이 있으면 우선) 경로는 query/query_range/rules 로 고정, GET 만 사용
  *   2) 파라미터 검증 (PromQL 길이, 시간 형식, 조회 범위/해상도 상한 → Prometheus 과부하 방지)
  *   3) 값은 URI 변수로 바인딩해 인코딩한다. (PromQL 의 { } " & # 등이 파라미터를 주입하지 못함)
  *   4) 응답(JSON 문자열)을 가공 없이 그대로 돌려준다. 입력 오류 400, Prometheus 실패/설정 누락 502
@@ -60,6 +60,9 @@ public class FlightPriceSnapshotCbcImpl implements FlightPriceSnapshotCbc {
     private static final String TIME_ZONE = "Asia/Seoul";
 
     // ---------------------------------------------------------------- Prometheus
+
+    // Prometheus 기본 주소 (내부망). HTML 의 environment 라벨(prod 등)로 환경을 구분하므로 한 주소를 공용으로 사용
+    private static final String DEFAULT_PROMETHEUS_BASE_URL = "http://10.100.23.95:9090";
 
     private static final String PROMETHEUS_QUERY = "/api/v1/query";
     private static final String PROMETHEUS_QUERY_RANGE = "/api/v1/query_range";
@@ -91,7 +94,9 @@ public class FlightPriceSnapshotCbcImpl implements FlightPriceSnapshotCbc {
     public FlightPriceSnapshotCbcImpl(RestServiceClient restServiceClient,
                                       ObjectMapper objectMapper,
                                       WebClient webClient,
-                                      @Value("${monitoring.prometheus.base-url:}") String prometheusBaseUrl) {
+                                      // 설정 파일 없이 동작하도록 기본값을 지정. 다른 주소가 필요하면 설정에
+                                      // monitoring.prometheus.base-url 을 추가해서 덮어쓸 수 있다. (설정 값이 우선)
+                                      @Value("${monitoring.prometheus.base-url:" + DEFAULT_PROMETHEUS_BASE_URL + "}") String prometheusBaseUrl) {
         this.restServiceClient = restServiceClient;
         this.objectMapper = objectMapper;
         this.webClient = webClient;
