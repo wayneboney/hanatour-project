@@ -54,10 +54,12 @@ public class FlightPriceSnapshotController {
     private static final String PROMETHEUS_PATH = "/air/monitoring/prometheus";
 
     // 대시보드 조회 허용 사용자 아이디 (스냅샷에 예약/탑승객 정보가 있으므로 허용 목록 방식)
-    // TODO: 운영 반영 전에 실제 허용할 아이디를 넣을 것. 비어 있으면 아무도 조회할 수 없다.
+    // TODO: 운영 반영 전에 "여기에_허용아이디N" 을 실제 로그인 아이디(getUsrid() 값)로 바꿀 것.
+    //       이 자리표시 값은 어떤 사용자와도 일치하지 않으므로, 바꾸기 전에는 아무도 조회할 수 없다.
+    //       아이디를 추가/삭제할 때는 마지막 항목 뒤에만 쉼표를 붙이지 않는다.
     private static final Set<String> ALLOWED_USER_IDS = Collections.unmodifiableSet(new HashSet<String>(Arrays.asList(
-            // "user01",
-            // "user02"
+            "여기에_허용아이디1",
+            "여기에_허용아이디2"
     )));
 
     private final FlightPriceSnapshotCbc flightPriceSnapshotCbc;
