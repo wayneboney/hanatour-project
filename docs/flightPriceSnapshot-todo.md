@@ -35,7 +35,7 @@ private static final String SNAPSHOT_PATH = "/flightPriceSnapshot/air/api/servic
 body.put("dateStart", ...); body.put("dateEnd", ...); body.put("timeZone", ...); // 요청 키 이름 가정
 ```
 
-항공API 개발자가 정한 실제 경로와 요청 키로 변경. HTTP 방식은 **POST(MCI)** 로 가정했으므로 다르면 알려줄 것.
+항공API 확정 경로(GET `/lambda/naver/flight/snapshots`)와 파라미터(`startDate`, `endDate`) 반영 완료.
 
 ### A-3. 의존 클래스 확인
 

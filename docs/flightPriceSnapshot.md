@@ -14,7 +14,7 @@ HTML (portal /air/**)
  └─ GET /air/flightPrice/snapshots?date_start=&date_end=&timezone=
       FlightPriceSnapshotController        파라미터 수신, Cbc 위임
         └─ FlightPriceSnapshotCbc(+Impl)   항공API WebClient GET 호출 → 응답 JSON 그대로 반환
-             └─ 항공API  POST /flightPriceSnapshot/air/api/service/snapshots/v1.00  (경로/요청키 확인 필요)
+             └─ 항공API  GET /lambda/naver/flight/snapshots?startDate&endDate
                   └─ MariaDB (price 데이터소스, AIR01.FLIGHT_PRICE_SNAPSHOT)
 ```
 
@@ -111,7 +111,7 @@ GET {ENDPOINT_API}/lambda/naver/flight/snapshots?startDate=2026-11-04&endDate=20
 
 | 항목 | dynamicPricing | 이번 구현 |
 |---|---|---|
-| 호출 | GET(`callGetApi`) + POST(MCI) | **MCI POST 만** (`callApiService` 동일) |
+| 호출 | GET(`callGetApi`) + POST(MCI) | **WebClient GET 만** (`callGetApi` 동일) |
 | 요청 본문 | `{ "targetValue": ... }` | `{ "dateStart", "dateEnd", "timeZone" }` (키 이름은 항공API 와 확정) |
 | 응답 로그 | 응답 전문 로그 | 크기만 로그 (대용량 응답) |
 | 예외 | Controller `@ExceptionHandler` | 핸들러 없음 (요구사항). `ApiException` 은 `IllegalStateException` 으로 변환해 전파 |
@@ -119,10 +119,10 @@ GET {ENDPOINT_API}/lambda/naver/flight/snapshots?startDate=2026-11-04&endDate=20
 
 ## 6. 확인 필요 / 남은 작업
 
-1. **항공API 경로/요청 키 확정** (항공API 개발자): `Cbc` 의 `SNAPSHOT_PATH` 상수와 `toRequestJson()` 의 키 이름 수정. MCI Header 값(`JobSysCd` 등)이 dynamicPricing 과 같은지도 확인
+1. **항공API 확정값 반영 완료**: GET `/lambda/naver/flight/snapshots?startDate&endDate`. MCI Header 는 사용하지 않음
 2. **항공API 응답 규격**: 4번 규칙대로 내려오는지 (특히 `total == rows`, `business_date`, `q_charge` 키)
 3. **데이터량**: 기간 전체를 한 응답으로 중계하는 구조. 하루 수만 건 이상이면 응답이 커져 ols/프론트 모두 부담 → 항공API 에서 서버 집계 API 로 확장 필요
-4. **타임아웃**: `RestServiceClient` 의 MCI 타임아웃 설정을 따름 (코드에서 별도 지정하지 않음). 프론트 30초, 포털 프록시 타임아웃보다 짧은지 확인
+4. **타임아웃**: 코드 25초(`SNAPSHOT_TIMEOUT`), 응답 버퍼 16MB. 프론트 30초, 포털 프록시 타임아웃보다 짧은지 확인
 5. **인증/인가 (운영 반영 전 필수)**: 포털 SSO 적용 범위, 사용자 권한별 조회 범위 검증. Controller 주석에 TODO
 6. **컴파일/실행 미검증**: 사내 라이브러리(`hntframe`, `RestServiceClient` 등)가 없는 환경에서 작성. DEV 환경에서 호출 확인 필요
 7. **편도/다구간 목적지**: 테이블에 `dest_airport` 컬럼 없음 → 프론트는 `return_airport` 로만 판단 (왕복만 정확)
