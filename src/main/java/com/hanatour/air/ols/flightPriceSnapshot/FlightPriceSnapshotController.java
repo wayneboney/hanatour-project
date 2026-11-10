@@ -60,9 +60,9 @@ public class FlightPriceSnapshotController {
     private static final String SESSION_MEMBER_INFO_KEY = "HNT_MEMBER_INFO";
     /**
      * true: 로그인 + 허용 목록(ALLOWED_USER_IDS) 모두 검사 / false: 로그인 여부만 검사.
-     * 운영 세션 값 확인 중에는 false. 확인이 끝나면 true 로 바꿔 허용 목록을 다시 적용할 것.
+     * 운영 세션 값 확인이 끝났으므로 true. (일시적으로 로그인만 검사하려면 false)
      */
-    private static final boolean ENFORCE_ALLOWLIST = false;
+    private static final boolean ENFORCE_ALLOWLIST = true;
     private static final String PROMETHEUS_PATH = "/air/monitoring/prometheus";
 
     // 대시보드 조회 허용 사용자 아이디 (스냅샷에 예약/탑승객 정보가 있으므로 허용 목록 방식)
@@ -142,7 +142,7 @@ public class FlightPriceSnapshotController {
             log.warn("[FLIGHT-PRICE-SNAPSHOT] 접근 거부 usrId={}", usrId);
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "이 대시보드를 조회할 권한이 없습니다.");
         }
-        log.info("[FLIGHT-PRICE-SNAPSHOT][AUTH] 로그인 확인 usrId={} source={}", usrId, source);   // 운영 추적용 (안정화 후 debug 로 낮출 것)
+        log.info("[FLIGHT-PRICE-SNAPSHOT][AUTH] 로그인 확인 usrId={} source={}", usrId, source);   // 조회 추적용 로그
         return usrId;
     }
 
