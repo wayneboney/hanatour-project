@@ -1,11 +1,11 @@
 # 항공권 가격 스냅샷 조회 (flightPriceSnapshot)
 
-프론트 대시보드(`flightPricingDashboard.html`)가 ols 를 호출하면, ols 가 **항공API 를 MCI(POST)로 호출**해서 응답을 그대로 돌려주는 **중계(조회 전용)** API.
+프론트 대시보드(`flightPricingDashboard.html`)가 ols 를 호출하면, ols 가 **항공API 를 GET(WebClient)으로 호출**해서 응답을 그대로 돌려주는 **중계(조회 전용)** API.
 DB(MariaDB, price 데이터소스) 조회는 **항공API 쪽**에서 수행한다. (ols 에는 price 데이터소스 설정이 없음, `PriceMapper` 는 공통 모듈)
 
 - 갱신일: 2026-11-05
 - 브랜치: `claude/busy-knuth-v7bcfs`
-- 기준: Java 8, 기존 `dynamicPricing` 구조 (Controller → Cbc → 항공API MCI POST 호출)
+- 기준: Java 8, 기존 `dynamicPricing` 구조 (Controller → Cbc → 항공API GET 호출)
 
 ## 1. 구조
 
@@ -13,7 +13,7 @@ DB(MariaDB, price 데이터소스) 조회는 **항공API 쪽**에서 수행한�
 HTML (portal /air/**)
  └─ GET /air/flightPrice/snapshots?date_start=&date_end=&timezone=
       FlightPriceSnapshotController        파라미터 수신, Cbc 위임
-        └─ FlightPriceSnapshotCbc(+Impl)   항공API MCI POST 호출 → 응답 JSON 그대로 반환
+        └─ FlightPriceSnapshotCbc(+Impl)   항공API WebClient GET 호출 → 응답 JSON 그대로 반환
              └─ 항공API  POST /flightPriceSnapshot/air/api/service/snapshots/v1.00  (경로/요청키 확인 필요)
                   └─ MariaDB (price 데이터소스, AIR01.FLIGHT_PRICE_SNAPSHOT)
 ```
@@ -26,7 +26,7 @@ HTML (portal /air/**)
 |---|---|
 | `FlightPriceSnapshotController.java` | `@RestController`, `GET /air/flightPrice/snapshots` + Prometheus 중계 2개 (`docs/prometheusProxy.md`) |
 | `cbc/FlightPriceSnapshotCbc.java` | 인터페이스 |
-| `cbc/impl/FlightPriceSnapshotCbcImpl.java` | 항공API MCI POST 호출 (`RestServiceClient`) |
+| `cbc/impl/FlightPriceSnapshotCbcImpl.java` | 항공API WebClient GET 호출 |
 | `cbc/vo/FlightPriceSnapshotReqVo.java` | 조회 조건 (`dateStart`, `dateEnd`) |
 
 참고 자료(항공API 개발자용): `docs/reference-for-api/`
@@ -39,19 +39,18 @@ HTML (portal /air/**)
 |---|---|---|
 | `date_start` | O | 수집일자 시작 `YYYY-MM-DD` (KST, 포함) |
 | `date_end` | O | 수집일자 종료 `YYYY-MM-DD` (KST, 포함) |
-| `timezone` | | 프론트가 `Asia/Seoul` 고정 전송. ols 는 사용하지 않고 항공API 에는 `Asia/Seoul` 로 고정 전달 |
+| `timezone` | | 프론트가 `Asia/Seoul` 고정 전송. `Asia/Seoul` 외 값은 400. 항공API 에는 전달하지 않음(영업일은 KST 기준) |
 
-> HTML → ols 는 **GET** (프론트 `fetch` 가 GET, 요청 body 없음). ols → 항공API 는 **POST**.
+> HTML → ols 는 **GET** (프론트 `fetch` 가 GET, 요청 body 없음). ols → 항공API 는 **GET**.
 
 프론트 HTML 의 `endpoint` 는 `/air/flightPrice/snapshots` (프론트 저장소 `air-seer/naver_snapshot/flightPricingDashboard.html` 기준). Controller 를 이 경로에 맞춤.
 
 ## 4. ols → 항공API (항공API 개발자 구현 사항)
 
-ols 가 호출하는 항공API (**경로/요청 키는 항공API 개발자와 확정 필요**, 현재 가정). 호출 방식은 `dynamicPricing` 과 같은 **MCI POST**:
+ols 가 호출하는 항공API. 호출 방식은 `dynamicPricing` 의 `callGetApi` 와 같은 **공통 WebClient GET** (MCI 헤더 없음, `x-guid` 헤더 전달):
 
 ```
-POST {ENDPOINT_API}/flightPriceSnapshot/air/api/service/snapshots/v1.00   (MCI Header 포함)
-Body: { "dateStart": "2026-11-04", "dateEnd": "2026-11-04", "timeZone": "Asia/Seoul" }
+GET {ENDPOINT_API}/lambda/naver/flight/snapshots?startDate=2026-11-04&endDate=2026-11-04
 ```
 
 항공API 가 반환해야 하는 응답 (프론트 `API_CONTRACT.md` 계약, ols 는 **가공 없이 그대로 전달**):

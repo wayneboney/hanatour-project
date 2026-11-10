@@ -3,19 +3,22 @@ package com.hanatour.air.ols.flightPriceSnapshot.cbc.impl;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.hanatour.air.cmn.common.ApiException;
 import com.hanatour.air.cmn.webclient.RestServiceClient;
 import com.hanatour.air.cmn.webclient.ServiceEndpoint;
 import com.hanatour.air.ols.flightPriceSnapshot.cbc.FlightPriceSnapshotCbc;
 import com.hanatour.air.ols.flightPriceSnapshot.cbc.PrometheusUpstreamException;
 import com.hanatour.air.ols.flightPriceSnapshot.cbc.vo.FlightPriceSnapshotReqVo;
-import com.hanatour.common.cmn.restclient.vo.Header;
+import hntframe.run.oltp.ext.service.context.ServiceContextConstants;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
+import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.io.ByteArrayOutputStream;
@@ -27,10 +30,12 @@ import java.net.URL;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -39,7 +44,7 @@ import java.util.regex.Pattern;
  *
  * <pre>
  * [스냅샷] ols -> 항공API (DB 조회는 항공API 에서 수행. ols 에는 price(MariaDB) 데이터소스 설정이 없음)
- *   dynamicPricing 의 callApiService(MCI 방식, POST) 와 동일. 항공API 경로는 서버에 고정하고, 응답은 가공 없이 그대로 반환
+ *   dynamicPricing 의 callGetApi(WebClient GET) 와 동일. 항공API 경로는 서버에 고정하고, 응답은 가공 없이 그대로 반환
  *
  * [Prometheus] ols -> Prometheus (읽기 전용 중계, flightPricingDashboard.html 전용)
  *   HTML 이 보내는 쿼리 형태만 허용한다. HTML 의 selector/freshness 템플릿을 서버가 같은 규칙으로 다시 만들어 보고
@@ -54,11 +59,14 @@ public class FlightPriceSnapshotCbcImpl implements FlightPriceSnapshotCbc {
 
     // ---------------------------------------------------------------- 스냅샷 (항공API)
 
-    // 항공API 경로 (TODO: 항공API 개발자와 최종 경로 확인 필요)
-    private static final String SNAPSHOT_PATH = "/flightPriceSnapshot/air/api/service/snapshots/v1.00";
+    // 항공API 경로 (GET /lambda/naver/flight/snapshots?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD)
+    private static final String SNAPSHOT_PATH = "/lambda/naver/flight/snapshots";
 
-    // 영업일 기준은 한국시간 고정 (UI 의 timezone 값은 사용하지 않음)
-    private static final String TIME_ZONE = "Asia/Seoul";
+    // HTML 요청 제한(30초)보다 짧게
+    private static final Duration SNAPSHOT_TIMEOUT = Duration.ofSeconds(25);
+
+    // 스냅샷 응답은 대용량일 수 있어 WebClient 기본 버퍼(256KB) 제한을 넓힌다.
+    private static final int SNAPSHOT_MAX_IN_MEMORY_BYTES = 16 * 1024 * 1024;
 
     // ---------------------------------------------------------------- Prometheus
 
@@ -92,17 +100,23 @@ public class FlightPriceSnapshotCbcImpl implements FlightPriceSnapshotCbc {
     private static final String PROMETHEUS_QUERY_TIMEOUT = "6000ms";   // Prometheus 쪽 쿼리 실행 제한 (브라우저가 늘릴 수 없음)
     private static final int MAX_RESPONSE_BYTES = 16 * 1024 * 1024;
 
-    private final RestServiceClient restServiceClient;
+    private final ServiceEndpoint serviceEndpoint;
+    private final WebClient webClient;
     private final ObjectMapper objectMapper;
     private final String prometheusBaseUrl;
 
     @Autowired
-    public FlightPriceSnapshotCbcImpl(RestServiceClient restServiceClient,
+    public FlightPriceSnapshotCbcImpl(ServiceEndpoint serviceEndpoint,
+                                      WebClient webClient,
                                       ObjectMapper objectMapper,
                                       // 설정 파일 없이 동작하도록 기본값을 지정. 다른 주소가 필요하면 설정에
                                       // monitoring.prometheus.base-url 을 추가해서 덮어쓸 수 있다. (설정 값이 우선)
                                       @Value("${monitoring.prometheus.base-url:" + DEFAULT_PROMETHEUS_BASE_URL + "}") String prometheusBaseUrl) {
-        this.restServiceClient = restServiceClient;
+        this.serviceEndpoint = serviceEndpoint;
+        // 공통 WebClient 설정(필터·커넥터)은 유지하고 응답 버퍼 제한만 넓힌 복사본을 사용한다.
+        this.webClient = webClient.mutate()
+                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(SNAPSHOT_MAX_IN_MEMORY_BYTES))
+                .build();
         this.objectMapper = objectMapper;
         this.prometheusBaseUrl = StringUtils.removeEnd(StringUtils.trimToEmpty(prometheusBaseUrl), "/");
         try {
@@ -123,10 +137,12 @@ public class FlightPriceSnapshotCbcImpl implements FlightPriceSnapshotCbc {
     @Override
     public String getSnapshots(FlightPriceSnapshotReqVo vo) {
         validateSnapshotDates(vo);
-        final String response = callApiService(SNAPSHOT_PATH, toRequestJson(vo));
+        // 날짜는 위에서 YYYY-MM-DD 형식·실제 날짜로 검증했으므로 URL 에 그대로 붙여도 안전하다.
+        final String path = SNAPSHOT_PATH + "?startDate=" + vo.getDateStart() + "&endDate=" + vo.getDateEnd();
+        final String response = callGetApi(path);
 
         // 응답 본문(대용량 가능)은 로그에 남기지 않고 크기만 기록
-        log.info("[FLIGHT-PRICE-SNAPSHOT] MCI response length={}", response == null ? 0 : response.length());
+        log.info("[FLIGHT-PRICE-SNAPSHOT] GET response length={}", response == null ? 0 : response.length());
         if (StringUtils.isBlank(response)) {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "항공API 응답이 비어 있습니다.");
         }
@@ -149,43 +165,40 @@ public class FlightPriceSnapshotCbcImpl implements FlightPriceSnapshotCbc {
     }
 
     /**
-     * 요청 JSON 생성 (TODO: 항공API 개발자와 요청 키 이름 확정 필요)
-     * { "dateStart" : "2026-11-04", "dateEnd" : "2026-11-04", "timeZone" : "Asia/Seoul" }
+     * 항공API GET 호출 (DynamicPricingCbcImpl.callGetApi 와 동일: 공통 WebClient + 엔드포인트 + GUID 헤더)
      */
-    private String toRequestJson(FlightPriceSnapshotReqVo vo) {
-        Map<String, String> body = new LinkedHashMap<String, String>();
-        body.put("dateStart", vo.getDateStart());
-        body.put("dateEnd", vo.getDateEnd());
-        body.put("timeZone", TIME_ZONE);
+    private String callGetApi(String path) {
+        final String uri = serviceEndpoint.findEndpoint(ServiceEndpoint.ENDPOINT_API) + path;
+        log.info("[FLIGHT-PRICE-SNAPSHOT] GET {}", uri);
 
         try {
-            return objectMapper.writeValueAsString(body);
-        } catch (JsonProcessingException e) {
-            throw new IllegalStateException("요청 JSON 생성 실패", e);
+            return webClient.get()
+                    .uri(uri)
+                    .accept(MediaType.APPLICATION_JSON_UTF8)
+                    .header(ServiceContextConstants.HTTP_REQUEST_GUID, currentGuid())
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .contextWrite(RestServiceClient.createContextWithGuid())
+                    .block(SNAPSHOT_TIMEOUT);
+        } catch (WebClientResponseException e) {
+            // 항공API 가 오류 상태를 반환. 본문은 브라우저에 전달하지 않고 로그에만 남긴다.
+            log.error("[FLIGHT-PRICE-SNAPSHOT] 항공API 오류 응답 status={} uri={} body={}", e.getRawStatusCode(), uri,
+                    StringUtils.abbreviate(e.getResponseBodyAsString(), 500));
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "항공API 조회에 실패했습니다.");
+        } catch (RuntimeException e) {
+            // Reactor block(Duration) 시간 초과는 IllegalStateException("Timeout on blocking read ...") 로 전달된다.
+            if (e instanceof IllegalStateException && String.valueOf(e.getMessage()).startsWith("Timeout on blocking read")) {
+                log.error("[FLIGHT-PRICE-SNAPSHOT] 시간 초과 uri={}", uri, e);
+                throw new ResponseStatusException(HttpStatus.GATEWAY_TIMEOUT, "항공API 응답 제한 시간을 초과했습니다.");
+            }
+            log.error("[FLIGHT-PRICE-SNAPSHOT] GET 호출 실패 uri={}", uri, e);
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "항공API 에 연결할 수 없습니다.");
         }
     }
 
-    /**
-     * 항공API MCI 방식 호출 (DynamicPricingCbcImpl.callApiService 와 동일)
-     */
-    private String callApiService(String url, String requestBody) {
-        log.info("[FLIGHT-PRICE-SNAPSHOT] MCI {} body={}", url, requestBody);
-
-        try {
-            final Header mciHeader = new Header();
-            mciHeader.setJobSysCd("P_AIR_A0SLE"); //업무시스템코드
-            mciHeader.setPupsInttCd("BP_AIR"); //목적기관코드
-            mciHeader.setFltxTycd("4280"); //전문유형코드
-            mciHeader.setTrncDvcd("550"); // 처리구분코드
-            mciHeader.setRspnTrnrMdcd("R"); // 응답전달방식코드
-            mciHeader.setSvcDmnInfo(RestServiceClient.HANATOUR_AIR_API); //서비스도메인정보
-            mciHeader.setSvcTrncId(url); //서비스거래ID
-
-            return restServiceClient.sendWithMciHeaderToString(ServiceEndpoint.ENDPOINT_API, url, mciHeader, requestBody);
-        } catch (ApiException e) {
-            log.error("[FLIGHT-PRICE-SNAPSHOT] MCI 호출 실패 url={}", url, e);
-            throw new IllegalStateException("항공API 호출 실패: " + url, e);
-        }
+    private String currentGuid() {
+        final String guid = MDC.get(ServiceContextConstants.HTTP_REQUEST_GUID);
+        return guid == null ? UUID.randomUUID().toString() : guid;
     }
 
     // ================================================================ Prometheus
