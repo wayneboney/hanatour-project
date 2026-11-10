@@ -56,17 +56,16 @@ import java.util.Set;
 public class FlightPriceSnapshotController {
 
     private static final String JSON_UTF8 = "application/json;charset=UTF-8";
-    /** 포털이 로그인 사용자 정보를 담아두는 서버 세션 속성명 (진단 로그로 확인) */
+    /** 포털이 로그인 사용자 정보를 담아두는 서버 세션 속성명 (운영 로그로 확인함: 값은 MemberInfo, getUsrid()에 로그인 아이디) */
     private static final String SESSION_MEMBER_INFO_KEY = "HNT_MEMBER_INFO";
     private static final String PROMETHEUS_PATH = "/air/monitoring/prometheus";
 
     // 대시보드 조회 허용 사용자 아이디 (스냅샷에 예약/탑승객 정보가 있으므로 허용 목록 방식)
-    // TODO: 운영 반영 전에 "여기에_허용아이디N" 을 실제 로그인 아이디(getUsrid() 값)로 바꿀 것.
-    //       이 자리표시 값은 어떤 사용자와도 일치하지 않으므로, 바꾸기 전에는 아무도 조회할 수 없다.
-    //       아이디를 추가/삭제할 때는 마지막 항목 뒤에만 쉼표를 붙이지 않는다.
+    // 아이디를 추가/삭제할 때는 마지막 항목 뒤에만 쉼표를 붙이지 않는다.
     private static final Set<String> ALLOWED_USER_IDS = Collections.unmodifiableSet(new HashSet<String>(Arrays.asList(
-            "여기에_허용아이디1",
-            "여기에_허용아이디2"
+            "A02347",
+            "HG207",
+            "HH659"
     )));
 
     private final FlightPriceSnapshotCbc flightPriceSnapshotCbc;
@@ -140,9 +139,7 @@ public class FlightPriceSnapshotController {
     private String readUserIdFromCoreUtil() {
         try {
             MemberInfo memberInfo = CoreUtil.getCertificationUtil().getMemberInfo();
-            String id = memberInfo == null ? null : memberInfo.getUsrid();
-            log.info("[FLIGHT-PRICE-SNAPSHOT][TEST] CoreUtil 경로 usrId={}", id);   // [임시 테스트 로그] 확인 후 삭제
-            return id;
+            return memberInfo == null ? null : memberInfo.getUsrid();
         } catch (RuntimeException e) {
             // 프레임워크 컨텍스트가 없는 요청에서는 정상적으로 발생할 수 있다.
             log.debug("[FLIGHT-PRICE-SNAPSHOT] CoreUtil 회원정보 없음: {}", e.toString());
@@ -166,9 +163,7 @@ public class FlightPriceSnapshotController {
                 log.warn("[FLIGHT-PRICE-SNAPSHOT] 세션 {} 타입 불일치: {}", SESSION_MEMBER_INFO_KEY, value.getClass().getName());
                 return null;
             }
-            String id = ((MemberInfo) value).getUsrid();
-            log.info("[FLIGHT-PRICE-SNAPSHOT][TEST] 세션 경로 usrId={}", id);   // [임시 테스트 로그] 확인 후 삭제
-            return id;
+            return ((MemberInfo) value).getUsrid();
         } catch (RuntimeException e) {
             log.warn("[FLIGHT-PRICE-SNAPSHOT] 세션 회원정보 읽기 실패: {}", e.toString());
             return null;
