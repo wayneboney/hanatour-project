@@ -4,6 +4,7 @@ import com.hanatour.air.ols.flightPriceSnapshot.cbc.FlightPriceSnapshotCbc;
 import com.hanatour.air.ols.flightPriceSnapshot.cbc.PrometheusUpstreamException;
 import com.hanatour.air.ols.flightPriceSnapshot.cbc.vo.FlightPriceSnapshotReqVo;
 import com.hanatour.common.cmn.CoreUtil;
+import com.hanatour.common.cmn.certification.vo.MemberInfo;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
@@ -14,8 +15,12 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.server.ResponseStatusException;
 
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpSession;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
@@ -51,6 +56,8 @@ import java.util.Set;
 public class FlightPriceSnapshotController {
 
     private static final String JSON_UTF8 = "application/json;charset=UTF-8";
+    /** 포털이 로그인 사용자 정보를 담아두는 서버 세션 속성명 (진단 로그로 확인) */
+    private static final String SESSION_MEMBER_INFO_KEY = "HNT_MEMBER_INFO";
     private static final String PROMETHEUS_PATH = "/air/monitoring/prometheus";
 
     // 대시보드 조회 허용 사용자 아이디 (스냅샷에 예약/탑승객 정보가 있으므로 허용 목록 방식)
@@ -114,12 +121,10 @@ public class FlightPriceSnapshotController {
      * 아이디를 읽을 수 없으면 401, 허용 목록에 없으면 403 (판단 불가는 거부).
      */
     private String requireAllowedUser() {
-        String usrId = null;
-        try {
-            usrId = CoreUtil.getCertificationUtil().getMemberInfo().getUsrid();
-        } catch (RuntimeException e) {
-            // 세션/회원정보가 없을 때의 예외 포함. 상세 원인은 로그에만 남긴다.
-            log.warn("[FLIGHT-PRICE-SNAPSHOT] 로그인 사용자 확인 실패: {}", e.toString());
+        String usrId = readUserIdFromCoreUtil();
+        if (usrId == null || usrId.trim().isEmpty()) {
+            // @RestController 경로는 CoreUtil 컨텍스트가 비어 있어, 포털이 세션에 넣어둔 값을 직접 읽는다.
+            usrId = readUserIdFromSession();
         }
         if (usrId == null || usrId.trim().isEmpty()) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "포털 로그인이 필요합니다.");
@@ -130,6 +135,40 @@ public class FlightPriceSnapshotController {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "이 대시보드를 조회할 권한이 없습니다.");
         }
         return usrId;
+    }
+
+    private String readUserIdFromCoreUtil() {
+        try {
+            MemberInfo memberInfo = CoreUtil.getCertificationUtil().getMemberInfo();
+            return memberInfo == null ? null : memberInfo.getUsrid();
+        } catch (RuntimeException e) {
+            // 프레임워크 컨텍스트가 없는 요청에서는 정상적으로 발생할 수 있다.
+            log.debug("[FLIGHT-PRICE-SNAPSHOT] CoreUtil 회원정보 없음: {}", e.toString());
+            return null;
+        }
+    }
+
+    /** 서버 세션(HNT_MEMBER_INFO)에서 아이디를 읽는다. 세션이 없거나 타입이 다르면 null (= 거부). */
+    private String readUserIdFromSession() {
+        try {
+            ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+            HttpServletRequest request = attrs == null ? null : attrs.getRequest();
+            HttpSession session = request == null ? null : request.getSession(false); // 세션을 새로 만들지 않는다
+            Object value = session == null ? null : session.getAttribute(SESSION_MEMBER_INFO_KEY);
+            if (value == null) {
+                log.warn("[FLIGHT-PRICE-SNAPSHOT] 로그인 사용자 확인 실패: session={} {}={}",
+                        session == null ? "없음" : "있음", SESSION_MEMBER_INFO_KEY, "없음");
+                return null;
+            }
+            if (!(value instanceof MemberInfo)) {
+                log.warn("[FLIGHT-PRICE-SNAPSHOT] 세션 {} 타입 불일치: {}", SESSION_MEMBER_INFO_KEY, value.getClass().getName());
+                return null;
+            }
+            return ((MemberInfo) value).getUsrid();
+        } catch (RuntimeException e) {
+            log.warn("[FLIGHT-PRICE-SNAPSHOT] 세션 회원정보 읽기 실패: {}", e.toString());
+            return null;
+        }
     }
 
     private ResponseEntity<String> jsonResponse(HttpStatus status, String body) {
