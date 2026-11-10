@@ -19,7 +19,7 @@ HTML: `proxyPath + '/api/v1/' + path`, `GET`, `credentials: same-origin`. 탭 �
 
 허용 query 템플릿 (HTML 의 `selector()` / `freshnessQuery()` 와 동일 규칙):
 
-1. `{__name__=~"<16종 이름>",environment="..",application="..",site_code=~"..|"}` (라벨은 있으면 포함)
+1. `{__name__=~"<22종 이름>",environment="..",application="..",site_code=~"..|"}` (라벨은 있으면 포함)
 2. 1번 + ` or up{job="air-api"}`
 3. freshness: `(label_replace(time()-timestamp(...),"dashboard_metric","<이름>","","")) or ...` 16개 + up 1개 (**query 만**, range 불가)
 4. `up{job="air-api"}`
@@ -71,7 +71,7 @@ Java 8(`--release 8`) 로 컴파일하고, **실제 HTTP 서버(가짜 Prometheu
 2. **인증/인가 (운영 반영 전 필수)**: 코드에 권한 검사 없음. 포털 SSO 적용 범위 확인. Controller 주석에 TODO
 3. **브라우저 시계 오차**: 요청 시각이 서버보다 60초 넘게 앞서면 400. PC 시계가 크게 어긋나면 화면 전체가 실패
 4. **동시 호출/캐시 없음**: 탭 하나가 20초마다 5건. 사용자가 많으면 ols → Prometheus 요청이 `사용자 수 × 5건/20초`. 필요하면 동시 한도나 5~10초 캐시 추가
-5. **HTML 이 바뀌면 같이 수정**: 허용 템플릿이 HTML 의 `selector()/freshnessQuery()` 와 메트릭 이름 16종·prefix 2종에 고정되어 있음. 레코딩 규칙이나 쿼리 형태가 바뀌면 `METRIC_SUFFIXES`/템플릿 수정 필요 (바뀌면 400 으로 즉시 드러남)
+5. **HTML 이 바뀌면 같이 수정**: 허용 템플릿이 HTML 의 `selector()/freshnessQuery()` 와 메트릭 이름 22종·prefix 2종에 고정되어 있음. 레코딩 규칙이나 쿼리 형태가 바뀌면 `METRIC_SUFFIXES`/템플릿 수정 필요 (바뀌면 400 으로 즉시 드러남)
 6. **Prometheus 주소**: 기본값 `10.100.23.95:9090` (운영에서 ols 서버 → Prometheus 접속, 수집 대상 3종 application 전부 정상 확인). HTML 기본값/연결 정보 문구에 있던 `203.245.33.80:9090` 은 ols 에서 접속 확인된 적이 없고, 예약·동시간대 지표 부재의 원인도 주소가 아니어서 사용하지 않음. 필요하면 설정 `monitoring.prometheus.base-url` 로 덮어쓸 수 있음
 7. **긴 URL**: freshness 쿼리가 GET 쿼리스트링으로 약 4.4~4.7KB. 포털/게이트웨이 요청줄 제한(보통 8KB, 일부 4KB)에 걸리면 ols 도달 전에 400/414
 

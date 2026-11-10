@@ -73,11 +73,11 @@ public class FlightPriceSnapshotCbcImpl implements FlightPriceSnapshotCbc {
     // Prometheus 기본 주소 (내부망). 설정 monitoring.prometheus.base-url 이 있으면 설정이 우선
     private static final String DEFAULT_PROMETHEUS_BASE_URL = "http://10.100.23.95:9090";
 
-    // HTML 이 조회하는 레코딩 규칙: (air:stage_ | air:naver:stage_) + 아래 16종 (HTML 의 TRAFFIC_RULES 와 같은 순서)
+    // HTML 이 조회하는 레코딩 규칙: (air:stage_ | air:naver:stage_) + 아래 22종 (HTML 의 TRAFFIC_RULES 와 같은 순서)
     private static final String[] METRIC_SUFFIXES = {
-            "events:rate10m", "attempts:rate10m", "success:rate10m", "failure_ratio:rate10m",
-            "events:rate30m", "attempts:rate30m", "success:rate30m", "failure_ratio:rate30m",
-            "failure_ratio:zscore30m", "events:increase7d", "attempts:increase7d", "success:increase7d",
+            "events:rate10m", "attempts:rate10m", "success:rate10m", "outcomes:rate10m", "failures:rate10m", "failure_ratio:rate10m",
+            "events:rate30m", "attempts:rate30m", "success:rate30m", "outcomes:rate30m", "failures:rate30m", "failure_ratio:rate30m",
+            "failure_ratio:zscore30m", "events:increase7d", "attempts:increase7d", "success:increase7d", "outcomes:increase7d", "failures:increase7d",
             "failure_ratio:7d", "events:rate30m:wow_min", "attempts:rate30m:wow_min", "success:rate30m:wow_min"};
     private static final String[] METRIC_PREFIXES = {"air:stage_", "air:naver:stage_"};   // [1] 이 naver (site_code 조건 없음)
     private static final String UP = "up{job=\"air-api\"}";
@@ -424,7 +424,7 @@ public class FlightPriceSnapshotCbcImpl implements FlightPriceSnapshotCbc {
         return sb.append('}').toString();
     }
 
-    /** HTML freshnessQuery(): 규칙별 label_replace(time()-timestamp(...)) 16개 + up 1개를 " or " 로 연결 */
+    /** HTML freshnessQuery(): 규칙별 label_replace(time()-timestamp(...)) 22개 + up 1개를 " or " 로 연결 */
     private String freshness(String prefix, String env, String app, String site) {
         final StringBuilder sb = new StringBuilder();
         for (String suffix : METRIC_SUFFIXES) {
