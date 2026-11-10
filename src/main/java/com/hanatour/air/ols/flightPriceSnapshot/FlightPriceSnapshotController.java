@@ -140,7 +140,9 @@ public class FlightPriceSnapshotController {
     private String readUserIdFromCoreUtil() {
         try {
             MemberInfo memberInfo = CoreUtil.getCertificationUtil().getMemberInfo();
-            return memberInfo == null ? null : memberInfo.getUsrid();
+            String id = memberInfo == null ? null : memberInfo.getUsrid();
+            log.info("[FLIGHT-PRICE-SNAPSHOT][TEST] CoreUtil 경로 usrId={}", id);   // [임시 테스트 로그] 확인 후 삭제
+            return id;
         } catch (RuntimeException e) {
             // 프레임워크 컨텍스트가 없는 요청에서는 정상적으로 발생할 수 있다.
             log.debug("[FLIGHT-PRICE-SNAPSHOT] CoreUtil 회원정보 없음: {}", e.toString());
@@ -164,7 +166,9 @@ public class FlightPriceSnapshotController {
                 log.warn("[FLIGHT-PRICE-SNAPSHOT] 세션 {} 타입 불일치: {}", SESSION_MEMBER_INFO_KEY, value.getClass().getName());
                 return null;
             }
-            return ((MemberInfo) value).getUsrid();
+            String id = ((MemberInfo) value).getUsrid();
+            log.info("[FLIGHT-PRICE-SNAPSHOT][TEST] 세션 경로 usrId={}", id);   // [임시 테스트 로그] 확인 후 삭제
+            return id;
         } catch (RuntimeException e) {
             log.warn("[FLIGHT-PRICE-SNAPSHOT] 세션 회원정보 읽기 실패: {}", e.toString());
             return null;
