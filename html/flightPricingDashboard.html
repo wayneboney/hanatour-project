@@ -198,6 +198,11 @@
         .traffic-thumbnail-controls select:focus-visible{outline:2px solid #9274d7;outline-offset:2px}
         .traffic-thumbnail-controls>p{margin:0;font-size:11px;line-height:1.6;color:#76678a;text-align:right}
         .traffic-thumbnail-controls>p>small{display:block;font-size:10px;color:#9a8da9}
+        .traffic-metric-basis{display:block;color:#9a89aa;font-size:9px;line-height:1.6;margin-top:4px;white-space:normal;overflow-wrap:anywhere}
+        .traffic-server-basis{border-top:1px solid #ece5f3;padding-top:12px;margin-top:12px;font-size:10px;line-height:1.6;color:#9b8ba9}
+        .traffic-graph-range{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:3px 8px;margin:10px 0 3px;padding-top:7px;border-top:1px solid #eee8f5;font-size:9px;line-height:1.5;color:#a08caf;text-align:left}
+        .traffic-graph-range b{font-weight:750;color:#7761a0;white-space:nowrap}
+        .traffic-health-chart>.traffic-graph-range,.traffic-record-button>.traffic-graph-range{align-self:stretch}
         @media(max-width:650px){.traffic-thumbnail-controls{flex-direction:column;align-items:stretch;gap:8px}.traffic-thumbnail-controls>label{justify-content:space-between;gap:10px}.traffic-thumbnail-controls select{min-width:0;flex:1;max-width:180px}.traffic-thumbnail-controls>p{text-align:left}}
         .traffic-primary-grid .traffic-metric-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
         .traffic-primary-grid .traffic-stage-secondary{grid-template-columns:1fr;gap:7px}
@@ -1692,6 +1697,35 @@
             if (stage === 'GDS' && operation && alert.operation && operation !== alert.operation) return false;
             return !labels || ['environment', 'application', 'site_code', 'gds_operation'].every(key => !alert.labels[key] || !labels[key] || alert.labels[key] === labels[key]);
         }
+        // Integrate recorded rates, not the latest point multiplied by the selected
+        // duration. Missing/invalid intervals never become zeros or extrapolated data.
+        function periodFor(matrix,prefix,start,end,step,groups=[]) {
+            const duration=end-start,maxGap=Math.max(60,step)*1.7,cohorts=new Map();
+            const keys=['attempts10','success10','attempts30','baselineAttempts30'];
+            const ensure=key=>{if(!cohorts.has(key))cohorts.set(key,{});return cohorts.get(key);};
+            groups.forEach(g=>ensure(labelKey(g.labels)));
+            matrix.forEach(row=>{const key=metricKey(row.metric?.__name__);if(!keys.includes(key))return;const cohort=ensure(labelKey(row.metric));cohort[key]=new Map((row.values||[]).map(([t,v])=>[Number(t),number(v)]));});
+            const integrate=(cohort,fields,valid)=>{
+                const times=[...new Set(fields.flatMap(f=>[...(cohort[f]?.keys()||[])]))].filter(t=>t>=start&&t<=end).sort((a,b)=>a-b),totals=fields.map(()=>0);let seconds=0;
+                for(let i=1;i<times.length;i++){
+                    const left=times[i-1],right=times[i],dt=right-left,a=fields.map(f=>cohort[f]?.get(left)),b=fields.map(f=>cohort[f]?.get(right));
+                    if(!(dt>0&&dt<=maxGap)||!a.every(v=>finite(v)&&v>=0)||!b.every(v=>finite(v)&&v>=0)||!valid(a)||!valid(b))continue;
+                    seconds+=dt;a.forEach((v,j)=>totals[j]+=(v+b[j])*.5*dt);
+                }
+                return {seconds,totals};
+            };
+            const collect=(fields,valid=()=>true)=>{
+                let known=0,seconds=0;const totals=fields.map(()=>0),rates=fields.map(()=>0);
+                cohorts.forEach(c=>{const part=integrate(c,fields,valid);if(part.seconds>0){known++;seconds+=part.seconds;part.totals.forEach((v,i)=>{totals[i]+=v;rates[i]+=v/part.seconds;});}});
+                return {totals,rates,known,total:cohorts.size,seconds,partial:known<cohorts.size||seconds<duration*cohorts.size-.001};
+            };
+            const request=collect(['attempts10']),success=collect(['success10']),failure=collect(['attempts10','success10'],v=>v[1]<=v[0]),comparison=collect(['attempts30','baselineAttempts30'],v=>v[1]>0);
+            request.count=request.known?request.totals[0]:null;success.count=success.known?success.totals[0]:null;
+            failure.attempts=failure.known?failure.totals[0]:null;failure.failures=failure.known?Math.max(0,failure.totals[0]-failure.totals[1]):null;
+            failure.ratio=failure.attempts>0?clamp(failure.failures/failure.attempts):null;
+            comparison.ratio=comparison.known&&comparison.totals[1]>0?comparison.totals[0]/comparison.totals[1]:null;
+            return {start,end,duration,request,success,failure,comparison,rpm:request.known?request.rates[0]*60:null};
+        }
         function historyFor(matrix, prefix) {
             const points = new Map(), universe = new Set();
             matrix.forEach(series => {
@@ -1841,11 +1875,11 @@
                 metricQuality.trafficRatio={stale:m.trafficComparison.paired===0&&m.trafficComparison.delayed>0,missing:m.trafficComparison.paired===0,partial:m.trafficComparison.partial};
                 const id = stage + (operation ? ':' + operation : '');
                 let cardHistory = input.historyCache && input.historyCache.get(id);
-                if (!cardHistory) { cardHistory = historyFor(ownHistory, prefix); if (input.historyCache) input.historyCache.set(id, cardHistory); }
+                if (!cardHistory) { cardHistory = historyFor(ownHistory, prefix); if(input.periodMode||finite(input.historyStart)&&finite(input.historyEnd)&&input.historyEnd>input.historyStart){const end=number(input.historyEnd)??Math.floor(nowMs/1000),start=number(input.historyStart)??end-(input.periodSeconds||600);cardHistory.periodSummary=periodFor(ownHistory,prefix,start,end,input.rangeStep||60,groups);} if (input.historyCache) input.historyCache.set(id, cardHistory); }
                 const policyRules=expected.filter(r=>r.labels?.policy_version===POLICY_VERSION&&(inferStage(r.name,{},r.expr)===stage||/OtherStage/.test(r.name)&&['FARE_DETAIL','RESERVATION_CANCEL','PAYMENT_CANCEL','REFUND'].includes(stage)));
                 const policy={version:POLICY_VERSION,definition:failurePolicy(stage),rules:policyRules.map(r=>{const live=ruleStatus.definitions.find(l=>l.name===r.name);return {name:r.name,criterion:r.labels.criterion,applied:!!live&&live.health==='ok'&&!live.evaluationStale&&live.labels?.policy_version===POLICY_VERSION&&live.forSeconds===r.forSeconds&&live.keepFiringForSeconds===r.keepFiringForSeconds&&canonicalExpression(live.expression)===canonicalExpression(r.expr)};}),absoluteMet:groups.filter(g=>g.failureSignals.absoluteMet).length,absoluteEligible:groups.filter(g=>g.failureSignals.absoluteEligible).length,relativeMet:groups.filter(g=>g.failureSignals.relativeMet).length,relativeEligible:groups.filter(g=>g.failureSignals.relativeEligible).length};
                 policy.applied=policy.rules.length>0&&policy.rules.every(r=>r.applied);
-                return {id, stage, operation, availability, metricQuality, policy, bookingDiagnostics:stage==='BOOKING'?bookingDiagnostics:undefined, title: TITLES[stage] + (operation ? ' · ' + operation : ''), shared: stage === 'GDS', scopeNote: stage === 'GDS' ? '전체 사이트 공통 · 채널 귀속 불가' : scope === 'naver' ? 'NAV_PC + NAV_MO 합산' : '', metrics: m, status: cardStatus, level: cardStatus.level, reason: cardStatus.reason, groups, subgroups: groups, alerts, history: cardHistory, series: ownSeries, recordMetrics};
+                return {id, stage, operation, periodSummary:cardHistory.periodSummary, availability, metricQuality, policy, bookingDiagnostics:stage==='BOOKING'?bookingDiagnostics:undefined, title: TITLES[stage] + (operation ? ' · ' + operation : ''), shared: stage === 'GDS', scopeNote: stage === 'GDS' ? '전체 사이트 공통 · 채널 귀속 불가' : scope === 'naver' ? 'NAV_PC + NAV_MO 합산' : '', metrics: m, status: cardStatus, level: cardStatus.level, reason: cardStatus.reason, groups, subgroups: groups, alerts, history: cardHistory, series: ownSeries, recordMetrics};
             });
             const healthAlerts = sharedRuleStatus.instances.filter(a => HEALTH_NAMES.includes(a.name));
             const targetDetails = rawUp.map(series => Object.assign({labels: series.metric, value: number(series.value && series.value[1])}, ages.get(sampleKey('up', series.metric)) || {age: null, sampleAt: null}));
@@ -1869,7 +1903,7 @@
             const options = key => Array.from(new Set(rawInstant.map(s => s.metric && s.metric[key]).filter(Boolean))).sort();
             const summary = {normal: 0, warning: 0, critical: 0, unknown: 0, idle: 0};
             cards.forEach(card => summary[card.status.level]++);
-            return {scope, filters, cards, bookingRuleCoverage, alerts: ruleStatus.instances.filter(a => !HEALTH_NAMES.includes(a.name)), health: {status: healthStatus, level: healthStatus.level, reason: healthStatus.reason, targets: rawUp, targetDetails, alerts: healthAlerts, issues: collectionIssues, shared: true, fresh: upFresh}, summary, options: {environments: options('environment'), applications: options('application'), sites: scope === 'naver' ? [] : options('site_code')}, instant, history, recordings: cat.recordings, rules: ruleStatus.definitions, ruleStatus, catalog: cat, rangeStep: input.rangeStep || 60, rangeStart: input.historyStart ?? null, rangeEnd: input.historyEnd ?? null, raw: {instant, history, freshness: rawFreshness, up: rawUp, rules: ruleGroups(input.rules)}, stale};
+            return {scope, filters, cards, periodSeconds:input.historyEnd-input.historyStart||600, bookingRuleCoverage, alerts: ruleStatus.instances.filter(a => !HEALTH_NAMES.includes(a.name)), health: {status: healthStatus, level: healthStatus.level, reason: healthStatus.reason, targets: rawUp, targetDetails, alerts: healthAlerts, issues: collectionIssues, shared: true, fresh: upFresh}, summary, options: {environments: options('environment'), applications: options('application'), sites: scope === 'naver' ? [] : options('site_code')}, instant, history, recordings: cat.recordings, rules: ruleStatus.definitions, ruleStatus, catalog: cat, rangeStep: input.rangeStep || 60, rangeStart: input.historyStart ?? null, rangeEnd: input.historyEnd ?? null, raw: {instant, history, freshness: rawFreshness, up: rawUp, rules: ruleGroups(input.rules)}, stale};
         }
         const escapeRegex = value => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const quote = value => JSON.stringify(String(value));
@@ -1944,7 +1978,7 @@
                 if (!modelCache || stamp !== modelStamp) {
                     if (historySource !== source.history) { historySource = source.history; historyCache = new Map(); }
                     const freshAdjusted = Object.assign({}, source, {freshness: result(source.freshness).map(s => ({metric: s.metric, value: [state.now / 1000, finite(s.value && s.value[1]) && finite(s.value && s.value[0]) ? Number(s.value[1]) + (state.now / 1000 - Number(s.value[0])) : 'NaN']}))});
-                    modelCache = buildModel(Object.assign({}, freshAdjusted, {scope, filters: state.filters, now: state.now, error: state.error, stale: state.isStale, historyCache}));
+                    modelCache = buildModel(Object.assign({}, freshAdjusted, {scope, filters: state.filters, now: state.now, error: state.error, stale: state.isStale, periodMode:true,periodSeconds:state.rangeSeconds,historyCache}));
                     modelStamp = stamp;
                 }
                 return Object.assign({}, state, {filters: Object.assign({}, state.filters), model: modelCache, loading: state.isLoading, lastSuccess: state.lastSuccessAt, nextPollAt: state.nextRefreshAt, stale: state.isStale, hasSuccessfulRefresh: state.hasSuccess});
@@ -1985,7 +2019,7 @@
                 if (!live) return snapshot();
                 clearPoll(); state.isLoading = true; requestStartedAt = now();
                 const token = ++generation, abort = new AbortController(); request = abort;
-                const select = selector(scope, state.filters), end = Math.floor(now() / 1000), step = Math.max(60, Math.ceil(state.rangeSeconds / 239 / 60) * 60);
+                const select = selector(scope, state.filters), end = Math.floor(now() / 1000), step = [60,120,180,240,300,360,480,600,720,900,1200,1800,3600].find(s=>state.rangeSeconds%s===0&&state.rangeSeconds/s+1<=240)||Math.max(60,Math.ceil(state.rangeSeconds/239/60)*60);
                 emit();
                 timeoutTimer = timers.setTimeout(() => abort.abort(), timeoutMs);
                 const task = Promise.resolve().then(async () => {
@@ -2061,7 +2095,7 @@
                 getState: snapshot
             };
         }
-        global.TrafficData = {create, buildModel, evaluateStatus, failurePolicy, failureSignals, canonicalExpression, catalog, durationSeconds, connection, selector, freshnessQuery, metricKey, escapeRegex};
+        global.TrafficData = {create, buildModel, evaluateStatus, failurePolicy, failureSignals, canonicalExpression, catalog, durationSeconds, connection, selector, freshnessQuery, metricKey, periodFor, escapeRegex};
     })(typeof window !== 'undefined' ? window : globalThis);
 
 </script>
@@ -2074,6 +2108,10 @@
         const MAX_AGE=180,MAX_SKEW=120,WINDOW_SECONDS=600;
 
         function measure(card,stale){
+            if(card?.periodSummary){
+                const p=card.periodSummary,r=p.request,quality=stale&&r.known?'stale':r.known?(r.partial?'partial':'complete'):'missing';
+                return {count:r.count,quality,reason:r.known?'선택 기간의 10분 이동 요청 발생률을 시간 적분한 추정치입니다. 빈 구간은 합산하지 않습니다.':'선택 기간에 적분 가능한 요청 시계열이 없습니다.',known:r.known,total:r.total,missing:r.total-r.known,invalid:0,delayed:0,sampleTimes:r.known?[p.end]:[]};
+            }
             const groups=card?.groups||card?.subgroups||[];
             const current=[],older=[];
             let missing=0,invalid=0,delayed=0;
@@ -2119,7 +2157,7 @@
                     return {key:reference.key,label:reference.label+' 대비',ratio,partial,numerator:entry.count,denominator:reference.count,reason};
                 });
             });
-            return {windowMinutes:10,basis:'attempts',estimated:true,entries};
+            return {windowMinutes:(model?.periodSeconds||600)/60,basis:'attempts',estimated:true,entries};
         }
         global.TrafficFunnel={build};
     })(window);
@@ -2143,7 +2181,7 @@
             traffic:{label:'요청량 · 10분 평균',suffix:'stage_attempts:rate10m',factor:60,unit:'회/분',kind:'traffic',description:'최근 10분의 시도 발생률 × 60입니다. 순간 TPS나 정확한 1분 요청 건수가 아닙니다.'},
             failure10:{label:'실패율 · 최근 10분',suffix:'stage_failure_ratio:rate10m',factor:100,unit:'%',kind:'failure10',description:'시도 수를 분모로 한 실패 비율입니다. 운임 조회는 REQUEST, 나머지 단계는 SUCCESS + FAILURE를 시도로 정의합니다.'},
             trafficRatio:{label:'동시간대 유입 수준',factor:100,unit:'%',kind:'traffic',description:'동일 라벨에 현재 30분 평균 시도율과 양수인 과거 기준선이 모두 있는 조합만 합산해 나눈 비율입니다. 100%가 기준 수준이며, 기준선은 과거 1·2주 같은 시간대 중 낮은 값입니다. 일부 조합만 비교하면 부분 비교로 표시합니다. 그래프의 비교 가능 범위는 시점별로 달라질 수 있습니다.'},
-            success30:{label:'예약·처리 성공 · 30분',suffix:'stage_success:rate30m',factor:1800,unit:'건 · 추정',kind:'success30',description:'최근 30분 성공 발생률 × 1,800으로 환산한 추정 건수입니다. rate의 외삽 특성상 소수가 나올 수 있습니다.'},
+            success30:{label:'성공 건수 · 최근 30분',suffix:'stage_success:rate30m',factor:1800,unit:'건 · 추정',kind:'success30',description:'해당 단계의 최근 30분 성공 발생률 × 1,800으로 환산한 추정 건수입니다. 운임 조회 성공을 예약 성공으로 해석하지 않습니다. rate의 외삽 특성상 소수가 나올 수 있습니다.'},
             failure30:{label:'실패율 · 최근 30분',suffix:'stage_failure_ratio:rate30m',factor:100,unit:'%',kind:'failure30',description:'최근 30분의 가중 실패율입니다. 7일 기준선·Z 점수·실패 표본 수를 함께 비교합니다.'},
             baselineFailure:{label:'평소 실패율 · 7일',suffix:'stage_failure_ratio:7d',factor:100,unit:'%',kind:'baseline',description:'1시간 전까지의 최근 7일 시도·성공 건수를 기준으로 계산한 실패율입니다. 개별 실패율을 단순 평균하지 않습니다.'},
             zscore:{label:'실패 이상도 · 최악 라벨',suffix:'stage_failure_ratio:zscore30m',factor:1,unit:'σ',kind:'zscore',description:'개별 환경·앱·사이트·operation 조합 중 가장 높은 Z 점수입니다. 서로 다른 라벨의 Z 점수를 더하거나 평균하지 않습니다.'},
@@ -2154,7 +2192,13 @@
         const GRAPH_RANGES=[[600,'최근 10분'],[1800,'최근 30분'],[3600,'최근 1시간'],[7200,'최근 2시간'],[21600,'최근 6시간'],[43200,'최근 12시간'],[86400,'최근 24시간']];
         const graphRange=()=>Number(snapshot?.rangeSeconds)||rangeByScope[scope]||600;
         const graphRangeLabel=()=>GRAPH_RANGES.find(([seconds])=>seconds===graphRange())?.[1]||num(graphRange()/60,0)+'분';
-        function graphRangeHTML(){return '<section class="panel traffic-thumbnail-controls" aria-label="페이지 전체 썸네일 그래프 기간"><label for="trafficRange">썸네일 그래프 기간<select id="trafficRange" aria-label="썸네일 그래프 기간">'+GRAPH_RANGES.map(([seconds,label])=>'<option value="'+seconds+'"'+(seconds===graphRange()?' selected':'')+'>'+label+'</option>').join('')+'</select></label><p>이 페이지의 모든 작은 그래프에 적용됩니다.<small>숫자·경보의 최근 10분·30분 계산 기준은 그대로 유지됩니다.</small></p></section>';}
+        function graphRangeHTML(){return '<section class="panel traffic-thumbnail-controls" aria-label="페이지 전체 썸네일 그래프 기간"><label for="trafficRange">조회·집계 기간<select id="trafficRange" aria-label="조회·집계 기간">'+GRAPH_RANGES.map(([seconds,label])=>'<option value="'+seconds+'"'+(seconds===graphRange()?' selected':'')+'>'+label+'</option>').join('')+'</select></label><p>4단계 건수·비율과 취소·환불·기타 처리의 숫자·그래프에 함께 적용됩니다.<small>건수는 이동 발생률의 시간 적분 추정치입니다. 서버 경보의 고정 10분·30분 기준은 변경하지 않습니다.</small></p></section>';}
+        function graphRangeCaption(){return '<span class="traffic-graph-range" data-graph-range-seconds="'+graphRange()+'"><span>그래프 표시 기간</span><b>'+esc(graphRangeLabel())+'</b></span>';}
+        function metricPresentation(card,key){
+            const title=key==='success30'?(card.stage==='GDS'?'처리':STAGES[card.stage]?.[0]||'처리')+' 성공':METRICS[key].label.split(' · ')[0];
+            const basis='선택 기간 · '+graphRangeLabel()+({traffic:' 평균',failure10:' 전체 실패율',trafficRatio:' / 과거 동시간대',success30:' 성공 추정'}[key]||'');
+            return {title,basis};
+        }
 
         function stamp(value){if(!finite(value))return null;const t=Number(value);return t>1e12?t:t*1000;}
         function clock(value,short=false){const ms=typeof value==='string'&&!/^\d+(\.\d+)?$/.test(value)?Date.parse(value):stamp(value);if(!Number.isFinite(ms))return '—';return new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Seoul',...(short?{}:{month:'2-digit',day:'2-digit'}),hour:'2-digit',minute:'2-digit',...(short?{}:{second:'2-digit'}),hour12:false}).format(ms)+(short?'':' KST');}
@@ -2206,9 +2250,12 @@
             if(metric==='zscore')return maxHistory(p+METRICS.zscore.suffix,card,source);
             return sumHistory(p+(METRICS[metric]?.suffix||''),card,source);
         }
-        function metricValue(card,key){if(card.metricQuality?.[key]?.stale)return null;const m=card.metrics||{};return ({traffic:m.attempts10??m.attempts10m,failure10:m.failure10??m.failure10m,trafficRatio:m.trafficRatio,success30:finite(m.estimatedSuccess30)?Number(m.estimatedSuccess30):finite(m.success30??m.success30m)?Number(m.success30??m.success30m)*1800:null,failure30:m.failure30??m.failure30m,baselineFailure:m.baselineFailure,zscore:m.zscore})[key];}
+        function metricValue(card,key){const p=card.periodSummary;if(['traffic','failure10','trafficRatio','success30'].includes(key))return p?({traffic:finite(p.rpm)?p.rpm/60:null,failure10:p.failure.ratio,trafficRatio:p.comparison.ratio,success30:p.success.count})[key]:null;if(card.metricQuality?.[key]?.stale)return null;const m=card.metrics||{};return ({failure30:m.failure30??m.failure30m,baselineFailure:m.baselineFailure,zscore:m.zscore})[key];}
+        function selectedCountsHTML(card){const p=card.periodSummary?.failure,count=v=>finite(v)?num(v,1):'—';return '<span class="traffic-failure-counts" data-selected-period="'+graphRange()+'"><strong>실패 '+count(p?.failures)+'건 / 시도 '+count(p?.attempts)+'건</strong><small>'+esc(graphRangeLabel())+' · 추정'+(p?.partial?' · 부분 관측':'')+'</small></span>';}
+        function cumulativeSuccess(card){let count=0,prior=null;const maxGap=(snapshot?.model?.rangeStep||60)*1.7;return (card.history?.success||[]).map(p=>{if(!finite(p.value)||p.value<0){prior=null;return {time:p.time,value:null};}if(prior&&p.time-prior.time<=maxGap)count+=(Number(prior.value)+Number(p.value))*.5*(p.time-prior.time);prior=p;return {time:p.time,value:count};});}
         function relevantAlert(name,key){return key==='traffic'||key==='trafficRatio'?/TrafficDrop|DropWhile/.test(name):key==='success30'?/SuccessStopped/.test(name):key==='failure10'?/FailureCritical/.test(name):key==='zscore'||key==='failure30'?/FailureAnomaly/.test(name):false;}
         function metricStatus(card,key){
+            if(['traffic','failure10','trafficRatio','success30'].includes(key)){const p=card.periodSummary,part=p&&({traffic:p.request,failure10:p.failure,trafficRatio:p.comparison,success30:p.success})[key];return {level:finite(metricValue(card,key))&&!snapshot?.isStale?'normal':'unknown',label:'선택 기간 집계',partial:part?.partial};}
             const base=status(card.status),specific=card.signals?.[key]||card.statuses?.[key];if(specific)return status(specific);
             const alerts=(card.alerts||base.alerts||[]).filter(item=>relevantAlert(alertName(item),key));
             if(alerts.some(item=>alertState(item)==='firing'))return {level:'critical',label:'확인필요!',stale:base.stale};
@@ -2227,7 +2274,7 @@
             const rangeAttrs=small?' data-range-seconds="'+graphRange()+'" data-range-start="'+rangeStart+'" data-range-end="'+rangeEnd+'"':'';
             if(small)normalized=normalized.map(s=>({...s,points:s.points.filter(p=>p.time>=rangeStart&&p.time<=rangeEnd)}));
             const values=normalized.flatMap(s=>s.points.filter(p=>p.value!==null).map(p=>p.value)),times=normalized.flatMap(s=>s.points.map(p=>p.time));
-            if(!values.length||!times.length)return '<div class="traffic-chart-empty '+(small?'is-small':'')+'"'+rangeAttrs+'>'+(small?'시계열 없음':'선택한 범위의 유효한 시계열이 없습니다. 결측치를 0으로 채우지 않습니다.')+'</div>';
+            if(!values.length||!times.length)return (small?graphRangeCaption():'')+'<div class="traffic-chart-empty '+(small?'is-small':'')+'"'+rangeAttrs+'>'+(small?'선택 기간에 시계열 없음':'선택한 범위의 유효한 시계열이 없습니다. 결측치를 0으로 채우지 않습니다.')+'</div>';
             const width=small?360:960,h=small?66:height,pad=small?{l:3,r:3,t:8,b:5}:{l:72,r:25,t:20,b:40};
             const minTime=small?rangeStart:Math.min(...times),maxTime=small?rangeEnd:Math.max(...times),minValue=Math.min(0,...values),rawMax=Math.max(...values,...(finite(threshold)?[Number(threshold)]:[])),maxValue=rawMax>minValue?rawMax+(rawMax-minValue)*.12:minValue+1;
             const x=t=>pad.l+(t-minTime)/(maxTime-minTime||1)*(width-pad.l-pad.r),y=v=>h-pad.b-(v-minValue)/(maxValue-minValue)*(h-pad.t-pad.b),maxGap=Math.max(60,Number(snapshot?.model?.rangeStep)||60)*1.7;
@@ -2236,21 +2283,21 @@
             if(finite(threshold)&&!small)svg+='<line class="traffic-threshold" x1="'+pad.l+'" x2="'+(width-pad.r)+'" y1="'+y(Number(threshold))+'" y2="'+y(Number(threshold))+'"/><text class="traffic-threshold-label" x="'+(width-pad.r)+'" y="'+(y(Number(threshold))-7)+'" text-anchor="end">기준 '+esc(axisValue(Number(threshold),unit))+'</text>';
             normalized.forEach(s=>{let segments=[],segment=[],prior=null;s.points.forEach(point=>{if(point.value===null||prior!==null&&point.time-prior>maxGap){if(segment.length)segments.push(segment);segment=[];}if(point.value!==null)segment.push(point);prior=point.time;});if(segment.length)segments.push(segment);segments.forEach(points=>{if(points.length===1)svg+='<circle cx="'+x(points[0].time)+'" cy="'+y(points[0].value)+'" r="'+(small?1.5:3)+'" fill="'+s.color+'"/>';else svg+='<polyline points="'+points.map(point=>x(point.time).toFixed(2)+','+y(point.value).toFixed(2)).join(' ')+'" fill="none" stroke="'+s.color+'" stroke-width="'+(small?'2.2':'2.1')+'" '+(s.dashed?'stroke-dasharray="6 5"':'')+' vector-effect="non-scaling-stroke"><title>'+esc(s.label||'시계열')+'</title></polyline>';});});
             if(!small)svg+='<line id="trafficChartCrosshair" class="traffic-crosshair" x1="0" x2="0" y1="'+pad.t+'" y2="'+(h-pad.b)+'" hidden/>';
-            svg+='</svg>';return svg;
+            svg+='</svg>';return (small?graphRangeCaption():'')+svg;
         }
         function selectionAttribute(selection){return esc(JSON.stringify(selection));}
         function failureCountsHTML(card,minutes){
             const counts=card.metrics?.failureCounts?.[minutes],count=value=>value>0&&value<.1?'0.1 미만':num(value,1);
             if(!counts||!finite(counts.attempts)||!finite(counts.failures))return '<span class="traffic-failure-counts is-unavailable">실패·시도 건수 확인 불가</span>';
-            return '<span class="traffic-failure-counts" data-minutes="'+minutes+'"><strong>실패 '+esc(count(counts.failures))+'건 / 시도 '+esc(count(counts.attempts))+'건</strong><small>최근 '+minutes+'분 · 추정'+(counts.partial?' · 부분 관측':'')+'</small></span>';
+            return '<span class="traffic-failure-counts" data-minutes="'+minutes+'"><strong>실패 '+esc(count(counts.failures))+'건 / 시도 '+esc(count(counts.attempts))+'건</strong><small>현재값 · 최근 '+minutes+'분 · 추정'+(counts.partial?' · 부분 관측':'')+'</small></span>';
         }
         function tile(card,key){
-            const definition=METRICS[key],raw=metricValue(card,key),value=key==='failure10'||key==='failure30'||key==='baselineFailure'||key==='trafficRatio'?num(finite(raw)?Number(raw)*100:null,1):key==='traffic'?num(finite(raw)?Number(raw)*60:null,1):num(raw,key==='zscore'?2:1),level=metricStatus(card,key),factor=definition.factor;
-            const points=aggregatePoints(key,card).map(p=>({...p,value:finite(p.value)?Number(p.value)*factor:null}));
+            const definition=METRICS[key],presentation=metricPresentation(card,key),raw=metricValue(card,key),value=key==='failure10'||key==='failure30'||key==='baselineFailure'||key==='trafficRatio'?num(finite(raw)?Number(raw)*100:null,1):key==='traffic'?num(finite(raw)?Number(raw)*60:null,1):num(raw,key==='zscore'?2:1),level=metricStatus(card,key),factor=definition.factor;
+            const points=key==='success30'?cumulativeSuccess(card):aggregatePoints(key,card).map(p=>({...p,value:finite(p.value)?Number(p.value)*factor:null}));
             const comparison=card.metrics?.trafficComparison;
             const comparisonText=!comparison?'과거 1·2주 중 낮은 기준':comparison.paired?'동일 라벨 '+comparison.paired+'/'+comparison.total+'개 비교'+(comparison.partial?' · 부분 비교':''):comparison.delayed?'비교 원본 갱신 확인 필요':comparison.missingCurrent===comparison.total?'현재 시도 지표 미수신':comparison.zeroBaseline?'과거 기준선 0 · 비율 산출 불가':'동일 라벨의 과거 기준선 부족';
-            const subtitle=key==='failure10'?'평소 '+percent(card.metrics?.baselineFailure):key==='trafficRatio'?comparisonText:key==='success30'?'rate × 1,800 · 정확한 건수 아님':key==='traffic'?(finite(raw)?num(raw,3)+' TPS · 10분 평균':'현재 측정값 없음'):key==='zscore'?'서로 다른 라벨을 평균하지 않음':'클릭하여 라벨별 데이터 확인';
-            return '<button type="button" class="traffic-metric traffic-metric-'+esc(level.level)+'" data-traffic-detail="'+selectionAttribute({cardId:cardId(card),metric:key})+'" aria-label="'+esc((STAGES[card.stage]?.[0]||card.title)+' '+definition.label+' 상세 그래프와 데이터 보기')+'"><span class="traffic-metric-label">'+esc(definition.label)+'<span aria-hidden="true">↗</span></span><span class="traffic-metric-value">'+value+'<small>'+esc(definition.unit)+'</small></span>'+(key==='failure10'?failureCountsHTML(card,10):'')+chart([{points,color:level.level==='critical'?'#d74758':level.level==='warning'?'#cc9129':'#6b5bd3'}],{small:true,unit:definition.unit})+'<span class="traffic-metric-sub">'+esc(subtitle)+'</span>'+(level.level==='critical'||level.level==='warning'?statusHTML(level):'')+(level.partial||level.label==='부분 관측'?statusHTML({level:'unknown',label:'부분 관측'}):'')+'</button>';
+            const subtitle=key==='failure10'?'평소 '+percent(card.metrics?.baselineFailure):key==='trafficRatio'?'동일 라벨 '+(card.periodSummary?.comparison.known||0)+'/'+(card.periodSummary?.comparison.total||0)+'개 비교'+(card.periodSummary?.comparison.partial?' · 부분 비교':''):key==='success30'?'선택 기간 발생률의 시간 적분 · 추정':key==='traffic'?(finite(raw)?num(raw,3)+' TPS · '+graphRangeLabel()+' 평균':'선택 기간 집계 불가'):'클릭하여 원본 데이터 확인';
+            return '<button type="button" class="traffic-metric traffic-metric-'+esc(level.level)+'" data-traffic-detail="'+selectionAttribute({cardId:cardId(card),metric:key})+'" aria-label="'+esc((STAGES[card.stage]?.[0]||card.title)+' '+presentation.title+' · '+presentation.basis+' 상세 그래프와 데이터 보기')+'"><span class="traffic-metric-label">'+esc(presentation.title)+'<span aria-hidden="true">↗</span></span><span class="traffic-metric-basis">'+esc(presentation.basis)+'</span><span class="traffic-metric-value">'+value+'<small>'+esc(definition.unit)+'</small></span>'+(key==='failure10'?selectedCountsHTML(card):'')+chart([{points,color:level.level==='critical'?'#d74758':level.level==='warning'?'#cc9129':'#6b5bd3'}],{small:true,unit:definition.unit})+'<span class="traffic-metric-sub">'+esc(subtitle)+'</span>'+(level.level==='critical'||level.level==='warning'?statusHTML(level):'')+(level.partial||level.label==='부분 관측'?statusHTML({level:'unknown',label:'부분 관측'}):'')+'</button>';
         }
         function policyDetailsHTML(card){
             const p=card.policy;if(!p?.definition||!['FARE_SEARCH','BOOKING','FINAL_BOOKING','PAYMENT','GDS'].includes(card.stage))return '';
@@ -2276,12 +2323,12 @@
                 const available=finite(item.ratio),description=available?entry.label+' 요청 '+count(item.numerator)+'건 ÷ '+item.label.replace(' 대비','')+' 요청 '+count(item.denominator)+'건 × 100. 동일 사용자 전환율이 아닌 요청 건수 비율입니다. '+(item.partial?item.reason:''):item.reason;
                 return '<div class="traffic-flow-ratio" data-flow-reference="'+esc(item.key)+'" data-available="'+available+'" title="'+esc(description)+'"><span>'+esc(item.label)+'</span><strong>'+esc(ratio(item.ratio))+(available&&item.partial?'<small class="traffic-flow-observed">관측 기준</small>':'')+'</strong></div>';
             }).join('');
-            return '<section class="traffic-flow-summary" data-flow-step="'+esc(entry.key)+'" data-quality="'+esc(entry.quality)+'" aria-label="'+esc(entry.label+' 요청 건수와 단계별 비율')+'"><div class="traffic-flow-heading"><span>최근 10분 요청 · 추정</span><span class="traffic-flow-step">'+entry.position+' / 4</span></div><div class="traffic-flow-count" title="'+esc(entry.reason)+'"><strong>'+esc(count(entry.count))+'</strong><span>건</span>'+(quality?'<i class="traffic-flow-quality">'+quality+'</i>':'')+'</div>'+(entry.sourceNote?'<p class="traffic-flow-source">'+esc(entry.sourceNote)+'</p>':'')+(comparisons?'<div class="traffic-flow-ratios">'+comparisons+'</div>':'<div class="traffic-flow-baseline"><b>비교 기준 단계</b><br>조회 100건당 다음 단계 요청을 비교합니다.</div>')+'</section>';
+            return '<section class="traffic-flow-summary" data-flow-step="'+esc(entry.key)+'" data-quality="'+esc(entry.quality)+'" aria-label="'+esc(entry.label+' 요청 건수와 단계별 비율')+'"><div class="traffic-flow-heading"><span>'+esc(graphRangeLabel())+' 요청 · 추정</span><span class="traffic-flow-step">'+entry.position+' / 4</span></div><div class="traffic-flow-count" title="'+esc(entry.reason)+'"><strong>'+esc(count(entry.count))+'</strong><span>건</span>'+(quality?'<i class="traffic-flow-quality">'+quality+'</i>':'')+'</div>'+(entry.sourceNote?'<p class="traffic-flow-source">'+esc(entry.sourceNote)+'</p>':'')+(comparisons?'<div class="traffic-flow-ratios">'+comparisons+'</div>':'<div class="traffic-flow-baseline"><b>비교 기준 단계</b><br>조회 100건당 다음 단계 요청을 비교합니다.</div>')+'</section>';
         }
         function stageCard(card,flow=null){
             const meta=(STAGES[card.stage]||[card.title||card.stage,'추가 단계','≋']).slice(),s=status(card.status),m=card.metrics||{},groups=card.subgroups||card.groups||[];
             if(flow){meta[0]=flow.title;if(card.stage==='BOOKING')meta[1]='BOOKING · 예약 단계 요청';}
-            return '<article class="traffic-stage-card" data-stage="'+esc(card.stage)+'" data-card-id="'+esc(cardId(card))+'" data-level="'+esc(s.level)+'"><div class="traffic-stage-header"><span class="traffic-stage-icon" aria-hidden="true">'+meta[2]+'</span><div><small>'+esc(card.stage==='GDS'?'공통 인프라 · 사이트 분리 불가':meta[1])+'</small><h3>'+esc(card.stage==='GDS'?(card.operation||card.title||'GDS operation'):meta[0])+'</h3></div>'+statusHTML(s)+'</div><p class="traffic-stage-reason">'+esc(s.reason||card.reason||'규칙·표본·수집 상태를 함께 확인합니다.')+'</p>'+(flow?flowSummaryHTML(flow):'')+'<div class="traffic-metric-grid">'+['traffic','failure10','trafficRatio','success30'].map(key=>tile(card,key)).join('')+'</div><div class="traffic-stage-secondary">'+['failure30','baselineFailure','zscore'].map(key=>{const value=metricValue(card,key),s=metricStatus(card,key);return '<button type="button" data-traffic-detail="'+selectionAttribute({cardId:cardId(card),metric:key})+'" data-level="'+esc(s.level)+'"><span>'+esc(METRICS[key].label)+(key==='failure30'?failureCountsHTML(card,30):'')+'</span><strong>'+(key==='zscore'?num(value,2)+' σ':percent(value))+'</strong><span aria-hidden="true">↗</span></button>';}).join('')+'</div><div class="traffic-stage-foot"><span>'+num(groups.length||new Set((card.recordMetrics||[]).map(item=>labelKey(item.labels))).size,0)+'개 라벨 조합'+(card.stage==='GDS'?' · 사이트 필터 미적용':'')+'</span><span>10분 시도 '+num(m.estimatedAttempts10)+'건 · 실패 '+num(m.estimatedFailures10)+'건 <small>(추정)</small></span></div></article>';
+            return '<article class="traffic-stage-card" data-stage="'+esc(card.stage)+'" data-card-id="'+esc(cardId(card))+'" data-level="'+esc(s.level)+'"><div class="traffic-stage-header"><span class="traffic-stage-icon" aria-hidden="true">'+meta[2]+'</span><div><small>'+esc(card.stage==='GDS'?'공통 인프라 · 사이트 분리 불가':meta[1])+'</small><h3>'+esc(card.stage==='GDS'?(card.operation||card.title||'GDS operation'):meta[0])+'</h3></div>'+statusHTML(s)+'</div><p class="traffic-stage-reason">'+esc(s.reason||card.reason||'규칙·표본·수집 상태를 함께 확인합니다.')+'</p>'+(flow?flowSummaryHTML(flow):'')+'<div class="traffic-metric-grid">'+['traffic','failure10','trafficRatio','success30'].map(key=>tile(card,key)).join('')+'</div><div class="traffic-server-basis">서버 판정 참고 · 고정 10분·30분 / 7일 기준</div><div class="traffic-stage-secondary">'+['failure30','baselineFailure','zscore'].map(key=>{const value=metricValue(card,key),s=metricStatus(card,key);return '<button type="button" data-traffic-detail="'+selectionAttribute({cardId:cardId(card),metric:key})+'" data-level="'+esc(s.level)+'"><span>'+esc(METRICS[key].label)+(key==='failure30'?failureCountsHTML(card,30):'')+'</span><strong>'+(key==='zscore'?num(value,2)+' σ':percent(value))+'</strong><span aria-hidden="true">↗</span></button>';}).join('')+'</div><div class="traffic-stage-foot"><span>'+num(groups.length||new Set((card.recordMetrics||[]).map(item=>labelKey(item.labels))).size,0)+'개 라벨 조합'+(card.stage==='GDS'?' · 사이트 필터 미적용':'')+'</span><span>'+esc(graphRangeLabel())+' 시도 '+num(card.periodSummary?.request.count)+'건 · 실패 '+num(card.periodSummary?.failure.failures)+'건 <small>(추정)</small></span></div></article>';
         }
         function controlsHTML(){return '<section class="panel traffic-controls" aria-label="트래픽 조회 조건"><div class="traffic-filters"><label>환경<select id="trafficEnvironment" aria-label="트래픽 환경"></select></label><label>애플리케이션<select id="trafficApplication" aria-label="트래픽 애플리케이션"></select></label>'+(scope==='all'?'<label>사이트<select id="trafficSite" aria-label="트래픽 사이트"></select></label>':'<div class="traffic-naver-scope"><span>NAVER</span><strong>NAV_PC + NAV_MO</strong><small>네이버 PC·모바일 합산</small></div>')+'<div class="traffic-control-actions"><button type="button" class="btn" id="trafficPause" aria-pressed="false">Ⅱ 자동 조회 정지</button><button type="button" class="btn primary" id="trafficRefresh">↻ 지금 조회</button></div></div><div class="traffic-controls-foot"><span id="trafficCountdown" class="traffic-countdown" data-state="waiting" role="progressbar" aria-label="다음 자동 조회까지 남은 시간" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="조회 대기" aria-live="off"><span class="traffic-timer-dial" aria-hidden="true"><i class="traffic-timer-hands"></i></span><span id="trafficCountdownLabel">조회 대기</span></span><span id="trafficRefreshIssue" class="traffic-refresh-issue" role="status" hidden></span><span id="trafficLastSuccess">마지막 성공 —</span><button type="button" id="trafficAnimation" class="traffic-text-button" aria-pressed="false">경고 움직임 끄기</button></div></section>';}
         function options(element,list,current,allLabel){if(!element||document.activeElement===element)return;const strings=(list||[]).map(item=>typeof item==='object'?String(item.value??item.name??''):String(item));if(current&&!['all',''].includes(current)&&!strings.includes(current))strings.unshift(current);const unique=[...new Set(strings.filter(Boolean))],html='<option value="all">'+esc(allLabel)+'</option>'+unique.filter(value=>value!=='all').map(value=>'<option value="'+esc(value)+'">'+esc(value)+'</option>').join('');if(element.innerHTML!==html)element.innerHTML=html;element.value=current||'all';}
@@ -2340,7 +2387,7 @@
         function render(){
             const rangeFocused=document.activeElement?.id==='trafficRange';
             if(!root)return;syncControls();const active=document.activeElement,focusSelection=active?.getAttribute?.('data-traffic-detail'),openPanels=[...root.querySelectorAll('details[open]')].map(panel=>panel.id||panel.className),list=cards(),flow=global.TrafficFunnel.build(snapshot?.model||{cards:list},{stale:Boolean(snapshot?.isStale)}),primary=flow.entries.map(entry=>list.find(card=>cardId(card)===entry.cardId)||{id:entry.cardId,stage:entry.stage,metrics:{},status:{level:'unknown',label:'데이터 없음',reason:'현재 요청 지표를 기다리고 있습니다.'}}),primaryIds=new Set(primary.map(cardId)),other=list.filter(card=>card.stage!=='GDS'&&!primaryIds.has(cardId(card))&&!['BOOKING','FINAL_BOOKING'].includes(card.stage)),gds=list.filter(card=>card.stage==='GDS');
-            $('trafficContent').innerHTML=statusStripHTML()+graphRangeHTML()+'<div class="traffic-section-heading traffic-main-heading"><div><small>BUSINESS FLOW</small><h3>조회 → 상세 → 예약 → 결제</h3></div><span>최근 10분 요청 건수(추정)와 단계별 비율 · 사용자별 구매 전환율 아님</span></div><div class="traffic-stage-grid traffic-primary-grid">'+(primary.length?primary.map((card,index)=>stageCard(card,flow.entries[index])).join(''):'<section class="panel traffic-empty"><h3>유효한 지표를 기다리고 있습니다.</h3><p>연결과 규칙 상태를 확인한 뒤 실제 트래픽을 표시합니다.</p></section>')+'</div>'+(other.length?'<div class="traffic-section-heading"><div><small>AFTER SERVICE</small><h3>취소·환불 및 기타 처리</h3></div><span>적은 표본은 정상 또는 급증으로 단정하지 않습니다.</span></div><div class="traffic-stage-grid traffic-secondary-grid">'+other.map(card=>stageCard(card)).join('')+'</div>':'')+(gds.length?'<div class="traffic-section-heading"><div><small>SHARED GDS</small><h3>공통 GDS · operation별</h3></div><span>사이트와 무관한 공통 지표 · 중복 합산하지 않음</span></div><div class="traffic-stage-grid traffic-secondary-grid">'+gds.map(card=>stageCard(card)).join('')+'</div>':'')+healthHTML()+catalogHTML()+'<footer class="traffic-methodology"><strong>판독 시 주의</strong><p>상단 요청 건수는 최근 10분 발생률 × 600초의 추정치입니다. 단계별 비율은 같은 시간 구간의 요청 건수끼리 나눈 값으로, 반복 호출·단계별 계측 차이·이전 구간에서 넘어온 처리 때문에 100%를 넘을 수 있으며 고객별 구매 전환율이나 실제 예약 건수가 아닙니다. 부분 집계는 관측 기준 참고 비율로 구분하며, 지표 없음·전체 지연·기준 0건은 비율을 계산하지 않습니다. 최근 10·30분의 이동 평균과 7일 기준선, 과거 동시간대 유입을 함께 봅니다. 표본 수와 지속 조건을 통과한 경보를 우선하고, 라벨별 이상을 전체 평균으로 숨기지 않습니다. 그래프의 빈 구간은 0이 아닌 미확인입니다. 이 화면은 경보 표시만 하며 알림 발송·수신 확인·Alertmanager 설정을 변경하지 않습니다.</p></footer>'+policyDefinitionHTML();
+            $('trafficContent').innerHTML=statusStripHTML()+graphRangeHTML()+'<div class="traffic-section-heading traffic-main-heading"><div><small>BUSINESS FLOW</small><h3>조회 → 상세 → 예약 → 결제</h3></div><span>'+esc(graphRangeLabel())+' 요청 건수(추정)와 단계별 비율 · 사용자별 구매 전환율 아님</span></div><div class="traffic-stage-grid traffic-primary-grid">'+(primary.length?primary.map((card,index)=>stageCard(card,flow.entries[index])).join(''):'<section class="panel traffic-empty"><h3>유효한 지표를 기다리고 있습니다.</h3><p>연결과 규칙 상태를 확인한 뒤 실제 트래픽을 표시합니다.</p></section>')+'</div>'+(other.length?'<div class="traffic-section-heading"><div><small>AFTER SERVICE</small><h3>취소·환불 및 기타 처리</h3></div><span>적은 표본은 정상 또는 급증으로 단정하지 않습니다.</span></div><div class="traffic-stage-grid traffic-secondary-grid">'+other.map(card=>stageCard(card)).join('')+'</div>':'')+(gds.length?'<div class="traffic-section-heading"><div><small>SHARED GDS</small><h3>공통 GDS · operation별</h3></div><span>사이트와 무관한 공통 지표 · 중복 합산하지 않음</span></div><div class="traffic-stage-grid traffic-secondary-grid">'+gds.map(card=>stageCard(card)).join('')+'</div>':'')+healthHTML()+catalogHTML()+'<footer class="traffic-methodology"><strong>판독 시 주의</strong><p>상단 요청 건수와 성공 건수는 선택 기간 내 10분 이동 발생률의 시간 적분 추정치입니다. 이동 평균의 경계 평활 효과가 있으며 실제 원본 카운터 증가량과 다를 수 있습니다. 빈 구간은 0으로 채우거나 외삽하지 않고 부분 관측으로 표시합니다. 단계별 비율은 같은 시간 구간의 요청 건수끼리 나눈 값으로, 반복 호출·단계별 계측 차이·이전 구간에서 넘어온 처리 때문에 100%를 넘을 수 있으며 고객별 구매 전환율이나 실제 예약 건수가 아닙니다. 부분 집계는 관측 기준 참고 비율로 구분하며, 지표 없음·전체 지연·기준 0건은 비율을 계산하지 않습니다. 최근 10·30분의 이동 평균과 7일 기준선, 과거 동시간대 유입을 함께 봅니다. 표본 수와 지속 조건을 통과한 경보를 우선하고, 라벨별 이상을 전체 평균으로 숨기지 않습니다. 그래프의 빈 구간은 0이 아닌 미확인입니다. 이 화면은 경보 표시만 하며 알림 발송·수신 확인·Alertmanager 설정을 변경하지 않습니다.</p></footer>'+policyDefinitionHTML();
             $('trafficRange').onchange=event=>{const seconds=Number(event.target.value);rangeByScope[scope]=seconds;controller?.setRange(seconds);};
             root.classList.toggle('traffic-no-motion',!animation);root.classList.toggle('traffic-is-stale',Boolean(snapshot?.isStale));
             root.querySelectorAll('details').forEach(panel=>{if(openPanels.includes(panel.id||panel.className))panel.open=true;});
@@ -2374,10 +2421,11 @@
         function openDetail(selection,button){dialogShell();detail={selection,projection:detailProjection(selection,snapshot),series:'all',page:0};opener=button?.getAttribute('data-traffic-detail')||null;renderDetail();if(!dialog.open)dialog.showModal();}
         function measurementDetailsHTML(card){
             if(!card)return '';
+            const p=card.periodSummary,selected=p?'<strong>선택 기간 집계 · '+esc(GRAPH_RANGES.find(([s])=>s===p.duration)?.[1]||num(p.duration/60,0)+'분')+'</strong><p>요청 '+num(p.request.count)+'건 · 성공 '+num(p.success.count)+'건 · 실패 '+num(p.failure.failures)+'건(추정). 10분 이동 발생률의 시간 적분으로 계산합니다. 아래 그래프·표는 개별 recording rule 원본이므로 10분/30분 이동 지표를 구분해 표시합니다.</p>':'';
             const comparison=card.metrics?.trafficComparison;
             const ratio=comparison?'<p>동시간대 비교: 동일 라벨 '+num(comparison.paired,0)+'/'+num(comparison.total,0)+'개 · 현재값 없음 '+num(comparison.missingCurrent,0)+' · 기준선 없음 '+num(comparison.missingBaseline,0)+' · 기준선 0 '+num(comparison.zeroBaseline,0)+' · 갱신 미확인 '+num(comparison.delayed,0)+'. 비교 가능한 동일 조합의 현재 시도율 합 ÷ 기준선 합이며, 제외된 조합은 0으로 채우지 않습니다.</p>':'';
             const booking=card.bookingDiagnostics?'<strong>예약 계측 단계별 수신 확인</strong><p>공식 예약 단계는 BOOKING입니다. FINAL_BOOKING은 이전 단계의 잔존 데이터로 현재 예약·기준선에 합산하지 않습니다. PACKAGE_BOOKING도 별도 범위입니다. 아래 숫자는 예약 건수가 아닌 응답의 유효 시계열 수이며 최신성은 별도 확인합니다.</p><ul>'+card.bookingDiagnostics.map(item=>'<li>'+esc(item.stage)+(item.stage==='FINAL_BOOKING'?' (이전 단계·현재 집계 제외)':'')+' — 최근 10분 시도 '+num(item.attempts10,0)+'개 / 30분 시도 '+num(item.attempts30,0)+'개 · 10분 결과 '+esc(item.results10.join(', ')||'없음')+' · 과거 기준선 '+num(item.historical,0)+'개</li>').join('')+'</ul>':'';
-            return ratio||booking?'<div class="traffic-measurement-details">'+booking+ratio+'</div>':'';
+            return selected||ratio||booking?'<div class="traffic-measurement-details">'+selected+booking+ratio+'</div>':'';
         }
         function renderDetail(){
             if(!detail||!dialog)return;const p=detail.projection,rule=p.rule,options=p.series.map(series=>'<option value="'+series.id+'">'+esc(series.label)+'</option>').join(''),annotations=rule?.annotations||{},rExpression=rule?ruleExpression(rule):'';
@@ -2407,7 +2455,7 @@
         function csvCell(value){let text=String(value??'');if(/^[\s]*[=+@-]/.test(text)&&typeof value!=='number')text="'"+text;return '"'+text.replace(/"/g,'""')+'"';}
         function downloadCSV(name,rows){const blob=new Blob(['\ufeff'+rows.map(row=>row.map(csvCell).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);}
         function downloadDetail(){if(!detail)return;const rows=detailRows();downloadCSV('traffic-'+scope+'-detail.csv',[['timestamp_kst','timestamp_unix','metric','value_display','value_raw_or_derived','source_numerator','source_denominator','conversion_factor','unit_display','environment','application','site_code','stage','gds_operation','result','instance'],...rows.map(row=>[clock(row.time),row.time,row.metric,row.value,row.rawValue,row.components?.numerator,row.components?.denominator,detail.projection.factor,detail.projection.unit,row.labels.environment,row.labels.application,row.labels.site_code,row.labels.stage,row.labels.gds_operation,row.labels.result,row.labels.instance])]);}
-        function downloadReport(){if(!snapshot?.hasSuccess)return;downloadCSV('traffic-'+scope+'-snapshot.csv',[['as_of_kst','stage','operation','status','reason','attempt_rate_10m','failure_ratio_10m','success_rate_30m','estimated_success_30m','traffic_ratio','worst_label_zscore','alerts'],...cards().map(card=>{const m=card.metrics||{},s=status(card.status);return [clock(snapshot.lastSuccess??snapshot.lastSuccessAt),card.stage,card.operation,s.level,s.reason,m.attempts10??m.attempts10m,m.failure10??m.failure10m,m.success30??m.success30m,m.estimatedSuccess30,m.trafficRatio,m.zscore,(card.alerts||[]).map(alertName).join('|')];})]);}
+        function downloadReport(){if(!snapshot?.hasSuccess)return;downloadCSV('traffic-'+scope+'-snapshot.csv',[['as_of_kst','stage','operation','server_status','reason','period_seconds','period_attempts_est','period_success_est','period_failures_est','period_failure_ratio','period_rpm','period_traffic_ratio','period_partial','server_attempt_rate_10m','server_failure_ratio_10m','server_success_rate_30m','server_worst_zscore','alerts'],...cards().map(card=>{const m=card.metrics||{},p=card.periodSummary,s=status(card.status);return [clock(snapshot.lastSuccess??snapshot.lastSuccessAt),card.stage,card.operation,s.level,s.reason,p?.duration,p?.request.count,p?.success.count,p?.failure.failures,p?.failure.ratio,p?.rpm,p?.comparison.ratio,p?.request.partial,m.attempts10,m.failure10,m.success30,m.zscore,(card.alerts||[]).map(alertName).join('|')];})]);}
         function mount(container,options={}){
             const nextScope=options.scope==='all'?'all':'naver';if(root===container&&scope===nextScope&&controller&&root.querySelector('#trafficMonitor'))return;
             unmount();root=container;scope=nextScope;snapshot=null;root.innerHTML='<div id="trafficMonitor" class="traffic-monitor" data-scope="'+scope+'"><div class="traffic-intro"><div><span class="traffic-live-pill">'+(scope==='naver'?'NAVER CHANNEL':'ALL CHANNELS')+' <i></i></span><h2 class="traffic-sr-only">'+esc(scope==='naver'?'네이버 항공 트래픽':'전체 항공 트래픽')+'</h2><span class="traffic-intro-note">실패 급증 · 유입 감소 · 예약·결제 중단 감지</span></div><div class="traffic-status-legend">'+statusHTML('normal')+statusHTML('warning')+statusHTML('critical')+statusHTML('unknown')+'</div></div>'+controlsHTML()+'<div id="trafficContent"></div></div>';
