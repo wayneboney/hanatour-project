@@ -60,9 +60,9 @@ public class FlightPriceSnapshotController {
     private static final String SESSION_MEMBER_INFO_KEY = "HNT_MEMBER_INFO";
     /**
      * true: 로그인 + 허용 목록(ALLOWED_USER_IDS) 모두 검사 / false: 로그인 여부만 검사.
-     * 운영 세션 값 확인이 끝났으므로 true. (일시적으로 로그인만 검사하려면 false)
+     * 테스트 기간 동안은 false (로그인만 하면 조회 가능). 테스트가 끝나면 반드시 true 로 되돌릴 것.
      */
-    private static final boolean ENFORCE_ALLOWLIST = true;
+    private static final boolean ENFORCE_ALLOWLIST = false;
     private static final String PROMETHEUS_PATH = "/air/monitoring/prometheus";
 
     // 대시보드 조회 허용 사용자 아이디 (스냅샷에 예약/탑승객 정보가 있으므로 허용 목록 방식)
