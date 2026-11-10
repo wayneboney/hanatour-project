@@ -19,6 +19,7 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.server.ResponseStatusException;
 
+import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
 import java.util.Arrays;
@@ -58,6 +59,11 @@ public class FlightPriceSnapshotController {
     private static final String JSON_UTF8 = "application/json;charset=UTF-8";
     /** 포털이 로그인 사용자 정보를 담아두는 서버 세션 속성명 (운영 로그로 확인함: 값은 MemberInfo, getUsrid()에 로그인 아이디) */
     private static final String SESSION_MEMBER_INFO_KEY = "HNT_MEMBER_INFO";
+    /**
+     * true: 로그인 + 허용 목록(ALLOWED_USER_IDS) 모두 검사 / false: 로그인 여부만 검사.
+     * 운영 세션 값 확인 중에는 false. 확인이 끝나면 true 로 바꿔 허용 목록을 다시 적용할 것.
+     */
+    private static final boolean ENFORCE_ALLOWLIST = false;
     private static final String PROMETHEUS_PATH = "/air/monitoring/prometheus";
 
     // 대시보드 조회 허용 사용자 아이디 (스냅샷에 예약/탑승객 정보가 있으므로 허용 목록 방식)
@@ -78,7 +84,7 @@ public class FlightPriceSnapshotController {
     public ResponseEntity<String> getSnapshots(@RequestParam("date_start") String dateStart,
                                @RequestParam("date_end") String dateEnd,
                                @RequestParam(value = "timezone", required = false) String timezone) {
-        final String usrId = requireAllowedUser();
+        final String usrId = requireLoginUser();
         log.info("[FLIGHT-PRICE-SNAPSHOT] 스냅샷 조회 usrId={} date_start={} date_end={}", usrId, dateStart, dateEnd);   // 조회 감사 로그
         if (timezone != null && !"Asia/Seoul".equals(timezone)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "timezone은 Asia/Seoul만 지원합니다.");
@@ -94,7 +100,7 @@ public class FlightPriceSnapshotController {
     @GetMapping(value = PROMETHEUS_PATH + "/api/v1/query", produces = JSON_UTF8)
     public ResponseEntity<String> prometheusQuery(@RequestParam("query") String query,
                                   @RequestParam(value = "time", required = false) String time) {
-        requireAllowedUser();
+        requireLoginUser();
         return jsonResponse(HttpStatus.OK, flightPriceSnapshotCbc.prometheusQuery(query, time));
     }
 
@@ -104,36 +110,75 @@ public class FlightPriceSnapshotController {
                                        @RequestParam("start") String start,
                                        @RequestParam("end") String end,
                                        @RequestParam("step") String step) {
-        requireAllowedUser();
+        requireLoginUser();
         return jsonResponse(HttpStatus.OK, flightPriceSnapshotCbc.prometheusQueryRange(query, start, end, step));
     }
 
     /** Prometheus 알림 규칙 조회 (type: alert, 생략 가능). record 조회는 허용하지 않는다. */
     @GetMapping(value = PROMETHEUS_PATH + "/api/v1/rules", produces = JSON_UTF8)
     public ResponseEntity<String> prometheusRules(@RequestParam(value = "type", required = false) String type) {
-        requireAllowedUser();
+        requireLoginUser();
         return jsonResponse(HttpStatus.OK, flightPriceSnapshotCbc.prometheusRules(type));
     }
 
     /**
-     * 로그인 사용자 확인 후 허용 목록에 있는 경우에만 통과. 통과하면 아이디를 반환한다.
-     * 아이디를 읽을 수 없으면 401, 허용 목록에 없으면 403 (판단 불가는 거부).
+     * 로그인 여부 확인. 통과하면 아이디를 반환한다.
+     * - 아이디를 읽을 수 없으면 401 (원인 추적용 컨텍스트를 로그로 남긴다)
+     * - ENFORCE_ALLOWLIST=true 일 때만 허용 목록을 추가로 검사하고, 목록에 없으면 403
      */
-    private String requireAllowedUser() {
+    private String requireLoginUser() {
+        String source = "CoreUtil";
         String usrId = readUserIdFromCoreUtil();
         if (usrId == null || usrId.trim().isEmpty()) {
-            // @RestController 경로는 CoreUtil 컨텍스트가 비어 있어, 포털이 세션에 넣어둔 값을 직접 읽는다.
+            // @RestController 경로는 CoreUtil 컨텍스트가 비어 있을 수 있어, 포털이 세션에 넣어둔 값을 직접 읽는다.
             usrId = readUserIdFromSession();
+            source = "session";
         }
         if (usrId == null || usrId.trim().isEmpty()) {
+            logAuthFailureContext();
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "포털 로그인이 필요합니다.");
         }
         usrId = usrId.trim();
-        if (!ALLOWED_USER_IDS.contains(usrId)) {
+        if (ENFORCE_ALLOWLIST && !ALLOWED_USER_IDS.contains(usrId)) {
             log.warn("[FLIGHT-PRICE-SNAPSHOT] 접근 거부 usrId={}", usrId);
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "이 대시보드를 조회할 권한이 없습니다.");
         }
+        log.info("[FLIGHT-PRICE-SNAPSHOT][AUTH] 로그인 확인 usrId={} source={}", usrId, source);   // 운영 추적용 (안정화 후 debug 로 낮출 것)
         return usrId;
+    }
+
+    /**
+     * 로그인 확인 실패 시 원인 추적용 로그. 값(쿠키/세션 속성 내용)은 남기지 않고 이름/타입/존재 여부만 남긴다.
+     * 서버 주소는 "서버 간 세션 미공유" 여부를 가리기 위한 용도.
+     */
+    private void logAuthFailureContext() {
+        try {
+            ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+            HttpServletRequest request = attrs == null ? null : attrs.getRequest();
+            if (request == null) {
+                log.warn("[FLIGHT-PRICE-SNAPSHOT][AUTH-FAIL] request 없음");
+                return;
+            }
+            StringBuilder cookieNames = new StringBuilder();
+            if (request.getCookies() != null) {
+                for (Cookie cookie : request.getCookies()) {
+                    cookieNames.append(cookie.getName()).append(',');
+                }
+            }
+            HttpSession session = request.getSession(false);
+            StringBuilder sessionAttrs = new StringBuilder();
+            if (session != null) {
+                for (String name : Collections.list(session.getAttributeNames())) {
+                    Object v = session.getAttribute(name);
+                    sessionAttrs.append(name).append('(').append(v == null ? "null" : v.getClass().getName()).append("),");
+                }
+            }
+            log.warn("[FLIGHT-PRICE-SNAPSHOT][AUTH-FAIL] uri={} server={}:{} cookieNames={} session={} sessionAttrs={} remoteUser={}",
+                    request.getRequestURI(), request.getLocalAddr(), request.getLocalPort(), cookieNames,
+                    session == null ? "없음" : "있음", sessionAttrs, request.getRemoteUser() == null ? "없음" : "있음");
+        } catch (RuntimeException e) {
+            log.warn("[FLIGHT-PRICE-SNAPSHOT][AUTH-FAIL] 컨텍스트 로그 실패: {}", e.toString());
+        }
     }
 
     private String readUserIdFromCoreUtil() {
