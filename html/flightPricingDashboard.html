@@ -331,7 +331,7 @@
             const storedRank=numeric(get('current_rank'),'current_rank');
             if(storedRank!==null&&(!Number.isInteger(storedRank)||storedRank<1))throw new Error('current_rank는 1 이상의 정수여야 합니다.');
             const ownPrice=numeric(get('base_fare'),'base_fare',false);
-            const row={id:String(get('snapshot_id','result_id','search_id')||options.index||''),date,capturedAt,depDate,returnDate,origin,destination,route:origin+'-'+(destination||'?'),region:String(get('region')||regionFor(origin,destination)),airline:String(get('dep_airline_code')||''),flightNo:String(get('dep_flight_no')||'').padStart(4,'0'),returnFlightNo:String(get('return_flight_no')||'').padStart(4,'0'),ownPrice,tax:numeric(get('tax'),'tax'),qCharge:numeric(get('q_charge'),'q_charge'),lead:days(depDate,date),stay:days(returnDate,depDate),offers,storedRank,payment:get('promo_card_code'),cabin:get('seat_class'),passengerType:get('passenger_type'),tripType:get('trip_type')||'ROUND_TRIP',reservationCode:get('reservation_code'),source:options.source||'imported',warnings:[]};
+            const row={id:String(get('snapshot_id','id','result_id','search_id')||options.index||''),date,capturedAt,depDate,returnDate,origin,destination,route:origin+'-'+(destination||'?'),region:String(get('region')||regionFor(origin,destination)),airline:String(get('dep_airline_code')||''),flightNo:String(get('dep_flight_no')||'').padStart(4,'0'),returnFlightNo:String(get('return_flight_no')||'').padStart(4,'0'),ownPrice,tax:numeric(get('tax'),'tax'),qCharge:numeric(get('q_charge'),'q_charge'),lead:days(depDate,date),stay:days(returnDate,depDate),offers,storedRank,payment:get('promo_card_code'),cabin:get('seat_class'),passengerType:get('passenger_type'),tripType:get('trip_type')||'ROUND_TRIP',reservationCode:get('reservation_code'),source:options.source||'imported',warnings:[]};
             if(!origin||!destination)row.warnings.push('목적지/출발지 공항 정보 부족');
             if(row.lead<0)row.warnings.push('수집일보다 과거인 출발일');
             if(row.stay<0)row.warnings.push('출발일보다 과거인 귀국일');
@@ -2645,7 +2645,7 @@
         function normalizeAnalysisRows(rawRows,range){
             const seen=new Map();let excludedRange=0;
             rawRows.forEach((raw,index)=>{
-                if(raw.snapshot_id===null||raw.snapshot_id===undefined||String(raw.snapshot_id).trim()==='')throw new Error((index+1)+'행의 snapshot_id가 없습니다.');
+                {const rawId=raw.snapshot_id??raw.id;if(rawId===null||rawId===undefined||String(rawId).trim()==='')throw new Error((index+1)+'행의 snapshot_id(id)가 없습니다.');}
                 const stamp=window.LiveSnapshotData.captureMs(raw);
                 if(!Number.isFinite(stamp))throw new Error((index+1)+'행의 captured_at/created_at이 올바른 수집시각이 아닙니다.');
                 const missingOwn=raw.base_fare===null||raw.base_fare===undefined||String(raw.base_fare).trim()==='';
