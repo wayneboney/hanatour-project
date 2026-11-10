@@ -726,6 +726,36 @@
                 .replace(/^fare_(\d+)(?=_|$)/, 'fare$1');
         }
 
+        // 항공API(Java) 응답 필드명 -> 대시보드 내부 필드명 연결. canonicalKey 변환(camelCase -> snake_case) 이후에 적용한다.
+        // 이미 내부 필드명으로 값이 있으면 덮어쓰지 않는다.
+        const API_FIELD_ALIASES = {
+            id: 'snapshot_id',
+            departure_date: 'dep_date',
+            departure_airport: 'dep_airport',
+            departure_airline_code: 'dep_airline_code',
+            departure_flight_no: 'dep_flight_no',
+            qcharge: 'q_charge'
+        };
+        function applyApiFieldAliases(row) {
+            for (const from of Object.keys(API_FIELD_ALIASES)) {
+                const to = API_FIELD_ALIASES[from];
+                if ((row[to] === undefined || row[to] === null) && row[from] !== undefined && row[from] !== null) row[to] = row[from];
+            }
+            // fares: [{fare, agencyCode, agencyName}, ...] (최저가순) -> fare1, fare1_agency_code, fare1_agency_name ... (최대 20개)
+            if (Array.isArray(row.fares)) {
+                row.fares.slice(0, 20).forEach((item, i) => {
+                    if (!item || typeof item !== 'object') return;
+                    const n = i + 1;
+                    const price = item.fare !== undefined ? item.fare : item.price;
+                    const code = item.agencyCode !== undefined ? item.agencyCode : item.agency_code;
+                    const name = item.agencyName !== undefined ? item.agencyName : item.agency_name;
+                    if (row['fare' + n] === undefined && price !== undefined) row['fare' + n] = price;
+                    if (row['fare' + n + '_agency_code'] === undefined && code !== undefined) row['fare' + n + '_agency_code'] = code;
+                    if (row['fare' + n + '_agency_name'] === undefined && name !== undefined) row['fare' + n + '_agency_name'] = name;
+                });
+            }
+        }
+
         // DB snake_case / Java camelCase / 대문자 컬럼을 같은 필드로 변환합니다.
         // decimal 문자열과 NULL은 건드리지 않습니다. 계산은 별도 분석 모듈이 담당합니다.
         function normalizeRowKeys(raw, index) {
@@ -737,6 +767,7 @@
                 if (own(row, normalized) && row[normalized] !== value) throw error('INVALID_ROW', (index + 1) + '번째 스냅샷의 ' + normalized + ' 필드가 중복 충돌합니다.');
                 row[normalized] = value;
             }
+            applyApiFieldAliases(row);
             if (typeof row.snapshot_id === 'number' && !Number.isSafeInteger(row.snapshot_id)) {
                 throw error('UNSAFE_ID', 'snapshot_id가 안전한 정수 범위를 벗어났습니다. 서버에서 BIGINT 식별자를 JSON 문자열로 내려주세요.');
             }
