@@ -46,10 +46,9 @@ import java.util.Set;
  *    그 외 경로(/api/v1/admin, /-/reload 등)는 매핑하지 않으므로 전달되지 않는다.
  * </pre>
  *
- * [접근 제어] 모든 엔드포인트는 로그인 사용자 아이디(CoreUtil...getUsrid())가 ALLOWED_USER_IDS 에 있을 때만 허용한다.
+ * [접근 제어] 모든 엔드포인트는 로그인한 사용자만 허용한다.
  *   - 로그인 정보 없음(세션 없음/아이디 없음) → 401 (HTML 이 로그인 경고창을 띄움)
- *   - 로그인했지만 허용 목록에 없음            → 403 (HTML 이 접근권한 오류 문구를 표시)
- *   - 허용 목록이 비어 있으면 모두 403 (fail-closed). 운영 반영 전에 아래 목록에 아이디를 넣어야 한다.
+ *   - ENFORCE_ALLOWLIST=true 이면 허용 목록(ALLOWED_USER_IDS)에 없는 사용자는 403 (HTML 이 접근권한 오류 문구를 표시)
  */
 @Slf4j
 @RestController
