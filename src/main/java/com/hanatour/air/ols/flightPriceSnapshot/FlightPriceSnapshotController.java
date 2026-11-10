@@ -3,7 +3,9 @@ package com.hanatour.air.ols.flightPriceSnapshot;
 import com.hanatour.air.ols.flightPriceSnapshot.cbc.FlightPriceSnapshotCbc;
 import com.hanatour.air.ols.flightPriceSnapshot.cbc.PrometheusUpstreamException;
 import com.hanatour.air.ols.flightPriceSnapshot.cbc.vo.FlightPriceSnapshotReqVo;
+import com.hanatour.common.cmn.CoreUtil;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
@@ -14,8 +16,12 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 항공권 가격 대시보드 Controller (스냅샷 조회 + Prometheus 중계)
@@ -34,15 +40,25 @@ import java.util.Map;
  *    그 외 경로(/api/v1/admin, /-/reload 등)는 매핑하지 않으므로 전달되지 않는다.
  * </pre>
  *
- * [TODO - 운영 반영 전 필수] 인증/인가 및 사용자 권한별 조회 범위 제한
- *   스냅샷(예약/탑승객 정보 포함)과 인프라 지표를 내려주는 API 이므로, 포털 인증(SSO) 적용 여부와 권한 검증이 반드시 필요하다.
+ * [접근 제어] 모든 엔드포인트는 로그인 사용자 아이디(CoreUtil...getUsrid())가 ALLOWED_USER_IDS 에 있을 때만 허용한다.
+ *   - 로그인 정보 없음(세션 없음/아이디 없음) → 401 (HTML 이 로그인 경고창을 띄움)
+ *   - 로그인했지만 허용 목록에 없음            → 403 (HTML 이 접근권한 오류 문구를 표시)
+ *   - 허용 목록이 비어 있으면 모두 403 (fail-closed). 운영 반영 전에 아래 목록에 아이디를 넣어야 한다.
  */
+@Slf4j
 @RestController
 @RequiredArgsConstructor
 public class FlightPriceSnapshotController {
 
     private static final String JSON_UTF8 = "application/json;charset=UTF-8";
     private static final String PROMETHEUS_PATH = "/air/monitoring/prometheus";
+
+    // 대시보드 조회 허용 사용자 아이디 (스냅샷에 예약/탑승객 정보가 있으므로 허용 목록 방식)
+    // TODO: 운영 반영 전에 실제 허용할 아이디를 넣을 것. 비어 있으면 아무도 조회할 수 없다.
+    private static final Set<String> ALLOWED_USER_IDS = Collections.unmodifiableSet(new HashSet<String>(Arrays.asList(
+            // "user01",
+            // "user02"
+    )));
 
     private final FlightPriceSnapshotCbc flightPriceSnapshotCbc;
 
@@ -54,6 +70,8 @@ public class FlightPriceSnapshotController {
     public ResponseEntity<String> getSnapshots(@RequestParam("date_start") String dateStart,
                                @RequestParam("date_end") String dateEnd,
                                @RequestParam(value = "timezone", required = false) String timezone) {
+        final String usrId = requireAllowedUser();
+        log.info("[FLIGHT-PRICE-SNAPSHOT] 스냅샷 조회 usrId={} date_start={} date_end={}", usrId, dateStart, dateEnd);   // 조회 감사 로그
         if (timezone != null && !"Asia/Seoul".equals(timezone)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "timezone은 Asia/Seoul만 지원합니다.");
         }
@@ -68,6 +86,7 @@ public class FlightPriceSnapshotController {
     @GetMapping(value = PROMETHEUS_PATH + "/api/v1/query", produces = JSON_UTF8)
     public ResponseEntity<String> prometheusQuery(@RequestParam("query") String query,
                                   @RequestParam(value = "time", required = false) String time) {
+        requireAllowedUser();
         return jsonResponse(HttpStatus.OK, flightPriceSnapshotCbc.prometheusQuery(query, time));
     }
 
@@ -77,13 +96,38 @@ public class FlightPriceSnapshotController {
                                        @RequestParam("start") String start,
                                        @RequestParam("end") String end,
                                        @RequestParam("step") String step) {
+        requireAllowedUser();
         return jsonResponse(HttpStatus.OK, flightPriceSnapshotCbc.prometheusQueryRange(query, start, end, step));
     }
 
     /** Prometheus 알림 규칙 조회 (type: alert, 생략 가능). record 조회는 허용하지 않는다. */
     @GetMapping(value = PROMETHEUS_PATH + "/api/v1/rules", produces = JSON_UTF8)
     public ResponseEntity<String> prometheusRules(@RequestParam(value = "type", required = false) String type) {
+        requireAllowedUser();
         return jsonResponse(HttpStatus.OK, flightPriceSnapshotCbc.prometheusRules(type));
+    }
+
+    /**
+     * 로그인 사용자 확인 후 허용 목록에 있는 경우에만 통과. 통과하면 아이디를 반환한다.
+     * 아이디를 읽을 수 없으면 401, 허용 목록에 없으면 403 (판단 불가는 거부).
+     */
+    private String requireAllowedUser() {
+        String usrId = null;
+        try {
+            usrId = CoreUtil.getCertificationUtil().getMemberInfo().getUsrid();
+        } catch (RuntimeException e) {
+            // 세션/회원정보가 없을 때의 예외 포함. 상세 원인은 로그에만 남긴다.
+            log.warn("[FLIGHT-PRICE-SNAPSHOT] 로그인 사용자 확인 실패: {}", e.toString());
+        }
+        if (usrId == null || usrId.trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "포털 로그인이 필요합니다.");
+        }
+        usrId = usrId.trim();
+        if (!ALLOWED_USER_IDS.contains(usrId)) {
+            log.warn("[FLIGHT-PRICE-SNAPSHOT] 접근 거부 usrId={}", usrId);
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "이 대시보드를 조회할 권한이 없습니다.");
+        }
+        return usrId;
     }
 
     private ResponseEntity<String> jsonResponse(HttpStatus status, String body) {

@@ -132,3 +132,18 @@ GET {ENDPOINT_API}/lambda/naver/flight/snapshots?startDate=2026-11-04&endDate=20
 - `FARE1~20`, `FAREn_AGENCY_CODE/NAME` 반복 컬럼(60개)은 정규화 대상.
   `FLIGHT_PRICE_COMPETITOR(SNAPSHOT_ID, RANK_NO, FARE, AGENCY_CODE, AGENCY_NAME)` 로 분리하면 확장/집계/조회가 쉬움
 - 경쟁사 운임·순위는 영업상 민감 정보라 노출 권한 범위 확정 필요
+
+## 접근 제어 (허용 아이디 목록)
+
+모든 엔드포인트(스냅샷 + Prometheus 중계)는 `CoreUtil.getCertificationUtil().getMemberInfo().getUsrid()` 로 읽은 로그인 아이디가
+`FlightPriceSnapshotController.ALLOWED_USER_IDS` 에 있을 때만 허용한다.
+
+| 상황 | 응답 | HTML 동작 |
+|---|---|---|
+| 아이디를 읽을 수 없음(세션 없음 등) | 401 | 로그인 경고창 |
+| 로그인했지만 허용 목록에 없음 | 403 | "접근권한을 확인해 주세요" 오류 문구 |
+| 허용 목록이 비어 있음 | 전원 403 | 〃 (fail-closed) |
+
+- **운영 반영 전에 `ALLOWED_USER_IDS` 에 아이디를 넣어야 한다.** 비어 있으면 아무도 조회할 수 없다.
+- 스냅샷 조회는 `usrId`, 기간을 INFO 로그로 남기고(감사), 접근 거부는 WARN 로그로 남긴다.
+- 아이디 비교는 대소문자를 구분하며 앞뒤 공백은 제거한다.
