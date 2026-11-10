@@ -269,6 +269,7 @@
 <dialog id="detailDialog"><div class="dialog-header"><div><div class="eyebrow">SNAPSHOT DETAIL</div><h2 id="dialogTitle"></h2></div><button class="icon-btn close-dialog" aria-label="닫기">✕</button></div><div id="dialogBody"></div></dialog>
 <dialog id="definitionDialog"><div class="dialog-header"><div><div class="eyebrow">METRIC DEFINITIONS</div><h2>같은 기준으로 가격을 비교합니다.</h2></div><button class="icon-btn close-dialog" aria-label="닫기">✕</button></div><div class="definition-list"><article><h3>트래픽 모니터링</h3><p>트래픽은 예약 DB가 아닌 Prometheus recording rule을 조회합니다. 화면 조회는 20초, 첨부 규칙의 지표 계산은 1분·기준선은 2분입니다. 10분·30분 이동 발생률을 순간 TPS나 실제 고객 전환율로 해석하지 않습니다. 경보는 서버의 pending/firing과 지속 조건을 사용하고, 연결 실패·오래된 데이터는 정상으로 표시하지 않습니다. 그래프를 누르면 원본 지표·라벨·수치·조건을 볼 수 있습니다.</p></article><article><h3>자사 가격</h3><p>base_fare는 성인 1인 최종금액입니다. tax와 q_charge는 이미 포함되어 있으므로 다시 더하지 않습니다.</p></article><article><h3>가격순위</h3><p>1 + 자사보다 더 저렴한 경쟁사 수. 코드가 있으면 같은 판매자의 최저가 1개를 사용합니다. 코드가 없는 과거 자료는 관측가격 기준의 재구성 순위입니다. 화면 노출 위치와 다릅니다.</p></article><article><h3>Top 3 예약 구성비</h3><p>가격 비교가능 스냅샷 중 가격순위가 3 이내인 비율입니다. 3위일 때 구매할 확률이나 유지 가능한 매출 비율을 의미하지 않습니다.</p></article><article><h3>최저가 대비 차액</h3><p>자사 최종금액 − 최저 적격 경쟁운임. 양수는 자사가 더 비싸고, 음수는 더 저렴함을 뜻합니다. A01과 특정 카드운임을 섞지 않습니다.</p></article><article><h3>가격 후보</h3><p>경쟁사 가격이 그대로라는 가정에서 Top K를 만족하는 동률 허용 경계가격입니다. 원가·전환율·재고 데이터가 연결되지 않아 수익 최적가격이나 자동 적용가격은 아닙니다.</p></article><article><h3>데이터 출처</h3><p>어드민 조회 API가 반환한 DB 스냅샷만 사용합니다. 실시간 탭은 오늘(KST), 나머지 탭은 조회 버튼으로 불러온 기간을 분석합니다. 수집일과 출발일은 다릅니다. 반복 스냅샷 수를 고유 예약 건수로 간주하지 않습니다.</p></article><article><h3>예약·탑승객 집계</h3><p>조회·필터 범위에서 같은 예약은 최신 스냅샷 1건으로 집계합니다. 성별 M1, F2는 남자 1명·여자 2명, 연령 M20, 1, F40, 1은 남자 20대 1명·여자 40대 1명을 뜻합니다. 인원 미기록·잘못된 형식·요약 불일치는 별도 표시하며, 성인 1인 요금을 전체 인원에 곱해 예약 총액으로 만들지 않습니다.</p></article></div></dialog>
 <dialog id="loginOverlay" aria-labelledby="loginTitle" class="admin-login"><h2 id="loginTitle">포털 로그인이 필요합니다</h2><p id="loginMessage">로그인한 뒤 이 창으로 돌아와 다시 확인해 주세요.</p><div class="login-actions"><button type="button" class="btn primary" id="btnLogin">포털 로그인</button><button type="button" class="btn" id="btnLoginRetry">로그인 후 재확인</button></div><p class="muted">권한은 서버가 검증합니다. 이 화면에 DB 비밀번호나 API 비밀키를 넣지 마세요.</p></dialog>
+<dialog id="forbiddenOverlay" aria-labelledby="forbiddenTitle" class="admin-login"><h2 id="forbiddenTitle">조회 권한이 없습니다</h2><p id="forbiddenMessage">로그인은 되어 있지만 이 대시보드를 조회할 수 있는 계정이 아닙니다. 담당자에게 권한을 요청한 뒤 새로고침해 주세요.</p><div class="login-actions"><button type="button" class="btn primary" id="btnForbiddenReload">권한 확인 후 새로고침</button></div><p class="muted">이 계정으로는 데이터를 조회하지 않습니다. 자동 조회는 중단되었습니다.</p></dialog>
 <div class="toast" id="toast" role="status"></div>
 <script>
     /* Embedded module 1 */
@@ -709,6 +710,13 @@
             }
         }
 
+        // 403 = 로그인은 했지만 이 대시보드를 볼 권한(허용 아이디)이 없음. 로그인 경고창과 구분한다.
+        function notifyForbidden(message) {
+            if (typeof global.dispatchEvent === 'function' && typeof global.CustomEvent === 'function') {
+                global.dispatchEvent(new global.CustomEvent('admin-snapshot:forbidden', { detail: { env: getEnv(), message } }));
+            }
+        }
+
         function canonicalKey(key) {
             return String(key)
                 .replace(/([a-z\d])([A-Z])/g, '$1_$2')
@@ -840,6 +848,11 @@
                     const message = getEnv().name + ' 포털 로그인이 필요합니다. 로그인 후 다시 조회해 주세요.';
                     notifyLogin(message);
                     throw error('LOGIN_REQUIRED', message, { status: response.status });
+                }
+                if (response.status === 403) {
+                    const message = '이 대시보드를 조회할 권한이 없습니다. 담당자에게 권한을 요청해 주세요.';
+                    notifyForbidden(message);
+                    throw error('FORBIDDEN', message, { status: response.status });
                 }
                 if (!response.ok) throw error('HTTP_' + response.status, 'API 조회 오류 (HTTP ' + response.status + '). 포털·OLS·항공 API 상태를 확인해 주세요.', { status: response.status });
                 let payload;
@@ -980,7 +993,7 @@
                         if(sequence!==requestSequence)return snapshot();
                         const now=epoch(clock());if(todayKST(now)!==date){resetDay(now);return snapshot();}
                         state.now=now;state.error=error.name==='AbortError'?'조회가 중단되었습니다. 다시 갱신해 주세요.':String(error.message||error);state.isStale=state.hasSuccessfulRefresh;state.newCount=0;
-                        if(error.code==='LOGIN_REQUIRED')state.paused=true;
+                        if(error.code==='LOGIN_REQUIRED'||error.code==='FORBIDDEN')state.paused=true;
                     }finally{
                         if(sequence===requestSequence){state.isLoading=false;state.nextRefreshAt=epoch(clock())+MINUTE;pending=null;abort=null;emit();}
                     }
@@ -2001,6 +2014,8 @@
                 const loginRequired=rawText!==null&&(global.AdminSnapshotAPI?.isSsoLoginRequired?.(rawText)||/id\s*=\s*["']ErrorCode["'][^>]*>\s*-801\s*</i.test(rawText));
                 const upstreamError=response.headers?.get?.('X-Monitoring-Error-Source')==='prometheus';
                 if(loginRequired||response.status===401&&!upstreamError){dispatchLogin('admin-snapshot:login-required');throw new Error('포털 로그인이 필요합니다. 로그인 후 다시 조회해 주세요.');}
+                // 403(Prometheus 서버가 아닌 OLS/포털의 접근 거부): 권한 없음 안내 + 자동 조회 중단
+                if(response.status===403&&!upstreamError){dispatchLogin('admin-snapshot:forbidden');const forbidden=new Error('이 대시보드를 조회할 권한이 없습니다. 담당자에게 권한을 요청해 주세요.');forbidden.code='FORBIDDEN';throw forbidden;}
                 try { body = rawText===null?await response.json():JSON.parse(rawText); } catch (error) {
                     if(error?.name==='AbortError')throw error;
                     if(response.ok)throw new Error('Prometheus가 JSON 대신 다른 응답을 반환했습니다. OLS 경로 또는 로그인 상태를 확인해 주세요.');
@@ -2049,6 +2064,7 @@
                     } catch (error) {
                         if (!live || token !== generation) return snapshot();
                         state.error = readableError(error, conn); modelRevision++;
+                        if (error && error.code === 'FORBIDDEN') state.paused = true;   // 권한이 없으면 자동 재조회를 멈춘다.
                     } finally {
                         if (token === generation) {
                             if (timeoutTimer !== null) timers.clearTimeout(timeoutTimer);
@@ -2716,8 +2732,14 @@
         $('exportBtn').onclick=()=>isTrafficView()?window.TrafficMonitor.downloadReport():state.view==='insights'?window.InsightMonitor.downloadReport():download();
         $('definitionBtn').onclick=()=>$('definitionDialog').showModal();
         document.querySelectorAll('.close-dialog').forEach(b=>b.onclick=()=>b.closest('dialog').close());
-        document.querySelectorAll('dialog:not(#loginOverlay)').forEach(d=>d.addEventListener('click',event=>{if(event.target===d){const r=d.getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)d.close();}}));
+        document.querySelectorAll('dialog:not(#loginOverlay):not(#forbiddenOverlay)').forEach(d=>d.addEventListener('click',event=>{if(event.target===d){const r=d.getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)d.close();}}));
         $('loginOverlay').addEventListener('cancel',event=>event.preventDefault());
+        $('forbiddenOverlay').addEventListener('cancel',event=>event.preventDefault());
+        $('btnForbiddenReload').onclick=()=>window.location.reload();
+        // 권한 없음 창: 브라우저가 Esc 를 두 번 이상 누르면 취소 방지를 무시하고 닫을 수 있으므로, 닫히면 다시 연다.
+        let forbiddenActive=false;
+        $('forbiddenOverlay').addEventListener('close',()=>{if(forbiddenActive)setTimeout(()=>{if(forbiddenActive&&!$('forbiddenOverlay').open)$('forbiddenOverlay').showModal();},0);});
+        window.addEventListener('admin-snapshot:forbidden',()=>{forbiddenActive=true;document.body.classList.add('need-login');if(!$('forbiddenOverlay').open)$('forbiddenOverlay').showModal();});
         $('btnLogin').onclick=goPortalLogin;$('btnLoginRetry').onclick=retrySession;
         window.addEventListener('admin-snapshot:login-required',showLoginRequired);
         window.addEventListener('admin-snapshot:login-ok',()=>{if(authBlocked)closeLogin();});
