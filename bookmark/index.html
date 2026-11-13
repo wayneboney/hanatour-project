@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>항공 북마크</title>
+<style>
+  :root {
+    --bg: #f4f6fa; --card: #fff; --text: #1f2430; --muted: #6b7280; --line: #e5e7eb;
+    --primary: #2563eb; --star: #f59e0b;
+    --env-dev: #e8603c; --env-qa: #1f8a3b; --env-stg: #7c3aed; --env-prod: #1d4ed8;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Malgun Gothic", -apple-system, sans-serif; background: var(--bg); color: var(--text); }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 20px; margin: 0 0 16px; }
+  .search { width: 100%; padding: 12px 14px; font-size: 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); }
+  .search:focus { outline: 2px solid var(--primary); border-color: transparent; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 18px; }
+  .chip { padding: 6px 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); font-size: 13px; cursor: pointer; }
+  .chip.active { border-color: var(--primary); color: var(--primary); font-weight: 700; }
+  table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+  th { background: #5f6368; color: #fff; text-align: left; font-size: 13px; padding: 12px 14px; }
+  td { padding: 14px; border-top: 1px solid var(--line); vertical-align: middle; }
+  .svc-name { font-weight: 700; font-size: 14px; }
+  .svc-desc { color: var(--muted); font-size: 12px; margin-top: 4px; }
+  .star { background: none; border: 0; font-size: 18px; color: #c4c7ce; cursor: pointer; vertical-align: middle; padding: 0 4px; }
+  .star.on { color: var(--star); }
+  .link { display: block; text-align: center; padding: 9px 10px; border-radius: 8px; color: #fff; text-decoration: none; font-size: 13px; }
+  .link:hover { filter: brightness(1.08); }
+  .link.disabled { background: #d1d5db !important; color: #6b7280; pointer-events: none; }
+  .empty { padding: 40px; text-align: center; color: var(--muted); }
+  @media (max-width: 720px) { th, td { padding: 10px 8px; } .svc-desc { display: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>항공 북마크</h1>
+  <input id="search" class="search" type="search" placeholder="서비스명, 설명 검색" autocomplete="off">
+  <div id="chips" class="chips"></div>
+  <div id="content"></div>
+</div>
+
+<script>
+/* =====================================================================
+ * [설정 영역] 서비스 추가/수정은 이 부분만 고치면 됩니다.
+ *  - url 이 비어 있으면 버튼이 회색(비활성)으로 표시됩니다.
+ *  - 새 환경이 필요하면 ENVS 에 추가하고, CSS 에 --env-xxx 색상을 추가하세요.
+ *  - TODO: 아래 url 은 임시값입니다. 실제 주소로 교체해 주세요.
+ * ===================================================================== */
+var ENVS = [
+  { key: 'DEV',  color: 'var(--env-dev)'  },
+  { key: 'QA',   color: 'var(--env-qa)'   },
+  { key: 'PROD', color: 'var(--env-prod)' }
+];
+
+var SERVICES = [
+  {
+    id: 'dynamic-pricing',
+    name: '다이나믹프라이싱',
+    category: '운임',
+    desc: '동적 운임 조회/관리',
+    links: {
+      DEV:  [{ label: '다이나믹프라이싱(DEV)',  url: '' }],
+      QA:   [{ label: '다이나믹프라이싱(QA)',   url: '' }],
+      PROD: [{ label: '다이나믹프라이싱(PROD)', url: '' }]
+    }
+  },
+  {
+    id: 'flight-snapshot',
+    name: '플라이트스냅샷',
+    category: '운임',
+    desc: '항공편 스냅샷 조회',
+    links: {
+      DEV:  [{ label: '플라이트스냅샷(DEV)',  url: '' }],
+      QA:   [{ label: '플라이트스냅샷(QA)',   url: '' }],
+      PROD: [{ label: '플라이트스냅샷(PROD)', url: '' }]
+    }
+  }
+];
+
+/* ===================== 아래부터는 로직 ===================== */
+var FAV_KEY = 'airBookmark.favorites.v1';
+var state = { category: '전체', keyword: '', favs: loadFavs() };
+
+/* localStorage 는 사내 보안설정/시크릿 모드에서 막힐 수 있어 항상 try/catch */
+function loadFavs() {
+  try {
+    var parsed = JSON.parse(localStorage.getItem(FAV_KEY) || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
+  }
+}
+function saveFavs() {
+  try {
+    localStorage.setItem(FAV_KEY, JSON.stringify(state.favs));
+  } catch (e) {
+    /* 저장 실패해도 화면 동작에는 영향 없음 */
+  }
+}
+
+/* javascript: 같은 위험 스킴 차단 - http/https 만 허용 */
+function safeUrl(url) {
+  if (!url) { return ''; }
+  try {
+    var u = new URL(url, location.href);
+    return (u.protocol === 'http:' || u.protocol === 'https:') ? u.href : '';
+  } catch (e) {
+    return '';
+  }
+}
+
+function el(tag, cls, text) {
+  var node = document.createElement(tag);
+  if (cls) { node.className = cls; }
+  if (text !== undefined) { node.textContent = text; } /* innerHTML 미사용(XSS 방지) */
+  return node;
+}
+
+function isFav(id) { return state.favs.indexOf(id) !== -1; }
+
+function toggleFav(id) {
+  var idx = state.favs.indexOf(id);
+  if (idx === -1) { state.favs.push(id); } else { state.favs.splice(idx, 1); }
+  saveFavs();
+  render();
+}
+
+function getCategories() {
+  var cats = ['전체', '★ 즐겨찾기'];
+  SERVICES.forEach(function (s) {
+    if (cats.indexOf(s.category) === -1) { cats.push(s.category); }
+  });
+  return cats;
+}
+
+function filterServices() {
+  var kw = state.keyword.toLowerCase();
+  var list = SERVICES.filter(function (s) {
+    if (state.category === '★ 즐겨찾기' && !isFav(s.id)) { return false; }
+    if (state.category !== '전체' && state.category !== '★ 즐겨찾기' && s.category !== state.category) { return false; }
+    if (kw && (s.name + ' ' + (s.desc || '')).toLowerCase().indexOf(kw) === -1) { return false; }
+    return true;
+  });
+  /* 즐겨찾기 항목을 상단에 고정 (원래 순서는 유지) */
+  return list.map(function (s, i) { return { s: s, i: i }; })
+    .sort(function (a, b) {
+      var fa = isFav(a.s.id) ? 0 : 1;
+      var fb = isFav(b.s.id) ? 0 : 1;
+      return fa !== fb ? fa - fb : a.i - b.i;
+    })
+    .map(function (x) { return x.s; });
+}
+
+function renderChips() {
+  var box = document.getElementById('chips');
+  box.textContent = '';
+  getCategories().forEach(function (c) {
+    var b = el('button', 'chip' + (c === state.category ? ' active' : ''), c);
+    b.type = 'button';
+    b.onclick = function () { state.category = c; render(); };
+    box.appendChild(b);
+  });
+}
+
+function renderLinkCell(service, env) {
+  var td = document.createElement('td');
+  var links = (service.links && service.links[env.key]) || [];
+  if (links.length === 0) {
+    td.appendChild(el('span', 'svc-desc', '-'));
+    return td;
+  }
+  links.forEach(function (l, i) {
+    var href = safeUrl(l.url);
+    var a = el('a', 'link' + (href ? '' : ' disabled'), l.label);
+    a.style.background = env.color;
+    if (i > 0) { a.style.marginTop = '6px'; }
+    if (href) {
+      a.href = href;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+    } else {
+      a.title = 'URL 미등록';
+    }
+    td.appendChild(a);
+  });
+  return td;
+}
+
+function renderTable(list) {
+  var table = document.createElement('table');
+  var thead = document.createElement('thead');
+  var hr = document.createElement('tr');
+  hr.appendChild(el('th', '', '서비스'));
+  ENVS.forEach(function (e) { hr.appendChild(el('th', '', e.key)); });
+  thead.appendChild(hr);
+  table.appendChild(thead);
+
+  var tbody = document.createElement('tbody');
+  list.forEach(function (s) {
+    var tr = document.createElement('tr');
+    var nameTd = document.createElement('td');
+    var nameLine = el('div', 'svc-name', s.name);
+    var star = el('button', 'star' + (isFav(s.id) ? ' on' : ''), isFav(s.id) ? '★' : '☆');
+    star.type = 'button';
+    star.title = '즐겨찾기';
+    star.onclick = function () { toggleFav(s.id); };
+    nameLine.appendChild(star);
+    nameTd.appendChild(nameLine);
+    if (s.desc) { nameTd.appendChild(el('div', 'svc-desc', s.desc)); }
+    tr.appendChild(nameTd);
+    ENVS.forEach(function (env) { tr.appendChild(renderLinkCell(s, env)); });
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  return table;
+}
+
+function render() {
+  renderChips();
+  var box = document.getElementById('content');
+  box.textContent = '';
+  var list = filterServices();
+  box.appendChild(list.length ? renderTable(list) : el('div', 'empty', '검색 결과가 없습니다.'));
+}
+
+document.getElementById('search').addEventListener('input', function (e) {
+  state.keyword = e.target.value.trim();
+  render();
+});
+render();
+</script>
+</body>
+</html>
