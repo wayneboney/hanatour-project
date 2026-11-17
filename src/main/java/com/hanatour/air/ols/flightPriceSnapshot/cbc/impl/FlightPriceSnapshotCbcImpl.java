@@ -81,6 +81,9 @@ public class FlightPriceSnapshotCbcImpl implements FlightPriceSnapshotCbc {
             "failure_ratio:7d", "events:rate30m:wow_min", "attempts:rate30m:wow_min", "success:rate30m:wow_min"};
     private static final String[] METRIC_PREFIXES = {"air:stage_", "air:naver:stage_"};   // [1] 이 naver (site_code 조건 없음)
     private static final String UP = "up{job=\"air-api\"}";
+    // 원본 GDS 카운터는 공급사·사이트를 보존한다. 아래 별칭은 조회 결과 이름이며 recording rule이 아니다.
+    private static final String GDS_DIMENSIONS = "environment,application,site_code,gds,gds_operation";
+    private static final String GDS_EVENT_PREFIX = "air:dashboard_gds_events:";
 
     // 라벨 값(environment/application/site_code) 허용 문자
     private static final Pattern LABEL_VALUE = Pattern.compile("[A-Za-z0-9_.:-]{1,64}");
@@ -374,7 +377,8 @@ public class FlightPriceSnapshotCbcImpl implements FlightPriceSnapshotCbc {
         for (int scope = 0; scope < METRIC_PREFIXES.length; scope++) {
             final boolean naver = scope == 1;
             final String select = selector(METRIC_PREFIXES[scope], null, env, app, naver ? null : site);
-            if (query.equals(select) || query.equals(select + " or " + UP)) {
+            final String combined = naver ? select : select + " or " + gdsQuery(env, app, site, rangeOnly);
+            if (query.equals(combined) || query.equals(combined + " or " + UP)) {
                 return true;
             }
             if (!rangeOnly && query.equals(freshness(METRIC_PREFIXES[scope], env, app, naver ? null : site))) {
@@ -421,10 +425,46 @@ public class FlightPriceSnapshotCbcImpl implements FlightPriceSnapshotCbc {
         if (site != null) {
             sb.append(",site_code=~").append(quote(escapeRegex(site) + "|"));
         }
+        if (METRIC_PREFIXES[0].equals(prefix)) {
+            sb.append(",stage!=\"GDS\"");
+        }
         return sb.append('}').toString();
     }
 
-    /** HTML freshnessQuery(): 규칙별 label_replace(time()-timestamp(...)) 22개 + up 1개를 " or " 로 연결 */
+    private String gdsCounterSelector(String env, String app, String site, String result) {
+        final StringBuilder sb = new StringBuilder("air_gds_operation_events_total{result=~").append(quote(result));
+        if (env != null) sb.append(",environment=").append(quote(env));
+        if (app != null) sb.append(",application=").append(quote(app));
+        if (site != null) sb.append(",site_code=").append(quote(site));
+        return sb.append('}').toString();
+    }
+
+    private String gdsAlias(String expression, String name) {
+        return "label_replace(" + expression + ",\"dashboard_gds_record\"," + quote(name) + ",\"\",\"\")";
+    }
+
+    /** HTML gdsQuery(): 고정된 집계식만 허용하며 임의 PromQL·라벨·시간창은 허용하지 않는다. */
+    private String gdsQuery(String env, String app, String site, boolean rangeOnly) {
+        final String counter = gdsCounterSelector(env, app, site, "SUCCESS|FAILURE");
+        final String group = "sum by (" + GDS_DIMENSIONS + ",result) (";
+        final StringBuilder sb = new StringBuilder("(").append(gdsAlias(group + "rate(" + counter + "[10m]))", GDS_EVENT_PREFIX + "rate10m")).append(')');
+        sb.append(" or (").append(gdsAlias(group + "rate(" + counter + "[30m]))", GDS_EVENT_PREFIX + "rate30m")).append(')');
+        // 7일 누적 기준선은 즉시 조회만 한다. 그래프의 매 시점에 7일 범위를 재계산하지 않는다.
+        if (!rangeOnly) sb.append(" or (").append(gdsAlias(group + "increase(" + counter + "[7d] offset 1h))", GDS_EVENT_PREFIX + "increase7d")).append(')');
+        for (String kind : new String[]{"attempts", "success"}) {
+            final String source = gdsCounterSelector(env, app, site, "success".equals(kind) ? "SUCCESS" : "SUCCESS|FAILURE");
+            final StringBuilder weeks = new StringBuilder();
+            for (int week = 1; week <= 2; week++) {
+                if (week > 1) weeks.append(" or ");
+                weeks.append("label_replace(sum by (").append(GDS_DIMENSIONS).append(") (rate(").append(source)
+                        .append("[30m] offset ").append(week).append("w)),\"dashboard_week_ago\",").append(quote(String.valueOf(week))).append(",\"\",\"\")");
+            }
+            sb.append(" or (").append(gdsAlias("min without (dashboard_week_ago) (" + weeks + ")", "air:dashboard_gds_" + kind + ":rate30m:wow_min")).append(')');
+        }
+        return sb.toString();
+    }
+
+    /** HTML freshnessQuery(): 레코딩 22개 + up + 전체 범위의 원본 GDS 표본 나이. */
     private String freshness(String prefix, String env, String app, String site) {
         final StringBuilder sb = new StringBuilder();
         for (String suffix : METRIC_SUFFIXES) {
@@ -432,8 +472,14 @@ public class FlightPriceSnapshotCbcImpl implements FlightPriceSnapshotCbc {
             sb.append("(label_replace(time()-timestamp(").append(selector(prefix, name, env, app, site))
                     .append("),\"dashboard_metric\",").append(quote(name)).append(",\"\",\"\")) or ");
         }
-        return sb.append("(label_replace(time()-timestamp(").append(UP)
-                .append("),\"dashboard_metric\",\"up\",\"\",\"\"))").toString();
+        sb.append("(label_replace(time()-timestamp(").append(UP)
+                .append("),\"dashboard_metric\",\"up\",\"\",\"\"))");
+        if (METRIC_PREFIXES[0].equals(prefix)) {
+            sb.append(" or (label_replace(max by (").append(GDS_DIMENSIONS).append(",result) (time()-timestamp(")
+                    .append(gdsCounterSelector(env, app, site, "SUCCESS|FAILURE"))
+                    .append(")),\"dashboard_metric\",").append(quote(GDS_EVENT_PREFIX + "rate10m")).append(",\"\",\"\"))");
+        }
+        return sb.toString();
     }
 
     /** JSON.stringify 와 동일 (값은 검증을 거친 안전 문자뿐이므로 역슬래시만 처리) */
