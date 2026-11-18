@@ -297,7 +297,10 @@ public class FlightPriceSnapshotCbcImpl implements FlightPriceSnapshotCbc {
             if (status != HttpURLConnection.HTTP_OK) {
                 // JSON Prometheus 오류는 원래 HTTP 상태/errorType/error/warnings를 보존한다.
                 // HTML 로그인/리다이렉트/임의 오류 본문은 브라우저에 전달하지 않는다.
-                log.warn("[PROMETHEUS-PROXY] upstream error operation={}, status={}", operation, status);
+                // 원인 추적용: Prometheus 오류 JSON(errorType/error)만 짧게 남긴다. (쿼리 결과 데이터는 포함되지 않음)
+                log.warn("[PROMETHEUS-PROXY] upstream error operation={}, status={}, errorType={}, error={}", operation, status,
+                        document == null ? "" : StringUtils.abbreviate(document.path("errorType").asText(""), 60),
+                        document == null ? "" : StringUtils.abbreviate(document.path("error").asText(""), 300));
                 HttpStatus upstreamStatus = HttpStatus.resolve(status);
                 if (status >= 400 && status <= 599 && upstreamStatus != null && document != null
                         && document.isObject() && "error".equals(document.path("status").asText())) {
