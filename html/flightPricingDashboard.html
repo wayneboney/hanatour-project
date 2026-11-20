@@ -211,8 +211,8 @@
         @media(max-width:430px){.traffic-flow-ratios{gap:8px}.traffic-flow-ratio{font-size:10px}.traffic-flow-ratio strong{font-size:13px}.traffic-flow-count strong{font-size:27px}}
 
         /* GDS operations display */
-.traffic-gds-result-summary{display:flex;flex-wrap:wrap;gap:12px 24px;margin:0 0 18px;padding:16px 18px;border:1px solid #e8def8;border-radius:12px;background:#f8f5ff;color:#70528c}.traffic-gds-result-summary strong{font-size:21px;color:#65468c}.traffic-gds-result-summary small{flex-basis:100%;font-size:11px}
-/* End GDS operations display */
+        .traffic-gds-result-summary{display:flex;flex-wrap:wrap;gap:12px 24px;margin:0 0 18px;padding:16px 18px;border:1px solid #e8def8;border-radius:12px;background:#f8f5ff;color:#70528c}.traffic-gds-result-summary strong{font-size:21px;color:#65468c}.traffic-gds-result-summary small{flex-basis:100%;font-size:11px}
+        /* End GDS operations display */
     </style>
     <!-- 연결 설정: API 경로와 파라미터명은 백엔드 구현에 맞게 이 블록에서 수정하세요. -->
     <script>
@@ -1983,7 +1983,7 @@
                 let cardStatus;
                 if(alerts.some(a=>a.state==='firing'))cardStatus=status('critical','Prometheus에서 발화 중인 알림이 있습니다.',{alerts,source:'prometheus',stale});
                 else if(alerts.some(a=>a.state==='pending'))cardStatus=status('warning','Prometheus 알림 조건 지속시간을 확인 중입니다.',{alerts,source:'prometheus',stale});
-                else if(stale)cardStatus=status('unknown','최신 조회를 확인하지 못해 마지막 성공 데이터를 표시합니다.',{stale:true,alerts});
+                else if(stale)cardStatus=status('unknown','일부 조회가 완료되지 않았거나 지표가 지연되어 최신 전체 상태를 확인할 수 없습니다.',{stale:true,alerts});
                 else if(rawGds)cardStatus=status('unknown',!current.length?'현재 원본 GDS 성공·실패 지표가 없습니다. 계측·필터·과거 조회 구간을 확인하세요.':invalid.length?'원본 GDS 집계에 무효값이 있습니다. 상세 데이터를 확인하세요.':delayed.length?'원본 GDS 카운터의 표본이 지연됐거나 수집 시각을 확인할 수 없습니다.':'공급사·작업별 원본 카운터 집계입니다. 기존 공통 GDS 경보를 이 공급사의 판정으로 적용하지 않습니다.',{alerts,label:!current.length?'데이터 없음':invalid.length||delayed.length?'확인 필요':'지표 관측',source:'gds_raw',stale:delayed.length>0});
                 else if(!ruleStatus.healthy||unavailableRule||unavailableCoverage)cardStatus=status('unknown',unavailableRule?bookingRuleReason:unavailableCoverage?'prod 이외 환경에 적용되는 서버 경보 규칙을 확인할 수 없습니다.':'서버 경보 규칙의 등록·평가 상태를 확인할 수 없습니다.',{alerts});
                 else if(observedWarning)cardStatus=Object.assign({},observedWarning.status,{alerts,reason:observedWarning.status.reason+(invalid.length||delayed.length?' 다른 지표의 수집 지연·유효성도 상세에서 확인하세요.':''),availabilityReason:invalid.length||delayed.length?'일부 현재 지표의 수집 지연 또는 무효값이 함께 있습니다.':null});
@@ -2114,6 +2114,37 @@
             if(scope!=='naver')queries.push('label_replace(max by ('+GDS_DIMENSIONS+',result) (time()-timestamp('+gdsCounterSelector(filters)+')),"dashboard_metric",'+quote(GDS_EVENT_PREFIX+'rate10m')+',"","")');
             return queries.map(expr=>'('+expr+')').join(' or ');
         }
+        // Split only top-level unions. Never cut nested week comparisons or quoted labels.
+        function splitUnion(expression) {
+            const parts=[];let start=0,depth=0,quoted=false,escaped=false;
+            for(let i=0;i<expression.length;i++){
+                const ch=expression[i];
+                if(quoted){if(!escaped&&ch==='"')quoted=false;if(!escaped&&ch==='\\')escaped=true;else escaped=false;continue;}
+                if(ch==='"'){quoted=true;continue;}
+                if('({['.includes(ch))depth++;else if(')}]'.includes(ch))depth--;
+                if(depth===0&&expression.startsWith(' or ',i)){parts.push(expression.slice(start,i));i+=3;start=i+1;}
+            }
+            parts.push(expression.slice(start));return parts;
+        }
+        function queryPlan(scope,filters) {
+            const split=expression=>scope==='all'?splitUnion(expression):[expression];
+            const plan=[];
+            const add=(bucket,path,queries)=>queries.forEach(query=>plan.push({bucket,path,query,id:path+'|'+(query||'rules')}));
+            add('instant','query',split(selector(scope,filters)));
+            add('history','query_range',split(selector(scope,filters,undefined,true)+' or up{job="air-api"}'));
+            const fresh=split(freshnessQuery(scope,filters)),batches=[];
+            for(let i=0;i<fresh.length;i+=4)batches.push(fresh.slice(i,i+4).join(' or '));
+            add('freshness','query',batches);add('rules','rules',[null]);add('up','query',['up{job="air-api"}']);
+            // Fast current samples/alerts first. Historical raw scans cannot hold them up.
+            const priority=job=>job.bucket==='rules'||job.bucket==='up'?0:/\[7d\]|offset [12]w/.test(job.query||'')?3:job.bucket==='history'?2:1;
+            return plan.sort((a,b)=>priority(a)-priority(b));
+        }
+        function mergeResponses(payloads,resultType) {
+            const rows=new Map();payloads.forEach(payload=>result(payload).forEach(row=>{
+                const key=JSON.stringify(Object.entries(row.metric||{}).sort(([a],[b])=>a.localeCompare(b)));
+                rows.set(key,row);
+            }));return {status:'success',data:{resultType,result:[...rows.values()]}};
+        }
         function connection(config, location) {
             config = Object.assign({}, DEFAULTS, config || {});
             location = location || global.location || {protocol: 'file:', hostname: '', origin: 'null'};
@@ -2152,14 +2183,15 @@
             let conn, connectionError = null;
             try { conn = connection(config, options.location); } catch (error) { conn = {mode: config.mode, url: config.baseUrl}; connectionError = error; }
             let live = false, generation = 0, request = null, pollTimer = null, tickTimer = null, timeoutTimer = null, inFlight = null, requestStartedAt = null;
+            let shardCache = new Map();
             let good = null, modelRevision = 0, modelCache = null, modelStamp = '', historyCache = new Map(), historySource = null;
-            const state = {scope, filters: {environment: config.environment || '', application: config.application || '', siteCode: 'all', site: 'all'}, rangeSeconds: Math.max(600,Math.min(86400,Number(options.rangeSeconds)||600)), now: now(), lastSuccessAt: null, nextRefreshAt: null, isLoading: false, paused: false, hidden: !!doc && doc.visibilityState === 'hidden', error: null, isStale: false, hasSuccess: false, connection: conn};
+            const state = {scope, filters: {environment: config.environment || '', application: config.application || '', siteCode: 'all', site: 'all'}, rangeSeconds: Math.max(600,Math.min(86400,Number(options.rangeSeconds)||600)), now: now(), lastSuccessAt: null, nextRefreshAt: null, isLoading: false, isPartial:false, hasData:false, paused: false, hidden: !!doc && doc.visibilityState === 'hidden', error: null, isStale: false, hasSuccess: false, connection: conn};
             const clearPoll = () => { if (pollTimer !== null) timers.clearTimeout(pollTimer); pollTimer = null; state.nextRefreshAt = null; };
             const snapshot = () => {
                 const source = good || {instant: [], history: [], freshness: [], up: [], rules: null, rulesLoaded: false, upLoaded: false};
                 state.now = now();
                 const age = state.lastSuccessAt !== null ? state.now - state.lastSuccessAt : null;
-                state.isStale = !!state.error || !!state.hasSuccess && age > Math.max(pollMs * 2, 60000);
+                state.isStale = !!state.isPartial || !!state.error || !!state.hasSuccess && age > Math.max(pollMs * 2, 60000);
                 // Countdown ticks reuse the model. Recheck freshness in 10-second buckets;
                 // range aggregation is cached separately for the lifetime of its payload.
                 const stamp = modelRevision + '|' + Math.floor(state.now / 10000) + '|' + state.isStale + '|' + (state.error || '');
@@ -2208,55 +2240,62 @@
             async function refresh() {
                 if (inFlight) return inFlight;
                 if (!live) return snapshot();
-                clearPoll(); state.isLoading = true; requestStartedAt = now();
-                const token = ++generation, abort = new AbortController(); request = abort;
-                const select = selector(scope, state.filters), rangeSelect = selector(scope,state.filters,undefined,true), end = Math.floor(now() / 1000), step = [60,120,180,240,300,360,480,600,720,900,1200,1800,3600].find(s=>state.rangeSeconds%s===0&&state.rangeSeconds/s+1<=240)||Math.max(60,Math.ceil(state.rangeSeconds/239/60)*60);
+                clearPoll();state.isLoading=true;state.isPartial=true;requestStartedAt=now();
+                const token=++generation,abort=new AbortController();request=abort;
+                const plan=queryPlan(scope,state.filters),end=Math.floor(now()/1000),start=end-state.rangeSeconds;
+                const step=[60,120,180,240,300,360,480,600,720,900,1200,1800,3600].find(s=>state.rangeSeconds%s===0&&state.rangeSeconds/s+1<=240)||Math.max(60,Math.ceil(state.rangeSeconds/239/60)*60);
+                const completed=new Set(),failures=[];let cursor=0;
+                state.completedQueries=0;state.totalQueries=plan.length;
+                const publish=()=>{
+                    if(!live||token!==generation)return;
+                    const payloads=bucket=>plan.filter(job=>job.bucket===bucket).map(job=>shardCache.get(job.id)).filter(Boolean);
+                    const rulesJob=plan.find(job=>job.bucket==='rules'),upJob=plan.find(job=>job.bucket==='up');
+                    const old=good||{};
+                    good={instant:mergeResponses(payloads('instant'),'vector'),history:mergeResponses(payloads('history'),'matrix'),freshness:mergeResponses(payloads('freshness'),'vector'),up:mergeResponses(payloads('up'),'vector'),rules:shardCache.get(rulesJob.id)||null,rulesLoaded:completed.has(rulesJob.id),upLoaded:completed.has(upJob.id),rangeStep:step,historyStart:start,historyEnd:end,fetchedAt:now()};
+                    // Never relabel a retained matrix as a wholly successful new period.
+                    // Original sample times survive; period integration leaves missing tails unknown.
+                    if(!payloads('history').length){good.historyStart=old.historyStart;good.historyEnd=old.historyEnd;}
+                    state.hasData=result(good.instant).length>0||result(good.history).length>0;
+                    state.completedQueries=completed.size+failures.length;state.totalQueries=plan.length;
+                    modelRevision++;emit();
+                };
+                const run=async job=>{
+                    const child=new AbortController(),cancel=()=>child.abort();abort.signal.addEventListener('abort',cancel,{once:true});
+                    const timer=timers.setTimeout(cancel,timeoutMs);
+                    try{
+                        if(abort.signal.aborted)child.abort();
+                        const params=job.path==='rules'?{type:'alert'}:job.path==='query_range'?{query:job.query,start,end,step}:{query:job.query,time:end};
+                        const payload=await get(job.path,params,child.signal);
+                        if(!live||token!==generation||abort.signal.aborted)return;
+                        shardCache.set(job.id,payload);completed.add(job.id);
+                    }catch(error){
+                        if(!live||token!==generation||abort.signal.aborted)return;
+                        failures.push({job,error});
+                        if(error?.code==='FORBIDDEN'){state.paused=true;abort.abort();}
+                    }finally{timers.clearTimeout(timer);abort.signal.removeEventListener('abort',cancel);publish();}
+                };
+                timeoutTimer=timers.setTimeout(()=>{failures.push({job:{bucket:'batch'},error:Object.assign(new Error('분할 조회 전체 제한시간을 초과했습니다.'),{name:'AbortError'})});abort.abort();},timeoutMs*3);
                 emit();
-                timeoutTimer = timers.setTimeout(() => abort.abort(), timeoutMs);
-                const task = Promise.resolve().then(async () => {
-                    try {
-                        if (connectionError) throw connectionError;
-                        const values = await Promise.allSettled([
-                            get('query', {query: select, time: end}, abort.signal),
-                            get('query_range', {query: rangeSelect + ' or up{job="air-api"}', start: end - state.rangeSeconds, end, step}, abort.signal),
-                            get('query', {query: freshnessQuery(scope, state.filters), time: end}, abort.signal),
-                            get('rules', {type: 'alert'}, abort.signal),
-                            get('query', {query: 'up{job="air-api"}', time: end}, abort.signal)
-                        ]);
-                        if (!live || token !== generation) return snapshot();
-                        const failures = values.filter(v => v.status === 'rejected');
-                        // Refresh endpoints independently: a chart/query error must not hide
-                        // newly firing server alerts. Only a failed rules read retains its old
-                        // state. Keep sample ages paired with their corresponding data payload.
-                        const old = good || {}, fulfilled = index => values[index].status === 'fulfilled';
-                        const oldFresh = result(old.freshness), newFresh = fulfilled(2) ? result(values[2].value) : [];
-                        const upAge = s => (s.metric.dashboard_metric || s.metric.__name__) === 'up';
-                        const recordFresh = fulfilled(0) ? newFresh.filter(s => !upAge(s)) : oldFresh.filter(s => !upAge(s));
-                        const healthFresh = fulfilled(4) ? newFresh.filter(upAge) : oldFresh.filter(upAge);
-                        good = {instant: fulfilled(0) ? values[0].value : old.instant || [], history: fulfilled(1) ? values[1].value : old.history || [], freshness: recordFresh.concat(healthFresh), rules: fulfilled(3) ? values[3].value : old.rules || null, rulesLoaded: fulfilled(3), up: fulfilled(4) ? values[4].value : old.up || [], upLoaded: fulfilled(4), rangeStep: fulfilled(1) ? step : old.rangeStep || step, historyStart: fulfilled(1) ? end-state.rangeSeconds : old.historyStart, historyEnd: fulfilled(1) ? end : old.historyEnd, fetchedAt: now()};
-                        modelRevision++;
-                        if (failures.length) throw failures[0].reason;
-                        state.hasSuccess = true; state.lastSuccessAt = now(); state.error = null;
-                    } catch (error) {
-                        if (!live || token !== generation) return snapshot();
-                        state.error = readableError(error, conn); modelRevision++;
-                        if (error && error.code === 'FORBIDDEN') state.paused = true;
-                    } finally {
-                        if (token === generation) {
-                            if (timeoutTimer !== null) timers.clearTimeout(timeoutTimer);
-                            timeoutTimer = null; request = null; state.isLoading = false; inFlight = null;
-                            schedule(); emit();
-                        }
-                    }
+                const task=Promise.resolve().then(async()=>{
+                    try{
+                        if(connectionError)throw connectionError;
+                        const worker=async()=>{while(cursor<plan.length&&!abort.signal.aborted&&live&&token===generation){const job=plan[cursor++];await run(job);}};
+                        await Promise.all(Array.from({length:3},worker));
+                        if(!live||token!==generation)return snapshot();
+                        state.isPartial=failures.length>0||completed.size!==plan.length;
+                        if(failures.length){
+                            const first=failures[0];state.error='분할 조회 '+failures.length+'/'+plan.length+'건 실패 ('+({instant:'현재 지표',history:'기간 그래프',freshness:'수집 시각',rules:'서버 알림',up:'수집 상태',batch:'전체 갱신'}[first.job.bucket]||first.job.bucket)+(first.job.query?.includes('[7d]')?' · GDS 7일 기준선':'')+'): '+readableError(first.error,conn);
+                        }else if(!state.isPartial){state.error=null;state.hasSuccess=true;state.lastSuccessAt=now();}
+                    }catch(error){if(live&&token===generation){state.error=readableError(error,conn);state.isPartial=true;}}
+                    finally{if(token===generation){if(timeoutTimer!==null)timers.clearTimeout(timeoutTimer);timeoutTimer=null;request=null;state.isLoading=false;inFlight=null;modelRevision++;schedule();emit();}}
                     return snapshot();
                 });
-                inFlight = task;
-                return task;
+                inFlight=task;return task;
             }
             function invalidate() {
                 generation++; if (request) request.abort(); request = null; inFlight = null;
                 if (timeoutTimer !== null) timers.clearTimeout(timeoutTimer); timeoutTimer = null;
-                clearPoll(); good = null; modelRevision++; historyCache = new Map(); historySource = null; state.hasSuccess = false; state.lastSuccessAt = null; state.error = null; state.isLoading = false;
+                clearPoll(); shardCache = new Map(); state.isPartial=false; state.hasData=false; good = null; modelRevision++; historyCache = new Map(); historySource = null; state.hasSuccess = false; state.lastSuccessAt = null; state.error = null; state.isLoading = false;
             }
             function visibility() {
                 state.hidden = !!doc && doc.visibilityState === 'hidden';
@@ -2287,10 +2326,10 @@
                 getState: snapshot
             };
         }
-        global.TrafficData = {create, buildModel, evaluateStatus, failurePolicy, failureSignals, canonicalExpression, catalog, durationSeconds, connection, selector, supplementalQuery, freshnessQuery, gdsQuery, gdsCounterSelector, gdsMetricQuery, normalizeGdsRows, normalizeGdsFreshness, metricKey, periodFor, escapeRegex};
+        global.TrafficData = {create, buildModel, evaluateStatus, failurePolicy, failureSignals, canonicalExpression, catalog, durationSeconds, connection, selector, splitUnion, queryPlan, mergeResponses, supplementalQuery, freshnessQuery, gdsQuery, gdsCounterSelector, gdsMetricQuery, normalizeGdsRows, normalizeGdsFreshness, metricKey, periodFor, escapeRegex};
     })(typeof window !== 'undefined' ? window : globalThis);
 
-    </script>
+</script>
 <script>
     /* Embedded module 11 */
     /* Same-window request-volume ratios, not a user/session conversion funnel. */
@@ -2528,7 +2567,7 @@
             const f=snapshot?.filters||{},o=snapshot?.model?.options||{},config=global.PRICING_DASHBOARD_CONFIG?.prometheus||{};
             options($('trafficEnvironment'),o.environments||[],f.environment??config.environment??'prod','전체 환경');options($('trafficApplication'),o.applications||[],f.application??config.application??'all','전체 애플리케이션');options($('trafficSite'),o.sites||[],f.siteCode??f.site??'all','전체 사이트');
             if($('trafficRange')&&document.activeElement!==$('trafficRange'))$('trafficRange').value=String(graphRange());
-            const loading=Boolean(snapshot?.loading??snapshot?.isLoading);$('trafficRefresh').disabled=loading;$('trafficRefresh').textContent=loading?'조회 중…':'↻ 지금 조회';$('trafficPause').setAttribute('aria-pressed',String(Boolean(snapshot?.paused)));$('trafficPause').textContent=snapshot?.paused?'▶ 자동 조회 재개':'Ⅱ 자동 조회 정지';tick(snapshot);
+            const loading=Boolean(snapshot?.loading??snapshot?.isLoading);$('trafficRefresh').disabled=loading;$('trafficRefresh').textContent=loading?'조회 중'+(snapshot?.totalQueries?' '+(snapshot.completedQueries||0)+'/'+snapshot.totalQueries:'…'):'↻ 지금 조회';$('trafficPause').setAttribute('aria-pressed',String(Boolean(snapshot?.paused)));$('trafficPause').textContent=snapshot?.paused?'▶ 자동 조회 재개':'Ⅱ 자동 조회 정지';tick(snapshot);
         }
         function stateSignature(next){return JSON.stringify([Boolean(next?.isStale),next?.model?.cards?.map(card=>[cardId(card),card.status?.level,card.status?.reason,card.status?.stale]),next?.model?.health?.status?.level,next?.model?.ruleStatus?.healthy]);}
         function tick(next){
@@ -2545,13 +2584,13 @@
                 countdown.setAttribute('aria-valuenow',String(Math.round(ratio*100)));countdown.setAttribute('aria-valuetext',description);countdown.title=description;
                 const text=$('trafficCountdownLabel');if(text&&text.textContent!==label)text.textContent=label;
             }
-            const issue=$('trafficRefreshIssue'),problem=next.error?'조회 실패 · '+(next.hasSuccess?'이전 데이터':'데이터 없음'):next.isStale?'갱신 지연 · 이전 데이터':'';
+            const issue=$('trafficRefreshIssue'),problem=next.error?'조회 실패 · '+(next.hasData?'일부 수신 · 실패 항목 확인':next.hasSuccess?'이전 데이터':'데이터 없음'):next.isPartial&&loading?'지표 수신 중 · 전체 판정 대기':next.isStale?'갱신 지연 · 이전 데이터':'';
             if(issue){issue.hidden=!problem;if(issue.textContent!==problem)issue.textContent=problem;issue.title=next.error?(typeof next.error==='string'?next.error:next.error.message||String(next.error)):problem;}
             const last=$('trafficLastSuccess');if(last)last.textContent='마지막 성공 '+clock(next.lastSuccess??next.lastSuccessAt);
         }
         function connectionDetailsHTML(){
             const error=snapshot?.error,stale=snapshot?.isStale,has=Boolean(snapshot?.hasSuccess),connection=snapshot?.connection||{},config=global.PRICING_DASHBOARD_CONFIG?.prometheus||{};
-            const message=error?(typeof error==='string'?error:error.message||String(error)):stale?'이전 데이터 · 최신 상태 확인 필요':has?'연결됨 · 최신 응답 조회 성공':'첫 연결 확인 중';
+            const message=error?(typeof error==='string'?error:error.message||String(error)):snapshot?.isPartial&&snapshot?.isLoading?'지표 수신 중 · 전체 판정 대기':stale?'일부 조회 미완료 · 최신 상태 확인 필요':has?'연결됨 · 최신 응답 조회 성공':'첫 연결 확인 중';
             return '<details class="traffic-connection-details" id="trafficConnectionDetails"><summary>연결 정보</summary><p>'+esc(message)+'</p><small>'+esc(connection.url||config.proxyPath||config.baseUrl||'접속 경로 미설정')+' · '+esc(connection.mode==='proxy'?'OLS 동일 출처 중계':connection.mode==='direct'?'브라우저 직접 조회':'접속 경로 확인 중')+'</small></details>';
         }
         function summaryHTML(){const list=cards(),alerts=activeAlerts(),critical=alerts.filter(item=>alertState(item)==='firing'),pending=alerts.filter(item=>alertState(item)==='pending'),near=list.filter(card=>status(card.status).level==='warning'),unknown=list.filter(card=>['unknown','idle'].includes(status(card.status).level)),verified=alertsVerified();return '<section class="traffic-summary" aria-label="현재 상태 요약"><article data-level="'+(critical.length?'critical':verified?'normal':'unknown')+'"><span>현재 발생 경보</span><strong>'+(critical.length||verified?num(critical.length,0):'—')+'<small>건</small></strong><p>'+(verified?'Prometheus firing · 심각도는 경보별 표시':'규칙·연결 검증 전에는 0건으로 판정하지 않음')+'</p></article><article data-summary="near" data-level="'+(near.length||pending.length?'warning':verified?'normal':'unknown')+'"><span>이상근접</span><strong>'+(near.length||verified?num(near.length,0):'—')+'<small>개 단계</small></strong><p>서버 발생 대기 '+(pending.length||verified?num(pending.length,0):'—')+'건</p></article><article data-level="'+(unknown.length||!verified?'unknown':'normal')+'"><span>판단 불가 / 트래픽 없음</span><strong>'+num(unknown.length,0)+'<small>개 단계</small></strong><p>표본·기준선·수집 상태를 먼저 확인</p></article><article><span>관측·판정 주기</span><strong>20<small>초 조회</small></strong><p>수집 15초 · 기록/경보 1분 · 기준선 2분</p></article></section>';}
@@ -2666,7 +2705,7 @@
         global.TrafficMonitor={mount,unmount,refresh,downloadReport,getState:()=>snapshot,getController:()=>controller};
     })(window);
 
-    </script>
+</script>
 <script>
     /* Embedded module 13 */
     (function(global){

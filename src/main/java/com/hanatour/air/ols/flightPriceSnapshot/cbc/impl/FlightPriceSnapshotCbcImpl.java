@@ -380,7 +380,8 @@ public class FlightPriceSnapshotCbcImpl implements FlightPriceSnapshotCbc {
         }
         final String env = labelValue(ENV_IN_QUERY, query, false);
         final String app = labelValue(APP_IN_QUERY, query, false);
-        final String site = labelValue(SITE_IN_QUERY, query, true);
+        final String siteRegex = labelValue(SITE_IN_QUERY, query, true);
+        final String site = siteRegex != null ? siteRegex : labelValue(Pattern.compile("site_code=\"([^\"]*)\""), query, false);
         if ("".equals(env) || "".equals(app) || "".equals(site)) {      // 값이 있는데 허용 문자가 아님
             return false;
         }
@@ -389,12 +390,43 @@ public class FlightPriceSnapshotCbcImpl implements FlightPriceSnapshotCbc {
             final boolean naver = scope == 1;
             final String select = selector(METRIC_PREFIXES[scope], null, env, app, naver ? null : site);
             final String combined = naver ? select : select + " or " + gdsQuery(env, app, site, rangeOnly) + (rangeOnly ? "" : " or " + supplementalQuery(env, app, site));
-            if (query.equals(combined) || query.equals(combined + " or " + UP)) {
+            if (query.equals(combined) || query.equals(combined + " or " + UP)
+                    || splitUnion(combined + " or " + UP).contains(query)) {
                 return true;
             }
-            if (!rangeOnly && query.equals(freshness(METRIC_PREFIXES[scope], env, app, naver ? null : site))) {
+            if (!rangeOnly && allowedFreshnessShard(query, freshness(METRIC_PREFIXES[scope], env, app, naver ? null : site))) {
                 return true;
             }
+        }
+        return false;
+    }
+
+    /** Frontend splitUnion: only the outer union, with strings/escapes preserved. */
+    private java.util.List<String> splitUnion(String expression) {
+        java.util.List<String> parts = new java.util.ArrayList<String>();
+        int start = 0, depth = 0; boolean quoted = false, escaped = false;
+        for (int i = 0; i < expression.length(); i++) {
+            char ch = expression.charAt(i);
+            if (quoted) {
+                if (!escaped && ch == '"') quoted = false;
+                if (!escaped && ch == '\\') escaped = true; else escaped = false;
+                continue;
+            }
+            if (ch == '"') { quoted = true; continue; }
+            if (ch == '(' || ch == '{' || ch == '[') depth++;
+            else if (ch == ')' || ch == '}' || ch == ']') depth--;
+            if (depth == 0 && expression.startsWith(" or ", i)) {
+                parts.add(expression.substring(start, i)); i += 3; start = i + 1;
+            }
+        }
+        parts.add(expression.substring(start)); return parts;
+    }
+
+    private boolean allowedFreshnessShard(String query, String full) {
+        if (query.equals(full)) return true;
+        java.util.List<String> parts = splitUnion(full);
+        for (int i = 0; i < parts.size(); i += 4) {
+            if (query.equals(String.join(" or ", parts.subList(i, Math.min(i + 4, parts.size()))))) return true;
         }
         return false;
     }
