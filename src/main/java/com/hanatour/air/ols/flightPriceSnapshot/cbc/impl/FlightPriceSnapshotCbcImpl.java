@@ -99,8 +99,8 @@ public class FlightPriceSnapshotCbcImpl implements FlightPriceSnapshotCbc {
     private static final Pattern STEP_SECONDS = Pattern.compile("[0-9]{1,6}");
 
     private static final int CONNECT_TIMEOUT_MS = 2000;
-    private static final int READ_TIMEOUT_MS = 8000;             // HTML 요청 제한(12초)보다 짧게
-    private static final String PROMETHEUS_QUERY_TIMEOUT = "6000ms";   // Prometheus 쪽 쿼리 실행 제한 (브라우저가 늘릴 수 없음)
+    private static final int READ_TIMEOUT_MS = 40000;             // HTML 요청 제한(45초)보다 짧게
+    private static final String PROMETHEUS_QUERY_TIMEOUT = "30000ms";   // Prometheus 쪽 쿼리 실행 제한 (브라우저가 늘릴 수 없음)
     private static final int MAX_RESPONSE_BYTES = 16 * 1024 * 1024;
 
     private final ServiceEndpoint serviceEndpoint;
@@ -256,28 +256,33 @@ public class FlightPriceSnapshotCbcImpl implements FlightPriceSnapshotCbc {
         return prometheusGet("rules", params);
     }
 
-    /** Prometheus GET 호출. 응답을 필터링/집계하지 않는다. read timeout은 읽기 대기 기준이다. */
+    /** Prometheus 조회 호출(query/query_range POST, rules GET). 응답을 필터링/집계하지 않는다. read timeout은 읽기 대기 기준이다. */
     private String prometheusGet(String operation, Map<String, String> params) {
         if (StringUtils.isBlank(prometheusBaseUrl)) {
             log.error("[PROMETHEUS-PROXY] monitoring.prometheus.base-url 설정이 없습니다.");
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Prometheus 연결 설정이 없습니다.");
         }
 
-        final StringBuilder url = new StringBuilder(prometheusBaseUrl).append("/api/v1/").append(operation).append('?');
+        final StringBuilder form = new StringBuilder();
+        final StringBuilder url = new StringBuilder(prometheusBaseUrl).append("/api/v1/").append(operation);
         boolean first = true;
         for (Map.Entry<String, String> entry : params.entrySet()) {
             if (!first) {
-                url.append('&');
+                form.append('&');
             }
             first = false;
-            url.append(encode(entry.getKey())).append('=').append(encode(entry.getValue()));
+            form.append(encode(entry.getKey())).append('=').append(encode(entry.getValue()));
         }
-        log.info("[PROMETHEUS-PROXY] GET {} params={}", operation, StringUtils.abbreviate(String.valueOf(params), 300));
+        final boolean post = !"rules".equals(operation);
+        if (!post) url.append('?').append(form);
+        log.info("[PROMETHEUS-PROXY] {} params={}", operation, StringUtils.abbreviate(String.valueOf(params), 300));
 
         HttpURLConnection conn = null;
         try {
             conn = (HttpURLConnection) new URL(url.toString()).openConnection();
-            conn.setRequestMethod("GET");
+            conn.setRequestMethod(post ? "POST" : "GET");
+            conn.setDoOutput(post);
+            conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
             conn.setInstanceFollowRedirects(false);
             conn.setUseCaches(false);
             conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
@@ -285,6 +290,9 @@ public class FlightPriceSnapshotCbcImpl implements FlightPriceSnapshotCbc {
             conn.setRequestProperty("Accept", "application/json");   // 인바운드 쿠키/인증 헤더는 전달하지 않는다
             conn.setRequestProperty("Cache-Control", "no-store");
 
+            if (post) try (java.io.OutputStream out = conn.getOutputStream()) {
+                out.write(form.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            }
             final int status = conn.getResponseCode();
             final InputStream in = status >= 400 ? conn.getErrorStream() : conn.getInputStream();
             final String body = in == null ? "" : readLimited(in);
@@ -380,7 +388,7 @@ public class FlightPriceSnapshotCbcImpl implements FlightPriceSnapshotCbc {
         for (int scope = 0; scope < METRIC_PREFIXES.length; scope++) {
             final boolean naver = scope == 1;
             final String select = selector(METRIC_PREFIXES[scope], null, env, app, naver ? null : site);
-            final String combined = naver ? select : select + " or " + gdsQuery(env, app, site, rangeOnly);
+            final String combined = naver ? select : select + " or " + gdsQuery(env, app, site, rangeOnly) + (rangeOnly ? "" : " or " + supplementalQuery(env, app, site));
             if (query.equals(combined) || query.equals(combined + " or " + UP)) {
                 return true;
             }
@@ -465,6 +473,17 @@ public class FlightPriceSnapshotCbcImpl implements FlightPriceSnapshotCbc {
             sb.append(" or (").append(gdsAlias("min without (dashboard_week_ago) (" + weeks + ")", "air:dashboard_gds_" + kind + ":rate30m:wow_min")).append(')');
         }
         return sb.toString();
+    }
+
+    /** Instant-only diagnostics; never included in final outcome aggregation. */
+    private String supplementalQuery(String env, String app, String site) {
+        String tail = "";
+        if (env != null) tail += ",environment=" + quote(env);
+        if (app != null) tail += ",application=" + quote(app);
+        if (site != null) tail += ",site_code=" + quote(site);
+        return "(label_replace(sum by (" + GDS_DIMENSIONS + ",exception_type,error_code,gds_error_code,airline) (rate(air_gds_operation_events_total{result=\"FAILURE\"" + tail
+                + "}[10m])),\"dashboard_detail\",\"gds_failures\",\"\",\"\")) or (label_replace(sum by (environment,application,site_code,stage) (rate(air_api_stage_events_total{result=\"REQUEST\",stage=~\"AUTO_TICKET|BSP_APPROVAL|PACKAGE_RESERVATION_CANCEL\"" + tail
+                + "}[10m])),\"dashboard_detail\",\"api_requests\",\"\",\"\"))";
     }
 
     /** HTML freshnessQuery(): 레코딩 22개 + up + 전체 범위의 원본 GDS 표본 나이. */

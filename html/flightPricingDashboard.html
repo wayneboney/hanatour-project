@@ -210,10 +210,10 @@
         @media(max-width:900px){.traffic-primary-grid{grid-template-columns:1fr}.traffic-primary-grid .traffic-stage-header,.traffic-primary-grid .traffic-stage-reason{min-height:0}.traffic-flow-summary{min-height:0}.traffic-flow-count{margin:5px 0 10px}.traffic-flow-ratios{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 14px}.traffic-flow-ratio{display:grid;gap:4px}.traffic-flow-caption{text-align:left;max-width:none}}
         @media(max-width:430px){.traffic-flow-ratios{gap:8px}.traffic-flow-ratio{font-size:10px}.traffic-flow-ratio strong{font-size:13px}.traffic-flow-count strong{font-size:27px}}
 
-    /* GDS operations display */
+        /* GDS operations display */
 .traffic-gds-result-summary{display:flex;flex-wrap:wrap;gap:12px 24px;margin:0 0 18px;padding:16px 18px;border:1px solid #e8def8;border-radius:12px;background:#f8f5ff;color:#70528c}.traffic-gds-result-summary strong{font-size:21px;color:#65468c}.traffic-gds-result-summary small{flex-basis:100%;font-size:11px}
 /* End GDS operations display */
-</style>
+    </style>
     <!-- 연결 설정: API 경로와 파라미터명은 백엔드 구현에 맞게 이 블록에서 수정하세요. -->
     <script>
         window.PRICING_DASHBOARD_CONFIG = Object.assign({
@@ -229,7 +229,7 @@
                 mode: 'proxy',
                 proxyPath: '/air/monitoring/prometheus',
                 pollIntervalMs: 20000,
-                timeoutMs: 12000,
+                timeoutMs: 45000,
                 environment: 'prod',
                 application: 'all'
             }
@@ -1525,8 +1525,8 @@
 
         // Read-only Prometheus client. Recording rules and server-side alert state remain
         // authoritative; the browser never reimplements the alert's `for` timer.
-        const DEFAULTS = {baseUrl: 'http://203.245.33.80:9090', mode: 'auto', proxyPath: '/air/monitoring/prometheus', pollIntervalMs: 20000, timeoutMs: 12000, environment: 'prod', application: 'all'};
-        const TITLES = {FARE_SEARCH: '운임조회', FARE_DETAIL: '운임 상세', BOOKING: '예약', PAYMENT: '결제', RESERVATION_CANCEL: '예약 취소', PAYMENT_CANCEL: '결제 취소', REFUND: '환불', GDS: 'GDS'};
+        const DEFAULTS = {baseUrl: 'http://203.245.33.80:9090', mode: 'auto', proxyPath: '/air/monitoring/prometheus', pollIntervalMs: 20000, timeoutMs: 45000, environment: 'prod', application: 'all'};
+        const TITLES = {FARE_SEARCH: '운임조회', FARE_DETAIL: '운임 상세', BOOKING: '예약', PAYMENT: '결제', RESERVATION_CANCEL: '예약 취소', PAYMENT_CANCEL: '결제 취소', REFUND: '환불', AUTO_TICKET: '자동발권', BSP_APPROVAL: 'BSP 카드 승인', PACKAGE_RESERVATION_CANCEL: '패키지 예약 취소', GDS: 'GDS'};
         const STAGES = Object.keys(TITLES);
         const HEALTH_NAMES = ['AirApiMetricsAbsent', 'AirApiTargetDown'];
         const SUFFIXES = ['events:rate10m', 'attempts:rate10m', 'success:rate10m', 'outcomes:rate10m', 'failures:rate10m', 'failure_ratio:rate10m', 'events:rate30m', 'attempts:rate30m', 'success:rate30m', 'outcomes:rate30m', 'failures:rate30m', 'failure_ratio:rate30m', 'failure_ratio:zscore30m', 'events:increase7d', 'attempts:increase7d', 'success:increase7d', 'outcomes:increase7d', 'failures:increase7d', 'failure_ratio:7d', 'events:rate30m:wow_min', 'attempts:rate30m:wow_min', 'success:rate30m:wow_min'];
@@ -1689,8 +1689,8 @@
         function status(level, reason, extra) { return Object.assign({level, label: ({normal: '정상', warning: '이상근접', critical: '확인필요!', unknown: '확인 불가', idle: '시도 없음'})[level], reason, stale: false, alerts: [], source: 'data'}, extra || {}); }
         const POLICY_VERSION = 'outcomes_v2';
         function failurePolicy(stage) {
-            if (!['FARE_SEARCH','BOOKING','FINAL_BOOKING','PAYMENT','GDS','FARE_DETAIL','RESERVATION_CANCEL','PAYMENT_CANCEL','REFUND'].includes(stage)) return null;
-            const other=['FARE_DETAIL','RESERVATION_CANCEL','PAYMENT_CANCEL','REFUND'].includes(stage);
+            if (!['FARE_SEARCH','BOOKING','FINAL_BOOKING','PAYMENT','GDS','FARE_DETAIL','RESERVATION_CANCEL','PAYMENT_CANCEL','REFUND','AUTO_TICKET','BSP_APPROVAL','PACKAGE_RESERVATION_CANCEL'].includes(stage)) return null;
+            const other=['FARE_DETAIL','RESERVATION_CANCEL','PAYMENT_CANCEL','REFUND','AUTO_TICKET','BSP_APPROVAL','PACKAGE_RESERVATION_CANCEL'].includes(stage);
             return {absolute:!other,failure:.5,nearFailure:.4,attempts:stage==='FARE_SEARCH'?50:0,failures:stage==='FARE_SEARCH'?0:stage==='GDS'?10:5,delta:other ? .1 : .05,nearDelta:other ? .08 : .04,zscore:3,nearZscore:2.4,failures30:stage==='GDS'?10:other?3:5,forSeconds:300,relativeForSeconds:600,keepSeconds:300};
         }
         function failureSignals(metrics, stage, currentFresh=true, comparisonFresh=true, current30Fresh=currentFresh) {
@@ -1817,9 +1817,9 @@
         // These aliases are query results, NOT new server recording rules. Aggregate
         // each original counter's rate before grouping; never add old shared GDS rows.
         function normalizeGdsRows(rows) {
-            const sources = rows.filter(row => isGdsSource(gdsSourceName(row)));
+            const sources = rows.filter(row => !row.metric?.dashboard_detail && isGdsSource(gdsSourceName(row)));
             if (!sources.length) return rows;
-            const out = rows.filter(row => !isGdsSource(gdsSourceName(row)) && row.metric?.stage !== 'GDS');
+            const out = rows.filter(row => !row.metric?.dashboard_detail && !isGdsSource(gdsSourceName(row)) && row.metric?.stage !== 'GDS');
             const grouped = new Map();
             const add = (labels, suffix, points, matrix) => out.push({metric:{...labels,__name__:'air:stage_'+suffix},...(matrix?{values:points}:{value:points[0]})});
             sources.forEach(row => {
@@ -1882,6 +1882,7 @@
             if (scope === 'naver') filters.siteCode = 'all';
             const cat = catalog(scope, opts.catalog || input.catalog), sharedCat = catalog('all', opts.catalog || input.catalog);
             const prefix = scope === 'naver' ? 'air:naver:stage_' : 'air:stage_';
+            const diagnostics=result(input.instant).filter(row=>row.metric?.dashboard_detail);
             const rawInstant = normalizeGdsRows(result(input.instant)), rawHistory = normalizeGdsRows(result(input.history)), rawFreshness = normalizeGdsFreshness(result(input.freshness),result(input.instant)), rawUp = result(input.up);
             const instant = rawInstant.filter(s => String(s.metric && s.metric.__name__ || '').startsWith(prefix) && allowed(s.metric || {}, scope, filters));
             const history = rawHistory.filter(s => s.metric && s.metric.__name__ === 'up' || String(s.metric && s.metric.__name__ || '').startsWith(prefix) && allowed(s.metric || {}, scope, filters));
@@ -1951,7 +1952,7 @@
                 const records=allGroups.filter(g=>g.labels.stage===stage).flatMap(g=>g.recordMetrics);
                 return {stage,attempts10:records.filter(r=>metricKey(r.name)==='attempts10'&&finite(r.value)).length,attempts30:records.filter(r=>metricKey(r.name)==='attempts30'&&finite(r.value)).length,results10:[...new Set(records.filter(r=>/stage_events:rate10m$/.test(r.name)&&finite(r.value)).map(r=>r.labels.result))].filter(Boolean),historical:records.filter(r=>BASELINE_KEYS.has(metricKey(r.name))).length};
             });
-            const ids = STAGES.filter(stage => (scope !== 'naver' || stage !== 'GDS')).map(stage => ({stage, operation: '', rawGds:stage==='GDS'}));
+            const ids = STAGES.filter(stage => (scope !== 'naver' || !['GDS','AUTO_TICKET','BSP_APPROVAL','PACKAGE_RESERVATION_CANCEL'].includes(stage))).map(stage => ({stage, operation: '', rawGds:stage==='GDS'}));
             const gdsCards = new Map();
             allGroups.filter(g=>g.labels.stage==='GDS').forEach(g=>{
                 const operation=g.labels.gds_operation||'',gds=g.labels.gds||'',rawGds=g.labels.dashboard_source==='gds_raw';
@@ -2008,11 +2009,11 @@
                 const id = stage + (operation ? ':' + operation : '') + (rawGds?':gds='+encodeURIComponent(gds||'__missing__'):'');
                 let cardHistory = input.historyCache && input.historyCache.get(id);
                 if (!cardHistory) { cardHistory = historyFor(ownHistory, prefix); if(input.periodMode||finite(input.historyStart)&&finite(input.historyEnd)&&input.historyEnd>input.historyStart){const end=number(input.historyEnd)??Math.floor(nowMs/1000),start=number(input.historyStart)??end-(input.periodSeconds||600);cardHistory.periodSummary=periodFor(ownHistory,prefix,start,end,input.rangeStep||60,groups);} if (input.historyCache) input.historyCache.set(id, cardHistory); }
-                const policyRules=expected.filter(r=>/Failure(Critical|Anomaly)$/.test(r.name)&&(inferStage(r.name,{},r.expr)===stage||/OtherStage/.test(r.name)&&['FARE_DETAIL','RESERVATION_CANCEL','PAYMENT_CANCEL','REFUND'].includes(stage)));
+                const policyRules=expected.filter(r=>/Failure(Critical|Anomaly)$/.test(r.name)&&(inferStage(r.name,{},r.expr)===stage||/OtherStage/.test(r.name)&&['FARE_DETAIL','RESERVATION_CANCEL','PAYMENT_CANCEL','REFUND','AUTO_TICKET','BSP_APPROVAL','PACKAGE_RESERVATION_CANCEL'].includes(stage)));
                 const policy={version:POLICY_VERSION,definition:failurePolicy(stage),rules:policyRules.map(r=>{const live=ruleStatus.definitions.find(l=>l.name===r.name);return {name:r.name,criterion:r.labels?.criterion,applied:!!live&&live.health==='ok'&&!live.evaluationStale&&live.forSeconds===r.forSeconds&&live.keepFiringForSeconds===r.keepFiringForSeconds&&canonicalExpression(live.expression)===canonicalExpression(r.expr)};}),absoluteMet:groups.filter(g=>g.failureSignals.absoluteMet).length,absoluteEligible:groups.filter(g=>g.failureSignals.absoluteEligible).length,relativeMet:groups.filter(g=>g.failureSignals.relativeMet).length,relativeEligible:groups.filter(g=>g.failureSignals.relativeEligible).length};
                 policy.applied=!rawGds&&policy.rules.length>0&&policy.rules.every(r=>r.applied);
                 if(rawGds)policy.rules=[];
-                return {id, stage, operation, gds, rawGds, periodSummary:cardHistory.periodSummary, availability, metricQuality, policy, bookingDiagnostics:stage==='BOOKING'?bookingDiagnostics:undefined, title: TITLES[stage] + (rawGds?' '+(gds||'공급사 미기록'):'') + (operation ? ' · ' + operation : ''), shared: stage === 'GDS'&&!rawGds, scopeNote: rawGds?'공급사 코드 '+(gds||'미기록')+' · 사이트별 원본 집계':stage === 'GDS' ? '전체 사이트 공통 · 채널 귀속 불가' : scope === 'naver' ? 'NAV_PC + NAV_MO 합산' : '', metrics: m, status: cardStatus, level: cardStatus.level, reason: cardStatus.reason, groups, subgroups: groups, alerts, history: cardHistory, series: ownSeries, recordMetrics};
+                return {id, stage, operation, gds, rawGds, diagnostics:diagnostics.filter(row=>allowed(row.metric,scope,filters)&&(rawGds?row.metric.dashboard_detail==='gds_failures'&&(row.metric.gds||'')===gds&&(row.metric.gds_operation||'')===operation:row.metric.dashboard_detail==='api_requests'&&row.metric.stage===stage)), periodSummary:cardHistory.periodSummary, availability, metricQuality, policy, bookingDiagnostics:stage==='BOOKING'?bookingDiagnostics:undefined, title: TITLES[stage] + (rawGds?' '+(gds||'공급사 미기록'):'') + (operation ? ' · ' + operation : ''), shared: stage === 'GDS'&&!rawGds, scopeNote: rawGds?'공급사 코드 '+(gds||'미기록')+' · 사이트별 원본 집계':stage === 'GDS' ? '전체 사이트 공통 · 채널 귀속 불가' : scope === 'naver' ? 'NAV_PC + NAV_MO 합산' : '', metrics: m, status: cardStatus, level: cardStatus.level, reason: cardStatus.reason, groups, subgroups: groups, alerts, history: cardHistory, series: ownSeries, recordMetrics};
             });
             const healthAlerts = sharedRuleStatus.instances.filter(a => HEALTH_NAMES.includes(a.name));
             const targetDetails = rawUp.map(series => Object.assign({labels: series.metric, value: number(series.value && series.value[1])}, ages.get(sampleKey('up', series.metric)) || {age: null, sampleAt: null}));
@@ -2088,9 +2089,19 @@
             });
             return queries.map(query=>'('+query+')').join(' or ');
         }
+        // Instant-only diagnostics: retain error codes without multiplying historical
+        // range cardinality or adding these values to the final outcome totals.
+        function supplementalQuery(filters) {
+            const common=[];
+            ['environment','application'].forEach(key=>{if(filters[key]&&filters[key]!=='all')common.push(key+'='+quote(filters[key]));});
+            const site=filters.siteCode||filters.site;if(site&&site!=='all')common.push('site_code='+quote(site));
+            const tail=common.length?','+common.join(','):'';
+            const alias=(expr,name)=>'label_replace('+expr+',"dashboard_detail",'+quote(name)+',"","")';
+            return '('+alias('sum by ('+GDS_DIMENSIONS+',exception_type,error_code,gds_error_code,airline) (rate(air_gds_operation_events_total{result="FAILURE"'+tail+'}[10m]))','gds_failures')+') or ('+alias('sum by (environment,application,site_code,stage) (rate(air_api_stage_events_total{result="REQUEST",stage=~"AUTO_TICKET|BSP_APPROVAL|PACKAGE_RESERVATION_CANCEL"'+tail+'}[10m]))','api_requests')+')';
+        }
         function selector(scope, filters, suppliedCatalog, rangeOnly=false) {
             const select=stageSelector(scope,filters,suppliedCatalog);
-            return scope==='naver'?select:select+' or '+gdsQuery(filters,rangeOnly);
+            return scope==='naver'?select:select+' or '+gdsQuery(filters,rangeOnly)+(rangeOnly?'':' or '+supplementalQuery(filters));
         }
         function freshnessQuery(scope, filters, suppliedCatalog) {
             // timestamp() must see the stored selector before any label transformation.
@@ -2137,7 +2148,7 @@
             const scope = options.scope === 'all' ? 'all' : 'naver';
             const clock = options.clock || (() => Date.now()), now = () => typeof clock === 'function' ? Number(clock()) : Number(clock.now());
             const timers = options.timers || global, doc = options.document || global.document, fetcher = options.fetch || global.fetch && global.fetch.bind(global);
-            const pollMs = Math.max(20000, Number(config.pollIntervalMs) || 20000), timeoutMs = Math.max(100, Number(config.timeoutMs) || 12000);
+            const pollMs = Math.max(20000, Number(config.pollIntervalMs) || 20000), timeoutMs = Math.max(100, Number(config.timeoutMs) || 45000);
             let conn, connectionError = null;
             try { conn = connection(config, options.location); } catch (error) { conn = {mode: config.mode, url: config.baseUrl}; connectionError = error; }
             let live = false, generation = 0, request = null, pollTimer = null, tickTimer = null, timeoutTimer = null, inFlight = null, requestStartedAt = null;
@@ -2164,12 +2175,13 @@
             const schedule = () => {
                 clearPoll();
                 if (!live || state.paused || state.hidden) return;
-                state.nextRefreshAt = Math.max(now(), (requestStartedAt === null ? now() : requestStartedAt) + pollMs);
+                state.nextRefreshAt = Math.max(now(), now() + pollMs);
                 pollTimer = timers.setTimeout(() => { pollTimer = null; refresh(); }, state.nextRefreshAt - now());
             };
             async function get(path, params, signal) {
                 if (!fetcher) throw new Error('이 환경에서는 Prometheus 조회를 지원하지 않습니다.');
                 const url = new URL(conn.url + '/api/v1/' + path);
+                if(conn.mode==='direct'&&path!=='rules')params={...params,timeout:Math.max(1,Math.min(30000,timeoutMs-5000))+'ms'};
                 Object.keys(params || {}).forEach(key => url.searchParams.set(key, params[key]));
                 const response = await fetcher(url.href, {method: 'GET', mode: conn.mode === 'direct' ? 'cors' : 'same-origin', credentials: conn.mode === 'proxy' ? 'same-origin' : 'omit', cache: 'no-store', headers: {Accept: 'application/json'}, signal});
                 let body=null,rawText=null;
@@ -2275,7 +2287,7 @@
                 getState: snapshot
             };
         }
-        global.TrafficData = {create, buildModel, evaluateStatus, failurePolicy, failureSignals, canonicalExpression, catalog, durationSeconds, connection, selector, freshnessQuery, gdsQuery, gdsCounterSelector, gdsMetricQuery, normalizeGdsRows, normalizeGdsFreshness, metricKey, periodFor, escapeRegex};
+        global.TrafficData = {create, buildModel, evaluateStatus, failurePolicy, failureSignals, canonicalExpression, catalog, durationSeconds, connection, selector, supplementalQuery, freshnessQuery, gdsQuery, gdsCounterSelector, gdsMetricQuery, normalizeGdsRows, normalizeGdsFreshness, metricKey, periodFor, escapeRegex};
     })(typeof window !== 'undefined' ? window : globalThis);
 
     </script>
@@ -2601,11 +2613,14 @@
         function openDetail(selection,button){dialogShell();detail={selection,projection:detailProjection(selection,snapshot),series:'all',page:0};opener=button?.getAttribute('data-traffic-detail')||null;renderDetail();if(!dialog.open)dialog.showModal();}
         function measurementDetailsHTML(card){
             if(!card)return '';
+            const diagnostics=card.diagnostics||[];
+            const supplemental=diagnostics.length?'<strong>최근 10분 원본 계측 상세</strong><ul>'+diagnostics.map(row=>{const l=row.metric,v=Number(row.value?.[1]);return '<li>'+(l.dashboard_detail==='gds_failures'?'애플리케이션 오류 '+esc(l.error_code||'UNKNOWN')+' · GDS 오류 '+esc(l.gds_error_code||'UNKNOWN')+' · 예외 '+esc(l.exception_type||'UNKNOWN')+' · 항공사 '+esc(l.airline||(l.gds_operation==='FARE_SEARCH'?'NOT_APPLICABLE':'UNKNOWN')):'API REQUEST')+' · '+num(Number.isFinite(v)?v*600:null)+'건(10분 발생률 환산 추정)</li>';}).join('')+'</ul>':'';
+            const scopeNote=card.stage==='AUTO_TICKET'?'<p>API 전체 결과입니다. errCode=FF 또는 예외가 FAILURE이며 개별 GDS TICKET_ISSUE 실패와 범위가 다릅니다. 사이트 미등록 요청은 UNREGISTERED에 포함될 수 있습니다.</p>':card.operation==='TICKET_ISSUE'?'<p>개별 GDS 발권 호출입니다. API AUTO_TICKET 전체 결과와 별도 집계합니다.</p>':'';
             const p=card.periodSummary,selected=p?'<strong>선택 기간 집계 · '+esc(GRAPH_RANGES.find(([s])=>s===p.duration)?.[1]||num(p.duration/60,0)+'분')+'</strong><p>요청 '+num(p.request.count)+'건 · 성공 '+num(p.success.count)+'건 · 실패 '+num(p.failure.failures)+'건(추정). 10분 이동 발생률의 시간 적분으로 계산합니다. 아래 그래프·표는 개별 recording rule 원본이므로 10분/30분 이동 지표를 구분해 표시합니다.</p>':'';
             const comparison=card.metrics?.trafficComparison;
             const ratio=comparison?'<p>동시간대 비교: 동일 라벨 '+num(comparison.paired,0)+'/'+num(comparison.total,0)+'개 · 현재값 없음 '+num(comparison.missingCurrent,0)+' · 기준선 없음 '+num(comparison.missingBaseline,0)+' · 기준선 0 '+num(comparison.zeroBaseline,0)+' · 갱신 미확인 '+num(comparison.delayed,0)+'. 비교 가능한 동일 조합의 현재 시도율 합 ÷ 기준선 합이며, 제외된 조합은 0으로 채우지 않습니다.</p>':'';
             const booking=card.bookingDiagnostics?'<strong>예약 계측 단계별 수신 확인</strong><p>공식 예약 단계는 BOOKING입니다. FINAL_BOOKING은 이전 단계의 잔존 데이터로 현재 예약·기준선에 합산하지 않습니다. PACKAGE_BOOKING도 별도 범위입니다. 아래 숫자는 예약 건수가 아닌 응답의 유효 시계열 수이며 최신성은 별도 확인합니다.</p><ul>'+card.bookingDiagnostics.map(item=>'<li>'+esc(item.stage)+(item.stage==='FINAL_BOOKING'?' (이전 단계·현재 집계 제외)':'')+' — 최근 10분 시도 '+num(item.attempts10,0)+'개 / 30분 시도 '+num(item.attempts30,0)+'개 · 10분 결과 '+esc(item.results10.join(', ')||'없음')+' · 과거 기준선 '+num(item.historical,0)+'개</li>').join('')+'</ul>':'';
-            return selected||ratio||booking?'<div class="traffic-measurement-details">'+selected+booking+ratio+'</div>':'';
+            return selected||ratio||booking||supplemental||scopeNote?'<div class="traffic-measurement-details">'+scopeNote+selected+supplemental+booking+ratio+'</div>':'';
         }
         function renderDetail(){
             if(!detail||!dialog)return;const p=detail.projection,rule=p.rule,options=p.series.map(series=>'<option value="'+series.id+'">'+esc(series.label)+'</option>').join(''),annotations=rule?.annotations||{},rExpression=rule?ruleExpression(rule):'';
