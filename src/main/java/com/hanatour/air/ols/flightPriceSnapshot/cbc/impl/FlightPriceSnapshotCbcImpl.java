@@ -36,6 +36,15 @@ import java.time.format.DateTimeParseException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -55,7 +64,7 @@ import java.util.regex.Pattern;
 @Slf4j
 @Component
 @hntframe.run.common.annotation.ServiceComponent
-public class FlightPriceSnapshotCbcImpl implements FlightPriceSnapshotCbc {
+public class FlightPriceSnapshotCbcImpl implements FlightPriceSnapshotCbc, org.springframework.beans.factory.DisposableBean {
 
     // ---------------------------------------------------------------- 스냅샷 (항공API)
 
@@ -102,6 +111,35 @@ public class FlightPriceSnapshotCbcImpl implements FlightPriceSnapshotCbc {
     private static final int READ_TIMEOUT_MS = 40000;             // HTML 요청 제한(45초)보다 짧게
     private static final String PROMETHEUS_QUERY_TIMEOUT = "30000ms";   // Prometheus 쪽 쿼리 실행 제한 (브라우저가 늘릴 수 없음)
     private static final int MAX_RESPONSE_BYTES = 16 * 1024 * 1024;
+
+    // ---- 무거운 7일 기준선 조회(increase(...[7d])) 캐시
+    // 값이 천천히 변하므로 백그라운드에서 길게 계산해 캐시하고, 화면 요청은 캐시를 즉시 돌려준다.
+    private static final String HEAVY_QUERY_MARKER = "[7d] offset 1h";
+    private static final String HEAVY_QUERY_TIMEOUT = "110000ms";      // Prometheus 서버 설정(--query.timeout)보다 길면 서버 제한이 적용됨
+    private static final int HEAVY_READ_TIMEOUT_MS = 115000;
+    private static final long HEAVY_FRESH_MS = 10L * 60 * 1000;         // 이 시간 안이면 캐시를 그대로 사용
+    private static final long HEAVY_STALE_MAX_MS = 60L * 60 * 1000;     // 갱신 실패 시 이전 값을 최대 이 시간까지 사용
+    private static final long HEAVY_WAIT_MS = 35000;                    // 첫 계산을 기다리는 시간 (HTML 요청 제한 45초보다 짧게)
+    private static final long HEAVY_RETRY_BACKOFF_MS = 120000;          // 계산 실패 후 재시도 간격 (Prometheus 부하 방지)
+    private static final int HEAVY_CACHE_MAX_ENTRIES = 50;
+
+    private static final class HeavyEntry {
+        final String body;
+        final long fetchedAt;
+        HeavyEntry(String body, long fetchedAt) { this.body = body; this.fetchedAt = fetchedAt; }
+    }
+
+    private final Map<String, HeavyEntry> heavyCache = new ConcurrentHashMap<String, HeavyEntry>();
+    private final Map<String, Future<String>> heavyInflight = new ConcurrentHashMap<String, Future<String>>();
+    private final Map<String, Long> heavyFailedAt = new ConcurrentHashMap<String, Long>();
+    private final ExecutorService heavyExecutor = Executors.newFixedThreadPool(2, new ThreadFactory() {
+        @Override
+        public Thread newThread(Runnable r) {
+            Thread t = new Thread(r, "prometheus-baseline");
+            t.setDaemon(true);
+            return t;
+        }
+    });
 
     private final ServiceEndpoint serviceEndpoint;
     private final WebClient webClient;
@@ -216,8 +254,11 @@ public class FlightPriceSnapshotCbcImpl implements FlightPriceSnapshotCbc {
         if (StringUtils.isNotBlank(time)) {
             params.put("time", String.valueOf(epochSeconds(time, "time")));
         }
+        if (query.contains(HEAVY_QUERY_MARKER)) {
+            return heavyQuery(query);
+        }
         params.put("timeout", PROMETHEUS_QUERY_TIMEOUT);
-        return prometheusGet("query", params);
+        return prometheusGet("query", params, READ_TIMEOUT_MS);
     }
 
     /** 범위 조회: selector / selector+up 만 허용, 범위 24시간·250포인트 이하 */
@@ -242,7 +283,7 @@ public class FlightPriceSnapshotCbcImpl implements FlightPriceSnapshotCbc {
         params.put("end", String.valueOf(endSec));
         params.put("step", String.valueOf(stepSec));
         params.put("timeout", PROMETHEUS_QUERY_TIMEOUT);
-        return prometheusGet("query_range", params);
+        return prometheusGet("query_range", params, READ_TIMEOUT_MS);
     }
 
     /** 알림 규칙 조회: HTML 은 type=alert 만 사용 */
@@ -253,11 +294,85 @@ public class FlightPriceSnapshotCbcImpl implements FlightPriceSnapshotCbc {
         }
         Map<String, String> params = new LinkedHashMap<String, String>();
         params.put("type", "alert");
-        return prometheusGet("rules", params);
+        return prometheusGet("rules", params, READ_TIMEOUT_MS);
     }
 
     /** Prometheus 조회 호출(query/query_range POST, rules GET). 응답을 필터링/집계하지 않는다. read timeout은 읽기 대기 기준이다. */
-    private String prometheusGet(String operation, Map<String, String> params) {
+    private String heavyQuery(final String query) {
+        final long now = System.currentTimeMillis();
+        final HeavyEntry cached = heavyCache.get(query);
+        if (cached != null && now - cached.fetchedAt < HEAVY_FRESH_MS) {
+            return cached.body;
+        }
+        final Future<String> running = startHeavyRefresh(query, now);
+        if (cached != null && now - cached.fetchedAt < HEAVY_STALE_MAX_MS) {
+            return cached.body;     // 갱신은 백그라운드에서 진행, 이전 값을 사용
+        }
+        if (running == null) {
+            // 최근 계산 실패 직후: 부하 방지를 위해 재시도를 미룬다.
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "7일 기준선 계산에 실패했습니다. 잠시 후 다시 시도됩니다.");
+        }
+        try {
+            return running.get(HEAVY_WAIT_MS, TimeUnit.MILLISECONDS);
+        } catch (TimeoutException e) {
+            log.info("[PROMETHEUS-PROXY] 7일 기준선 계산 중 (백그라운드 진행)");
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "7일 기준선을 계산 중입니다. 잠시 후 자동으로 다시 조회됩니다.");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "조회가 중단되었습니다.");
+        } catch (ExecutionException e) {
+            final Throwable cause = e.getCause();
+            if (cause instanceof RuntimeException) {
+                throw (RuntimeException) cause;
+            }
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Prometheus 조회에 실패했습니다.");
+        }
+    }
+
+    /** 같은 쿼리의 계산은 하나만 실행(single-flight). 최근 실패 직후면 null. */
+    private synchronized Future<String> startHeavyRefresh(final String query, long now) {
+        final Future<String> existing = heavyInflight.get(query);
+        if (existing != null) {
+            return existing;
+        }
+        final Long failedAt = heavyFailedAt.get(query);
+        if (failedAt != null && now - failedAt < HEAVY_RETRY_BACKOFF_MS) {
+            return null;
+        }
+        if (heavyCache.size() >= HEAVY_CACHE_MAX_ENTRIES && !heavyCache.containsKey(query)) {
+            heavyCache.clear();
+        }
+        final FutureTask<String> task = new FutureTask<String>(new java.util.concurrent.Callable<String>() {
+            @Override
+            public String call() {
+                try {
+                    Map<String, String> params = new LinkedHashMap<String, String>();
+                    params.put("query", query);
+                    params.put("timeout", HEAVY_QUERY_TIMEOUT);
+                    final String body = prometheusGet("query", params, HEAVY_READ_TIMEOUT_MS);
+                    heavyCache.put(query, new HeavyEntry(body, System.currentTimeMillis()));
+                    heavyFailedAt.remove(query);
+                    return body;
+                } catch (RuntimeException e) {
+                    heavyFailedAt.put(query, System.currentTimeMillis());
+                    throw e;
+                } finally {
+                    heavyInflight.remove(query);
+                }
+            }
+        });
+        heavyInflight.put(query, task);
+        heavyExecutor.execute(task);
+        return task;
+    }
+
+    /** 컨테이너 종료 시 백그라운드 스레드 정리 */
+    @Override
+    public void destroy() {
+        heavyExecutor.shutdownNow();
+    }
+
+    private String prometheusGet(String operation, Map<String, String> params, int readTimeoutMs) {
         if (StringUtils.isBlank(prometheusBaseUrl)) {
             log.error("[PROMETHEUS-PROXY] monitoring.prometheus.base-url 설정이 없습니다.");
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Prometheus 연결 설정이 없습니다.");
@@ -286,7 +401,7 @@ public class FlightPriceSnapshotCbcImpl implements FlightPriceSnapshotCbc {
             conn.setInstanceFollowRedirects(false);
             conn.setUseCaches(false);
             conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
-            conn.setReadTimeout(READ_TIMEOUT_MS);
+            conn.setReadTimeout(readTimeoutMs);
             conn.setRequestProperty("Accept", "application/json");   // 인바운드 쿠키/인증 헤더는 전달하지 않는다
             conn.setRequestProperty("Cache-Control", "no-store");
 
